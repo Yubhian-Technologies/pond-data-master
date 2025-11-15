@@ -9,6 +9,8 @@ import TechnicianSelection from "./pages/TechnicianSelection";
 import Dashboard from "./pages/Dashboard";
 import Farmers from "./pages/Farmers";
 import Samples from "./pages/Samples";
+import Invoice from "./pages/Invoice";
+import LabResults from "./pages/LabResults";
 import Reports from "./pages/Reports";
 import CMIS from "./pages/CMIS";
 import NotFound from "./pages/NotFound";
@@ -28,6 +30,8 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/farmers" element={<Farmers />} />
           <Route path="/samples" element={<Samples />} />
+          <Route path="/invoice" element={<Invoice />} />
+          <Route path="/lab-results" element={<LabResults />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/cmis" element={<CMIS />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
