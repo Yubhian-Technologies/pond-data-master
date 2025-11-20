@@ -16,6 +16,7 @@ export interface Farmer {
 export type SampleType = "water" | "soil" | "pl" | "adult";
 
 export interface Sample {
+  reportSubmission?: boolean;
   id: string;
   farmerId: string;
   farmerName: string;
@@ -48,6 +49,7 @@ export interface InvoiceItem {
 }
 
 export interface Invoice {
+   
   id: string;
   invoiceNumber: string;
   farmerId: string;

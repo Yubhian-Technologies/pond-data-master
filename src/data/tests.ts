@@ -15,7 +15,7 @@ export const availableTests = [
   { id: "vibrio", name: "Analysis Vibrio Plating (Green/Yellow)", price: 42.37, sampleType: "water", category: "WATER ANALYSIS" },
   { id: "pl_vibrio", name: "Analysis of PL/Animal Tissue Vibrio Plating (Green/Yellow)", price: 84.75, sampleType: "water", category: "WATER ANALYSIS" },
   // Rt-q PCR ANALYSIS
-  { id: "pl_general", name: "Post larvae General Analysis", price: 84.75, sampleType: "rtqpcr", category: "Rt-q PCR ANALYSIS" },
+  { id: "pl_general", name: "Post larvae General Analysis", price: 84.75, sampleType: "pl", category: "Rt-q PCR ANALYSIS" },
   { id: "pl_ehp", name: "Post larvae / Animal EHP", price: 847.46, sampleType: "rtqpcr", category: "Rt-q PCR ANALYSIS" },
   { id: "pl_wssv", name: "Post larvae / Animal WSSV", price: 847.46, sampleType: "rtqpcr", category: "Rt-q PCR ANALYSIS" },
   { id: "pl_vibrio_pcr", name: "Post larvae / Animal VIBRIO", price: 847.46, sampleType: "rtqpcr", category: "Rt-q PCR ANALYSIS" },

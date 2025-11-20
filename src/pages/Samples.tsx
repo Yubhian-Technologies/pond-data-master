@@ -238,6 +238,22 @@ useEffect(() => {
               </TableCell>
 
               {/* Actions */}
+              {sample.reportSubmission ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                >
+                  View Report
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/lab-results/${sample.id}`)}
+                >
+                  Generate Report
+                </Button>
+              )}
               <TableCell className="flex gap-2">
                 <Button
                   variant="outline"
@@ -258,6 +274,7 @@ useEffect(() => {
                   Edit
                 </Button>
               </TableCell>
+              
 
             </TableRow>
           ))

@@ -17,7 +17,6 @@ const LabResults = () => {
   const [searchParams] = useSearchParams();
   const [invoices] = useLocalStorage<Invoice[]>("invoices", []);
   const [reports, setReports] = useLocalStorage<Report[]>("reports", []);
-  
   const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [remarks, setRemarks] = useState("");
