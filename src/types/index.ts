@@ -19,12 +19,16 @@ export interface Sample {
   id: string;
   farmerId: string;
   farmerName: string;
-  sampleType: SampleType;
+  sampleType: SampleType[];
   dateOfCulture: string;
   quantity: number;
   createdAt: Date;
-  technicianId: string;
+  technicianName: string;
   locationId: string;
+  invoiceId?: string;
+  farmerPhone?: string;
+  total?: number;
+  pendingAmount?: number;
 }
 
 export interface Test {

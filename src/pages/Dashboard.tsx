@@ -2,12 +2,39 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Users, FlaskConical, FileText, TrendingUp } from "lucide-react";
+import { Search, Filter, Users, FlaskConical, FileText, TrendingUp, User } from "lucide-react";
+import { useUserSession } from "../contexts/UserSessionContext";
 
 const Dashboard = () => {
+  const { session, clearTechnician } = useUserSession();
+
+  const handleExit = () => {
+    clearTechnician(); // removes only technicianId & technicianName
+
+    // Redirect back to technician selection of same location
+    window.location.href = `/technicians/${session.locationId}`;
+  };
+
   return (
     <DashboardLayout>
       <div className="p-8">
+
+        {/* Technician Info Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-3">
+            <User className="w-6 h-6 text-primary" />
+            <h2 className="text-xl font-semibold">
+              {session.technicianName || "Technician"}
+            </h2>
+          </div>
+
+          {/* Exit Technician Button */}
+          <Button variant="destructive" onClick={handleExit}>
+            Exit Technician
+          </Button>
+        </div>
+
+        {/* Page Title */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
           <p className="text-muted-foreground">Overview of laboratory operations and analytics</p>
@@ -45,9 +72,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">284</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                +12 from last month
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">+12 from last month</p>
             </CardContent>
           </Card>
 
@@ -60,9 +85,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">1,428</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                This month
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">This month</p>
             </CardContent>
           </Card>
 
@@ -75,9 +98,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">892</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                This month
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">This month</p>
             </CardContent>
           </Card>
 
@@ -90,9 +111,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">₹3,45,680</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                +18% from last month
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">+18% from last month</p>
             </CardContent>
           </Card>
         </div>
@@ -101,10 +120,13 @@ const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest samples and reports from your laboratory</CardDescription>
+            <CardDescription>
+              Latest samples and reports from your laboratory
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+
               <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -117,7 +139,7 @@ const Dashboard = () => {
                 </div>
                 <span className="text-sm text-muted-foreground">2 hours ago</span>
               </div>
-              
+
               <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
@@ -130,9 +152,11 @@ const Dashboard = () => {
                 </div>
                 <span className="text-sm text-muted-foreground">5 hours ago</span>
               </div>
+
             </div>
           </CardContent>
         </Card>
+
       </div>
     </DashboardLayout>
   );

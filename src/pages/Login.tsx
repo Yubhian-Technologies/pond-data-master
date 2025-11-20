@@ -6,20 +6,35 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Beaker } from "lucide-react";
 import { toast } from "sonner";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "./firebase";
 
 const Login = () => {
   const navigate = useNavigate();
-  const [credentials, setCredentials] = useState({ username: "", password: "" });
+  const [credentials, setCredentials] = useState({ email: "", password: "" });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Simple admin validation (you can enhance this later)
-    if (credentials.username === "admin" && credentials.password === "admin123") {
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        credentials.email,
+        credentials.password
+      );
+
       toast.success("Login successful!");
       navigate("/locations");
-    } else {
-      toast.error("Invalid credentials");
+
+    } catch (error: any) {
+      console.error(error);
+      let message = "Login failed";
+
+      if (error.code === "auth/user-not-found") message = "User not found";
+      if (error.code === "auth/wrong-password") message = "Wrong password";
+      if (error.code === "auth/invalid-email") message = "Invalid email format";
+
+      toast.error(message);
     }
   };
 
@@ -37,19 +52,22 @@ const Login = () => {
             </CardDescription>
           </div>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
+            
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Enter username"
-                value={credentials.username}
-                onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                id="email"
+                type="email"
+                placeholder="Enter email"
+                value={credentials.email}
+                onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                 required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -61,12 +79,10 @@ const Login = () => {
                 required
               />
             </div>
+
             <Button type="submit" className="w-full">
               Sign In
             </Button>
-            <p className="text-xs text-center text-muted-foreground mt-4">
-              Demo: admin / admin123
-            </p>
           </form>
         </CardContent>
       </Card>

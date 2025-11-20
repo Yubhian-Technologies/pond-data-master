@@ -14,12 +14,15 @@ import LabResults from "./pages/LabResults";
 import Reports from "./pages/Reports";
 import CMIS from "./pages/CMIS";
 import NotFound from "./pages/NotFound";
-
+import InvoiceTemplate from "../src/data/template";
+import { UserSessionProvider } from "./contexts/UserSessionContext";
+import InvoiceView  from "./pages/InvoiceViewer";
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <UserSessionProvider> 
       <Toaster />
       <Sonner />
       <BrowserRouter>
@@ -32,12 +35,15 @@ const App = () => (
           <Route path="/samples" element={<Samples />} />
           <Route path="/invoice" element={<Invoice />} />
           <Route path="/lab-results" element={<LabResults />} />
+          <Route path="/invoice-template" element={<InvoiceTemplate />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/cmis" element={<CMIS />} />
+          <Route path="/invoice/:invoiceId/:locationId" element={<InvoiceView />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      </UserSessionProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
