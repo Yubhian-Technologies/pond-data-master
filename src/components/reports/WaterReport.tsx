@@ -2,7 +2,34 @@ import React, { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { doc, getDoc, collection, getDocs,query,where } from "firebase/firestore";
-import { db } from "../../pages/firebase"; // change path if different
+import { db } from "../../pages/firebase"; 
+import ADC from "@/assets/ADC.jpg";
+import AV from "@/assets/AV.jpg"
+import corrella from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alge/1-CHORELLA.png"
+import phacus from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alge/2-OOSYSTIS.jpg"
+import desmids from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alge/3-Eudorina.jpg"
+import scenedesmus from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alge/4-Scenedesmus.jpeg"
+import copepod from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/1-Copepods.webp";
+import rotifer from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/3-ROTIFERS.jpg";
+import naupilus from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/2-Nauplius.jpg"
+import spirulina from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/2.BLUE GREEN ALGE/SPIRULINA.jpg"
+import chaetoceros from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/3.DIATAM/2-Chaetoceros.jpg";
+import skeletonema from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/3.DIATAM/1-SKELETOEMA.jpg";
+import rhizosolenia from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/3.DIATAM/3-RHIZOSOLENIA.jpg";
+import anabaena from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green alge/2-Anabaena.gif";
+import oscillatoria from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green alge/3-Oscillatoria.jpg";
+import microcystis from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green alge/1-Microcystis.png";
+import coscinodiscus from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/1-coscinodiscus.jpg";
+import nitzchia from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/2-Navicula.jpg";
+import navicula from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/2-Navicula.jpg";
+import noctiluca from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Dainoflagellates/1-NOCTILUCA.jpg";
+import ceratium from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Dainoflagellates/3-CERATIUM.jpg";
+import dinophysis from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Dainoflagellates/2-Dinophysis.jpg";
+import gymnodinium from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Dainoflagellates/4-Gymnodinium.jpg";
+import zoothamnium from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Protozoa/3-Zoothamnium.jpg";
+import tintinnopsis from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Protozoa/2-Vorticella-1.jpg";
+import favelia from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Protozoa/1-Favella.jpg";
+
 
 interface FormData {
   farmerName: string;
@@ -49,6 +76,8 @@ interface FarmerData {
   phone?: string;
   farmerId?: string;
 }
+
+
 
 export default function WaterReport() {
   const { invoiceId, locationId } = useParams();
@@ -195,181 +224,303 @@ useEffect(() => {
         <div className="flex justify-between items-start mb-4 border-b-2 border-black pb-4">
           <div className="flex items-center gap-4">
             <div className="w-32 h-24">
-              <svg viewBox="0 0 120 80" className="w-full h-full">
-                <text x="10" y="35" fill="black" fontSize="48" fontWeight="bold" fontFamily="Arial">A</text>
-                <text x="40" y="35" fill="black" fontSize="48" fontWeight="bold" fontFamily="Arial">D</text>
-                <text x="70" y="35" fill="black" fontSize="48" fontWeight="bold" fontFamily="Arial">C</text>
-                <text x="5" y="55" fill="#333" fontSize="10" fontFamily="Arial">Aqua Diagnostic Centre</text>
-              </svg>
+              
+                
+                <div className="w-40 h-32 flex items-center justify-center"> 
+  <img 
+    src={ADC} 
+    alt="Aqua Diagnostic Centre" 
+    className="max-w-full max-h-full object-contain" 
+  />
+</div>
+            
             </div>
           </div>
           
           <div className="text-center flex-1">
-            <h1 className="text-3xl font-bold mb-2">వాటర్‌బేస్ ఆక్వా డయాగ్నోస్టిక్ సెంటర్</h1>
-            <p className="text-sm text-black">అదినారాష్ట్ర విజిని., కోటబాల్ కాంప్లెక్స., బిల్బర్స్ టౌజ్నపైట్ వదునుగా., జూబానాఫాహరీల</p>
+            <h1 className="text-3xl font-bold mb-2 text-blue-700">వాటర్‌బేస్ ఆక్వా డయాగ్నోస్టిక్ సెంటర్</h1>
+            <p className="text-xs text-black font-semibold">అదినారాష్ట్ర విజిని., కోటబాల్ కాంప్లెక్స., బిల్బర్స్ టౌజ్నపైట్ వదునుగా., జూబానాఫాహరీల</p>
             <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
-            <h2 className="text-2xl font-bold mt-2">Water Quality Report</h2>
+            <h2 className="text-2xl font-bold mt-2 text-red-600">Water Quality Report</h2>
           </div>
           
-          <div className="w-32 h-24">
-            <svg viewBox="0 0 120 80" className="w-full h-full">
-              <polygon points="20,20 50,10 80,20 90,50 80,70 50,80 20,70 10,50" fill="white" stroke="black" strokeWidth="2" />
-              <text x="35" y="50" fill="black" fontSize="24" fontWeight="bold" fontFamily="Arial">WB</text>
-            </svg>
-          </div>
+          <div className="w-48 h-32 flex items-center justify-center"> 
+  <img 
+    src={AV} 
+    alt="Aqua Diagnostic Centre" 
+    className="max-w-full max-h-full object-contain" 
+  />
+</div>
         </div>
 
         <div className="text-right mb-2">
           <span className="font-bold">Report Id:-</span>
         </div>
 
-        <div className="grid grid-cols-6 gap-0 text-sm mb-4 border border-black">
-          <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100">Farmer Name</div>
-          <div className="col-span-2 border-r border-black p-1">{formData.farmerName}</div>
-          <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100">Mobile</div>
-          <div className="col-span-1 border-r border-black p-1">{formData.mobile}</div>
-          <div className="col-span-1 p-1"><span className="font-semibold">S.D/D.O.C:</span> {formData.sdDoc}</div>
-          
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100">Farmer UID</div>
-          <div className="col-span-2 border-r border-t border-black p-1">{formData.farmerUID}</div>
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100">Source of Water</div>
-          <div className="col-span-1 border-r border-t border-black p-1">{formData.sourceOfWater}</div>
-          <div className="col-span-1 border-t border-black p-1"><span className="font-semibold">Sample Date:</span> {formData.sampleDate}</div>
-          
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100">Farmer Address</div>
-          <div className="col-span-2 border-r border-t border-black p-1">{formData.farmerAddress}</div>
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100">No.of Samples</div>
-          <div className="col-span-1 border-r border-t border-black p-1">{formData.noOfSamples}</div>
-          <div className="col-span-1 border-t border-black p-1"><span className="font-semibold">Report Date:</span> {formData.reportDate}</div>
-        </div>
+        <div className="grid grid-cols-10 gap-0 text-sm mb-4 border border-black">
 
-        <div className="mb-4">
-          <h3 className="text-center font-bold bg-white text-black py-1 text-sm border border-black">WATER ANALYSIS</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-black text-xs">
-              <thead>
-                <tr className="bg-gray-200">
-                  <th className="border border-black p-1" rowSpan={2}>Pond No.</th>
-                  <th className="border border-black p-1" rowSpan={2}>pH</th>
-                  <th className="border border-black p-1" rowSpan={2}>Salinity (PPT)</th>
-                  <th className="border border-black p-1" colSpan={2}>Alkalinity (PPM as CaCO₃)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Total Alkalinity</th>
-                  <th className="border border-black p-1" rowSpan={2}>Hardness (ppm as CaCO₃)</th>
-                  <th className="border border-black p-1" colSpan={4}>Minerals (ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Total Ammonia NH₃(ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Unionized Ammonia NH3(ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Hydrogen Sulfide H2S(ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Nitrite NO₂ (ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Nitrate NO₃ (ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Iron (Fe) (ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Chlorine (ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>DO (ppm)</th>
-                  <th className="border border-black p-1" rowSpan={2}>Total Dissolved Matter TDM (ppm)</th>
-                </tr>
-                <tr className="bg-gray-200">
-                  <th className="border border-black p-1">CO₃</th>
-                  <th className="border border-black p-1">HCO₃</th>
-                  <th className="border border-black p-1">Ca⁺⁺</th>
-                  <th className="border border-black p-1">Mg⁺⁺</th>
-                  <th className="border border-black p-1">Na⁺</th>
-                  <th className="border border-black p-1">K⁺</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ponds.map((pond) => (
-                  <tr key={pond.id}>
-                    <td className="border border-black p-1 text-center">{pond.pondNo}</td>
-                    <td className="border border-black p-1 text-center">{pond.pH}</td>
-                    <td className="border border-black p-1 text-center">{pond.salinity}</td>
-                    <td className="border border-black p-1 text-center">{pond.co3}</td>
-                    <td className="border border-black p-1 text-center">{pond.hco3}</td>
-                    <td className="border border-black p-1 text-center">{pond.alkalinity}</td>
-                    <td className="border border-black p-1 text-center">{pond.hardness}</td>
-                    <td className="border border-black p-1 text-center">{pond.ca}</td>
-                    <td className="border border-black p-1 text-center">{pond.mg}</td>
-                    <td className="border border-black p-1 text-center">{pond.na}</td>
-                    <td className="border border-black p-1 text-center">{pond.k}</td>
-                    <td className="border border-black p-1 text-center">{pond.totalAmmonia}</td>
-                    <td className="border border-black p-1 text-center">{pond.unionizedAmmonia}</td>
-                    <td className="border border-black p-1 text-center">{pond.h2s}</td>
-                    <td className="border border-black p-1 text-center">{pond.nitrite}</td>
-                    <td className="border border-black p-1 text-center">{pond.nitrate}</td>
-                    <td className="border border-black p-1 text-center">{pond.iron}</td>
-                    <td className="border border-black p-1 text-center">{pond.chlorine}</td>
-                    <td className="border border-black p-1 text-center">{pond.dissolvedOxygen}</td>
-                    <td className="border border-black p-1 text-center">{pond.totalDissolvedMatter}</td>
-                  </tr>
-                ))}
-                <tr className="bg-white font-semibold">
-                  <td className="border border-black p-1">Optimum Level</td>
-                  <td className="border border-black p-1 text-center">7.5-8.5</td>
-                  <td className="border border-black p-1 text-center">15-20</td>
-                  <td className="border border-black p-1 text-center">20-40</td>
-                  <td className="border border-black p-1 text-center">30-150</td>
-                  <td className="border border-black p-1 text-center">175-200</td>
-                  <td className="border border-black p-1 text-center">3000-5000</td>
-                  <td className="border border-black p-1 text-center">&gt;100</td>
-                  <td className="border border-black p-1 text-center">&gt;300</td>
-                  <td className="border border-black p-1 text-center">&gt;40</td>
-                  <td className="border border-black p-1 text-center">&gt;10</td>
-                  <td className="border border-black p-1 text-center">&lt;0.1-1.0</td>
-                  <td className="border border-black p-1 text-center">0-0.1</td>
-                  <td className="border border-black p-1 text-center">0-0.4</td>
-                  <td className="border border-black p-1 text-center">&lt;0.25</td>
-                  <td className="border border-black p-1 text-center">&lt;0.50</td>
-                  <td className="border border-black p-1 text-center">&lt;0.1</td>
-                  <td className="border border-black p-1 text-center">0-0.02</td>
-                  <td className="border border-black p-1 text-center">&gt;4</td>
-                  <td className="border border-black p-1 text-center">40-70</td>
-                </tr>
-              </tbody>
-            </table>
+  
+  <div className="col-span-1 border-r border-black p-0.5 text-start item-center font-semibold bg-gray-100">Farmer Name</div>
+  <div className="col-span-2 border-r border-black p-0.5 text-start item-center">{formData.farmerName}</div>
+  <div className="col-span-1 border-r border-black p-0.5 text-start item-center font-semibold bg-gray-100">Mobile</div>
+  <div className="col-span-1 border-r border-black p-0.5 text-start item-center">{formData.mobile}</div>
+  <div className="col-span-1 border-r border-black p-0.5 text-start item-center font-semibold bg-gray-100">S.D/D.O.C:</div>
+  <div className="col-span-1 border-r border-black p-0.5 text-start item-center">{formData.sdDoc}</div>
+  <div className="col-span-2 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">Sample Collection Time</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center">{formData.sampleCollectionTime}</div>
+
+   <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">Farmer UID</div>
+  <div className="col-span-2 border-r border-t border-black p-0.5 text-start item-center">{formData.farmerUID}</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">Source of Water</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center">{formData.sourceOfWater}</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">Sample Date:</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center">{formData.sampleDate}</div>
+  <div className="col-span-2 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">Sample Time</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center">{formData.sampleTime}</div>
+
+  
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">Farmer Address</div>
+  <div className="col-span-2 border-r border-t border-black p-0.5 text-start item-center">{formData.farmerAddress}</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">No.of Samples</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center">{formData.noOfSamples}</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">Report Date:</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center">{formData.reportDate}</div>
+  <div className="col-span-2 border-r border-t border-black p-0.5 text-start item-center font-semibold bg-gray-100">Report Time</div>
+  <div className="col-span-1 border-r border-t border-black p-0.5 text-start item-center">{formData.reportTime}</div>
+
+
+</div>
+
+        <div className="mb-6">
+          
+          <div className="grid grid-cols-1 lg:grid-cols-12  mt-3">
+            <div className="lg:col-span-10">
+              <h4 className="text-center font-bold text-xs  bg-gray-200 border-t border-black py-1 text-red-600">
+                WATER ANALYSIS
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-black text-xs">
+                  <thead>
+                    <tr className="bg-gray-200">
+                      <th className="border border-black p-1" rowSpan={2}>Pond No.</th>
+                      <th className="border border-black p-1" rowSpan={2}>pH</th>
+                      <th className="border border-black p-1" rowSpan={2}>Salinity (PPT)</th>
+                      <th className="border border-black p-1" colSpan={2}>Alkalinity (PPM as CaCO₃)</th>
+                      <th className="border border-black p-1" rowSpan={2}>Total Alkalinity</th>
+                      <th className="border border-black p-1" rowSpan={2}>Hardness (ppm as CaCO₃)</th>
+                      <th className="border border-black p-1" colSpan={4}>Minerals (ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>Total Ammonia NH₃(ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>Unionized Ammonia NH3(ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>H₂S(ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>Nitrite NO₂ (ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>Nitrate NO₃ (ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>Iron (Fe) (ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>Chlorine (ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>DO (ppm)</th>
+                      <th className="border border-black p-1" rowSpan={2}>TDM (ppm)</th>
+                    </tr>
+                    <tr className="bg-gray-200">
+                      <th className="border border-black p-1">CO₃</th>
+                      <th className="border border-black p-1">HCO₃</th>
+                      <th className="border border-black p-1">Ca⁺⁺</th>
+                      <th className="border border-black p-1">Mg⁺⁺</th>
+                      <th className="border border-black p-1">Na⁺</th>
+                      <th className="border border-black p-1">K⁺</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ponds.map((pond) => (
+                      <tr key={pond.id}>
+                        <td className="border border-black p-1 text-center font-medium">{pond.pondNo}</td>
+                        <td className="border border-black p-1 text-center">{pond.pH}</td>
+                        <td className="border border-black p-1 text-center">{pond.salinity}</td>
+                        <td className="border border-black p-1 text-center">{pond.co3}</td>
+                        <td className="border border-black p-1 text-center">{pond.hco3}</td>
+                        <td className="border border-black p-1 text-center">{pond.alkalinity}</td>
+                        <td className="border border-black p-1 text-center">{pond.hardness}</td>
+                        <td className="border border-black p-1 text-center">{pond.ca}</td>
+                        <td className="border border-black p-1 text-center">{pond.mg}</td>
+                        <td className="border border-black p-1 text-center">{pond.na}</td>
+                        <td className="border border-black p-1 text-center">{pond.k}</td>
+                        <td className="border border-black p-1 text-center">{pond.totalAmmonia}</td>
+                        <td className="border border-black p-1 text-center">{pond.unionizedAmmonia}</td>
+                        <td className="border border-black p-1 text-center">{pond.h2s}</td>
+                        <td className="border border-black p-1 text-center">{pond.nitrite}</td>
+                        <td className="border border-black p-1 text-center">{pond.nitrate}</td>
+                        <td className="border border-black p-1 text-center">{pond.iron}</td>
+                        <td className="border border-black p-1 text-center">{pond.chlorine}</td>
+                        <td className="border border-black p-1 text-center">{pond.dissolvedOxygen}</td>
+                        <td className="border border-black p-1 text-center">{pond.totalDissolvedMatter}</td>
+                      </tr>
+                    ))}
+                    <tr className=" font-bold">
+                      <td className="border border-black p-1 text-red-600">Optimum</td>
+                      <td className="border border-black p-1 text-center text-red-500">7.5-8.5</td>
+                      <td className="border border-black p-1 text-center text-red-500">15-20</td>
+                      <td className="border border-black p-1 text-center text-red-500">20-40</td>
+                      <td className="border border-black p-1 text-center text-red-500">30-150</td>
+                      <td className="border border-black p-1 text-center text-red-500">175-200</td>
+                      <td className="border border-black p-1 text-center text-red-500">3000-5000</td>
+                      <td className="border border-black p-1 text-center text-red-500">&gt;100</td>
+                      <td className="border border-black p-1 text-center text-red-500">&gt;300</td>
+                      <td className="border border-black p-1 text-center text-red-500">&gt;40</td>
+                      <td className="border border-black p-1 text-center text-red-500">&gt;10</td>
+                      <td className="border border-black p-1 text-center text-red-500">&lt;0.1-1.0</td>
+                      <td className="border border-black p-1 text-center text-red-500">0-0.1</td>
+                      <td className="border border-black p-1 text-center text-red-500">0-0.4</td>
+                      <td className="border border-black p-1 text-center text-red-500">&lt;0.25</td>
+                      <td className="border border-black p-1 text-center text-red-500">&lt;0.50</td>
+                      <td className="border border-black p-1 text-center text-red-500">&lt;0.1</td>
+                      <td className="border border-black p-1 text-center text-red-500">0-0.02</td>
+                      <td className="border border-black p-1 text-center text-red-500">&gt;4</td>
+                      <td className="border border-black p-1 text-center text-red-500">40-70</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2">
+              <h4 className="text-center font-bold text-xs  bg-gray-200 border border-black py-1 text-red-600">
+                BACTERIOLOGY
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-black  text-xs font-medium">
+                  <thead>
+                    <tr className="bg-gray-200 ">
+                      <th className="h-[39px] border border-black"  colSpan={4} >Vibrio CFU /ml</th>
+                    </tr>
+                    <tr className="bg-gray-200 mt-3 ">
+                      <th className="border border-black p-1" rowSpan={4}>Yellow Colonies</th>
+                      <th className="border border-black p-1" rowSpan={4}>Green Colonies<br/></th>
+                      <th className="border border-black p-1" rowSpan={4}>TPC<br/></th>
+                      
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ponds.map((pond) => (
+                      <tr key={pond.id}>
+                        <td className="border border-black p-1 text-center">{pond.pondNo}</td>
+                        <td className="border border-black p-1 text-center">
+                          {/* {pond.totalBacteria || "-"} */}
+                        </td>
+                        <td className="border border-black p-1 text-center">
+                          {/* {pond.vibrio || "Nil"} */}
+                        </td>
+                        <td>
+
+                        </td>
+                        
+                      </tr>
+                    ))}
+                    <tr className=" font-bold h-[40px]">
+                      <td className="border border-black p-1 text-center text-red-500">&lt;300</td>
+                      <td className="border border-black p-1 text-center text-red-500">&lt;10</td>
+                      <td className="border border-black p-1 text-center text-red-500">&lt;300</td>
+                      
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="mb-4">
-          <h3 className="text-center font-bold bg-white text-black py-1 text-sm border border-black">PLANKTON ANALYSIS</h3>
-          <div className="border border-black">
-            <table className="w-full border-collapse text-xs">
-              <thead>
+        <div className="border border-black  scale-1 origin-top-left mb-4">
+          <h3 className="text-center font-bold bg-white text-red-500 py-1 text-sm border border-black ">PLANKTON ANALYSIS</h3>
+          <div className="border border-black overflow-x-auto ">
+            <table className="w-full border-collapse text-xs ">
+              <thead >
                 <tr className="bg-gray-100">
-                  <th className="border border-black p-1 w-16">Pond No.</th>
-                  <th className="border border-black p-2" colSpan={4}>USEFUL PLANKTON - ఉపయోగకరమైన పలాంక్టన్లు</th>
-                  <th className="border border-black p-2" colSpan={9}>HARMFUL PLANKTON - హానికరమైన పలాంక్టన్లు</th>
+                  <th className="border border-black p-1 ">Pond No.</th>
+                  <th className="border border-black p-0.5 text-green-700 text-sm" colSpan={11}>USEFUL PLANKTON - ఉపయోగకరమైన పలాంక్టన్లు</th>
+                  <th className="border border-black p-0.5 text-red-700 text-sm" colSpan={14}>HARMFUL PLANKTON - హానికరమైన పలాంక్టన్లు</th>
                 </tr>
                 <tr className="bg-gray-100">
                   <th className="border border-black p-1"></th>
-                  <th className="border border-black p-1 text-center" colSpan={4}>
+                  <th className="border border-black p-1 text-center w-[100px]" colSpan={4}>
                     <div className="font-bold mb-1">Phyto Plankton</div>
                   </th>
                   <th className="border border-black p-1 text-center" colSpan={3}>
                     <div className="font-bold mb-1">Zooplankton</div>
                   </th>
-                  <th className="border border-black p-1 text-center" colSpan={2}>
+                  <th className="border border-black p-1 text-center" colSpan={1}>
                     <div className="font-bold mb-1">B.G Algae</div>
                   </th>
-                  <th className="border border-black p-1 text-center" colSpan={2}>
+                  <th className="border border-black p-1 text-center" colSpan={3}>
                     <div className="font-bold mb-1">Dalton</div>
                   </th>
-                  <th className="border border-black p-1 text-center" colSpan={2}>
+                  <th className="border border-black p-1 text-center" colSpan={3}>
                     <div className="font-bold mb-1">Blue Green Algae</div>
+                  </th>
+                  <th className="border border-black p-1 text-center" colSpan={3}>
+                    <div className="font-bold mb-1">Dalton</div>
+                  </th>
+                  <th className="border border-black p-1 text-center" colSpan={4}>
+                    <div className="font-bold mb-1">Dinoflagellate</div>
+                  </th>
+                  <th className="border border-black p-1 text-center" colSpan={4}>
+                    <div className="font-bold mb-1">Protozoa</div>
                   </th>
                 </tr>
                 <tr className="bg-gray-50">
                   <th className="border border-black p-1"></th>
-                  <th className="border border-black p-1">Phacus</th>
-                  <th className="border border-black p-1">Chlorella</th>
-                  <th className="border border-black p-1">Desmids</th>
-                  <th className="border border-black p-1">Scenedesmus</th>
-                  <th className="border border-black p-1">Copepod</th>
-                  <th className="border border-black p-1">Rotifer</th>
-                  <th className="border border-black p-1">Nauplius</th>
-                  <th className="border border-black p-1">Spirulina</th>
-                  <th className="border border-black p-1">Chaleoceras</th>
-                  <th className="border border-black p-1">Rhizoselenia</th>
-                  <th className="border border-black p-1">Anabena</th>
-                  <th className="border border-black p-1">Oscillatoria</th>
-                  <th className="border border-black p-1">Microcystis</th>
+                  <th className="border border-black p-0.5 text-xs">Phacus</th>
+                  <th className="border border-black p-0.5 text-xs">Chlorella</th>
+                  <th className="border border-black p-0.5 text-xs">Desmids</th>
+                  <th className="border border-black p-0.5 text-xs">Scenedesmus</th>
+                  <th className="border border-black p-0.5 text-xs">Copepod</th>
+                  <th className="border border-black p-0.5 text-xs">Rotifer</th>
+                  <th className="border border-black p-0.5 text-xs">Nauplius</th>
+                  <th className="border border-black p-0.5 text-xs">Spirulina</th>
+                  <th className="border border-black p-0.5 text-xs">Chaleoceras</th>
+                  <th className="border border-black p-0.5 text-xs">Rhizoselenia</th>
+                  <th className="border border-black p-0.5 text-xs">Anabena</th>
+                  <th className="border border-black p-0.5 text-xs">Oscillatoria</th>
+                  <th className="border border-black p-0.5 text-xs">Microcystis</th>
+                  <th className="border border-black p-0.5 text-xs">coscinodiscus</th>
+                  <th className="border border-black p-0.5 text-xs">nitzchia</th>
+                  <th className="border border-black p-0.5 text-xs">navicula</th>
+                  <th className="border border-black p-0.5 text-xs">noctiluca</th>
+                  <th className="border border-black p-0.5 text-xs">ceratium</th>
+                  <th className="border border-black p-0.5 text-xs">dinophysis</th>
+                  <th className="border border-black p-0.5 text-xs">gymnodinium</th>
+                  <th className="border border-black p-0.5 text-xs">zoothamnium</th>
+                  <th className="border border-black p-0.5 text-xs">tintinnopsis</th>
+                  <th className="border border-black p-0.5 text-xs">favelia</th>
+                  <th className="border border-black p-0.5 text-xs">coscinodiscus</th>
+                  
+                </tr>
+
+                <tr className="bg-gray-50">
+                  <th className="border border-black p-1"></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={phacus} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={corrella} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={desmids} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img  src={scenedesmus} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={copepod} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={rotifer} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={naupilus} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={spirulina} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={chaetoceros} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={skeletonema} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={rhizosolenia} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={anabaena} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={oscillatoria} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={coscinodiscus} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={nitzchia} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={naupilus} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={noctiluca} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={ceratium} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={dinophysis} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={gymnodinium} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={zoothamnium} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={tintinnopsis} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={favelia} alt="" /></th>
+                  <th className="border border-black p-0.5 text-xs"><img className="w-12 h-12" src={coscinodiscus} alt="" /></th>
+                  {/* <th className="border border-black p-0.5 text-xs">Microcystis</th> */}
+
+
                 </tr>
               </thead>
               <tbody>
