@@ -13,7 +13,10 @@ export interface Farmer {
   createdAt: Date;
 }
 
-export type SampleType = "water" | "soil" | "pl" | "adult";
+export interface SampleType {
+  type: "water" | "soil" | string; // or other types if needed
+  count: string; // count comes as a string in your data
+}
 
 export interface Sample {
   reportSubmission?: boolean;
@@ -50,7 +53,7 @@ export interface InvoiceItem {
 
 export interface Invoice {
    
-  id: string;
+  docId: string;
   invoiceNumber: string;
   farmerId: string;
   farmerName: string;
@@ -65,6 +68,13 @@ export interface Invoice {
   createdAt: Date;
   technicianId: string;
   locationId: string;
+  dateOfCulture: string;
+  sampleType: SampleType[];
+  reportsProgress: {
+    soil: "pending" | "completed";
+    water: "pending" | "completed";
+  };
+ 
 }
 
 export interface TestResult {

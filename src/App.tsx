@@ -17,6 +17,8 @@ import NotFound from "./pages/NotFound";
 import InvoiceTemplate from "../src/data/template";
 import { UserSessionProvider } from "./contexts/UserSessionContext";
 import InvoiceView  from "./pages/InvoiceViewer";
+import SoilReport from "../../pond-data-master/src/components/reports/SoilReport";
+import WaterReport from "../../pond-data-master/src/components/reports/WaterReport"
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -34,7 +36,10 @@ const App = () => (
           <Route path="/farmers" element={<Farmers />} />
           <Route path="/samples" element={<Samples />} />
           <Route path="/invoice" element={<Invoice />} />
-          <Route path="/lab-results" element={<LabResults />} />
+          <Route path="/lab-results/:invoiceId" element={<LabResults />} />
+          <Route path="/soil-report/:invoiceId/:locationId" element={<SoilReport />} />
+          <Route path="/water-report/:invoiceId/:locationId" element={<WaterReport />} />
+
           <Route path="/invoice-template" element={<InvoiceTemplate />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/cmis" element={<CMIS />} />
