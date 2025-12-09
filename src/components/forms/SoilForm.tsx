@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { db } from "../../pages/firebase"; // update path if needed
 import { collection, doc, getDoc, setDoc,updateDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { useUserSession } from "../../contexts/UserSessionContext";
 
 interface FormData {
   farmerName: string;
@@ -76,7 +77,10 @@ export default function SoilForm({
       remarks: ''
     }
   ]);
-
+  const [soilType, setSoilType] = useState("");
+const [sourceOfSoil, setSourceOfSoil] = useState("");
+  const { session } = useUserSession();
+  let technicianName = session.technicianName;
   const [currentPondIndex, setCurrentPondIndex] = useState(0);
 
   // Derived value: total number of samples
@@ -97,6 +101,7 @@ export default function SoilForm({
 
   // Fetch farmer details from invoice
   useEffect(() => {
+    
     const fetchFarmerFromInvoice = async () => {
       if (!invoice || !locationId) return;
 
@@ -114,6 +119,9 @@ export default function SoilForm({
 
         setFormData(prev => ({
           ...prev,
+          cmisBy : technicianName,
+          checkedBy: technicianName,
+          reportedBy: technicianName,
           farmerName: farmer.name || "",
           farmerUID: farmer.farmerUID || "",
           farmerAddress: (farmer.address || "") + ", " + (farmer.city || ""),
@@ -131,30 +139,60 @@ export default function SoilForm({
   }, [invoice, locationId]);
 
   // Save a single pond/sample to Firestore
-  const savePondReport = async (pondData: Sample, sampleIndex: number) => {
-    if (!locationId || !invoiceId) return;
-    
+  const savePondReport = async (
+  pondData: Sample,
+  sampleIndex: number,
+  sourceOfSoil: string,
+  soilType: string,
+  technicianName: string
+) => {
+  if (!locationId || !invoiceId) return;
 
-    try {
-      const samplesCollectionRef = collection(
-        db,
-        "locations",
-        locationId,
-        "reports",
-        invoiceId,
-        "soil samples",
-      );
-      const sampleDocRef = doc(samplesCollectionRef, `sample_${sampleIndex + 1}`);
-      await setDoc(sampleDocRef, pondData);
-      console.log(`Sample ${sampleIndex + 1} saved successfully`);
-    } catch (err) {
-      console.error("Error saving sample report:", err);
-    }
-  };
+  try {
+    // 1️⃣ Save HEADER INFORMATION at: locations/{id}/reports/{invoiceId}
+    const reportHeaderRef = doc(
+      db,
+      "locations",
+      locationId,
+      "reports",
+      invoiceId
+    );
+
+    await setDoc(
+      reportHeaderRef,
+      {
+        sourceOfSoil,
+        soilType,
+        technicianName,
+      },
+      { merge: true } // prevents overwriting existing data
+    );
+
+    // 2️⃣ Save SAMPLE DATA inside subcollection
+    const samplesCollectionRef = collection(
+      db,
+      "locations",
+      locationId,
+      "reports",
+      invoiceId,
+      "soil samples"
+    );
+
+    const sampleDocRef = doc(samplesCollectionRef, `sample_${sampleIndex + 1}`);
+    await setDoc(sampleDocRef, pondData);
+
+    console.log(
+      `Sample ${sampleIndex + 1} & report metadata saved successfully`
+    );
+  } catch (err) {
+    console.error("Error saving sample report:", err);
+  }
+};
+
 
   // Handle next pond/sample
   const handleNextPond = async () => {
-    await savePondReport(samples[currentPondIndex], currentPondIndex);
+    await savePondReport(samples[currentPondIndex],currentPondIndex,sourceOfSoil,soilType,technicianName)
     if (currentPondIndex < totalSamples - 1) {
       if (!samples[currentPondIndex + 1]) {
         setSamples(prev => [
@@ -182,7 +220,13 @@ export default function SoilForm({
   const handleSubmit = async () => {
   try {
     // Save the last pond
-    await savePondReport(samples[currentPondIndex], currentPondIndex);
+    await savePondReport(
+  samples[currentPondIndex],
+  currentPondIndex,
+  sourceOfSoil,
+  soilType,
+  technicianName
+);
 
     // Mark water report as completed in invoice.progressReports
     if (invoiceId && locationId) {

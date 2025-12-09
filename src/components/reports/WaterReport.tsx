@@ -30,7 +30,6 @@ import zoothamnium from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Protozoa/3
 import tintinnopsis from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Protozoa/2-Vorticella-1.jpg";
 import favelia from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Protozoa/1-Favella.jpg";
 
-
 interface FormData {
   farmerName: string;
   mobile: string;
@@ -44,6 +43,7 @@ interface FormData {
   noOfSamples: string;
   reportDate: string;
   reportTime: string;
+  technicianName: string;
 }
 
 interface Pond {
@@ -69,6 +69,7 @@ interface Pond {
   dissolvedOxygen: string;
   totalDissolvedMatter: string;
 }
+
 interface FarmerData {
   address?: string;
   soilType?: string;
@@ -76,8 +77,6 @@ interface FarmerData {
   phone?: string;
   farmerId?: string;
 }
-
-
 
 export default function WaterReport() {
   const { invoiceId, locationId } = useParams();
@@ -95,119 +94,104 @@ export default function WaterReport() {
     noOfSamples: "",
     reportDate: "",
     reportTime: "",
+    technicianName: "",
   });
 
   const [ponds, setPonds] = useState<Pond[]>([]);
-  const [samples, setSamples] = useState<any[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
-  // Convert timestamp
-  const formatDate = (ts: any) => {
-    if (!ts) return "";
-    const date = ts.toDate();
-    return date.toISOString().split("T")[0]; // YYYY-MM-DD
-  };
+  const formatDate = (ts: any) => ts?.toDate().toISOString().split("T")[0] || "";
+  const formatTime = (ts: any) => ts?.toDate().toTimeString().split(" ")[0] || "";
 
-  const formatTime = (ts: any) => {
-    if (!ts) return "";
-    const date = ts.toDate();
-    return date.toTimeString().split(" ")[0]; // HH:MM:SS
-  };
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      if (!invoiceId || !locationId) return;
-      const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
-      const reportSnap = await getDoc(reportRef);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (!invoiceId || !locationId) return;
 
-      let technicianName = "";
-      let sourceOfWater = "";
+        // GET REPORT TO FETCH technicianId
+        const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
+        const reportSnap = await getDoc(reportRef);
 
-      if (reportSnap.exists()) {
-        technicianName = reportSnap.data()?.technicianName || "";
-        sourceOfWater = reportSnap.data()?.sourceOfWater || "";
-      }
+        let technicianName = "";
+        let sourceOfWater = ""; 
+        if (reportSnap.exists()) 
+          { technicianName = reportSnap.data()?.technicianName || "";
+             sourceOfWater = reportSnap.data()?.sourceOfWater || ""; 
+            }
 
-      // Step 1: Query invoices where invoiceId field matches
-      const invoicesRef = collection(db, "locations", locationId, "invoices");
-      const q = query(invoicesRef, where("id", "==", invoiceId));
-      const snapshot = await getDocs(q);
+        // GET INVOICE DOCUMENT
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+        const q = query(invoicesRef, where("id", "==", invoiceId));
+        const snapshot = await getDocs(q);
 
-      if (snapshot.empty) {
-        console.log("Invoice not found for invoiceId:", invoiceId);
-        return;
-      }
+        if (!snapshot.empty) {
+          const invoiceDoc = snapshot.docs[0];
+          const data = invoiceDoc.data();
 
-      const invoiceDoc = snapshot.docs[0];       // first matched document
-      const docId = invoiceDoc.id;               // actual Firestore document ID
-      const data = invoiceDoc.data();
-      const waterCount =
-    data.sampleType?.filter((s: any) => s.type === "water")
-                 ?.reduce((sum: number, item: any) => sum + Number(item.count), 0) || 0;
+          const waterCount =
+            data.sampleType?.filter((s: any) => s.type === "water")
+              ?.reduce((sum: number, item: any) => sum + Number(item.count), 0) || 0;
 
-      // Step 2: Set Invoice Form Data
-      setFormData((prev) => ({
-        ...prev,
-        sdDoc: data.dateOfCulture || "",
-        farmerName: data.farmerName || "",
-        sampleCollectionTime: data.sampleCollectionTime || "",
-        sampleDate: formatDate(data.createdAt),
-        sampleTime: formatTime(data.createdAt),
-        farmerAddress: data.farmerAddress || "",
-        noOfSamples: waterCount,
-        reportDate: new Date().toISOString().split("T")[0],
-        reportTime: formatTime(data.updatedAt),
-        technicianName: technicianName,
-        sourceOfWater: sourceOfWater
+          setFormData((prev) => ({
+            ...prev,
+            sdDoc: data.dateOfCulture || "",
+            farmerName: data.farmerName,
+            sampleCollectionTime: data.sampleCollectionTime,
+            sampleDate: formatDate(data.createdAt),
+            sampleTime: formatTime(data.createdAt),
+            farmerAddress: data.farmerAddress,
+            noOfSamples: waterCount,
+            reportDate: new Date().toISOString().split("T")[0],
+            reportTime: formatTime(data.updatedAt),
+            technicianName: technicianName,
+            sourceOfWater: sourceOfWater,
+          }));
 
-      }));
-      if (data.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
-          const farmerSnap = await getDoc(farmerRef);
-
-          if (farmerSnap.exists()) {
-            const farmerData = farmerSnap.data() as FarmerData;
-
-            setFormData(prev => ({
-              ...prev,
-              farmerUID: farmerData.farmerId || "",
-              farmerAddress: farmerData.address || "",
-              mobile: farmerData.phone || "",
-            }));
+          // FETCH FARMER DATA
+          if (data.farmerId) {
+            const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
+            const farmerSnap = await getDoc(farmerRef);
+            if (farmerSnap.exists()) {
+              const farmerData = farmerSnap.data() as FarmerData;
+              setFormData((prev) => ({
+                ...prev,
+                farmerUID: farmerData.farmerId || "",
+                farmerAddress: farmerData.address || "",
+                mobile: farmerData.phone || "",
+              }));
+            }
           }
         }
 
-      // Step 3: Fetch soil samples subcollection from reports
-      const samplesRef = collection(
-        db,
-        "locations",
-        locationId,
-        "reports",
-        invoiceId,
-        "water samples"
-      );
+        // FETCH WATER SAMPLES (PONDS)
+        const samplesRef = collection(
+          db,
+          "locations",
+          locationId,
+          "reports",
+          invoiceId,
+          "water samples"
+        );
 
-      const sampleSnap = await getDocs(samplesRef);
+        const sampleSnap = await getDocs(samplesRef);
 
-      const list = sampleSnap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
+        const list = sampleSnap.docs.map((d) => ({
+          id: parseInt(d.id),
+          ...d.data(),
+        })) as Pond[];
 
-      setSamples(list);
-    } catch (error) {
-      console.error("Error loading report:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        setPonds(list);
+      } catch (error) {
+        console.error("Error loading report:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchData();
-}, [invoiceId, locationId]);
+    fetchData();
+  }, [invoiceId, locationId]);
 
   return (
     <>

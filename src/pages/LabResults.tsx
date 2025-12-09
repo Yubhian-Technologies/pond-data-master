@@ -8,6 +8,7 @@ import { collection, query, where, getDocs, doc, updateDoc } from "firebase/fire
 import { db } from "./firebase";
 import { useUserSession } from "../contexts/UserSessionContext";
 
+
 export default function LabResults() {
   const [invoice, setInvoice] = useState(null);
   const { session } = useUserSession();
@@ -34,6 +35,7 @@ export default function LabResults() {
 
       const fullData = { ...docData, docId };
       setInvoice(fullData);
+      console.log(fullData);
 
       startFlow(fullData);
     } else {
@@ -43,37 +45,49 @@ export default function LabResults() {
   };
 
   const startFlow = (data) => {
-    const types = data.sampleType || [];
-    const soil = types.find((t) => t.type === "soil");
-    const water = types.find((t) => t.type === "water");
-    const progress = data.reportsProgress || {};
+  const types = data.sampleType || [];
 
-    if (progress.soil === "completed" && progress.water === "completed") {
-      setStep("waterReport");
-      return;
-    }
+  const soil = types.find((t) => (t?.type ?? "").toLowerCase().trim() === "soil");
+const water = types.find((t) => (t?.type ?? "").toLowerCase().trim() === "water");
 
-    if (progress.soil === "completed" && water) {
-      setCurrentType("water");
-      setStep("waterForm");
-      return;
-    }
 
-    if (progress.water === "completed" && soil) {
-      setCurrentType("soil");
-      setStep("soilForm");
-      return;
-    }
+  const progress = data.reportsProgress || {};
 
-    // default always start with soil
-    if (soil) {
-      setCurrentType("soil");
-      setStep("soilForm");
-    } else if (water) {
-      setCurrentType("water");
-      setStep("waterForm");
-    }
-  };
+  console.log("soil:", soil, "water:", water, "progress:", progress);
+
+  if (progress.soil === "completed" && progress.water === "completed") {
+    setStep("waterReport");
+    return;
+  }
+
+  if (progress.soil === "completed" && water) {
+    setCurrentType("water");
+    setStep("waterForm");
+    return;
+  }
+
+  if (progress.water === "completed" && soil) {
+    setCurrentType("soil");
+    setStep("soilForm");
+    return;
+  }
+
+  if (soil) {
+    setCurrentType("soil");
+    setStep("soilForm");
+    return;
+  }
+
+  if (water) {
+    setCurrentType("water");
+    setStep("waterForm");
+    return;
+  }
+
+  // fallback
+  setStep("error");
+};
+
 
   const handleSoilSubmit = async () => {
     const maxCount = Number(invoice.sampleType.find((t) => t.type === "soil")?.count);

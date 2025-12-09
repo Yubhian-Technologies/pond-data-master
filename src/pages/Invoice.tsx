@@ -143,50 +143,95 @@ const InvoicePage = () => {
   const { total, groupedItems } = calculateGroupedTotal();
 const handleGenerateInvoice = async () => {
   if (total === 0) {
-    toast({ title: "Error", description: "Please select at least one test", variant: "destructive" });
+    toast({
+      title: "Error",
+      description: "Please select at least one test",
+      variant: "destructive"
+    });
     return;
   }
 
   if (!paymentMode) {
-    toast({ title: "Error", description: "Please select a payment mode", variant: "destructive" });
+    toast({
+      title: "Error",
+      description: "Please select a payment mode",
+      variant: "destructive"
+    });
     return;
   }
 
+  // format date
   const today = new Date();
-  const formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(today.getMonth()+1).toString().padStart(2,"0")}-${today.getFullYear()}`;
-  const selectedSampleTypes = Object.keys(groupedItems);
+  const formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(today.getMonth()+1)
+    .toString().padStart(2,"0")}-${today.getFullYear()}`;
+
   const invoiceId = generateInvoiceId();
-  // Prepare invoice data to store
+
+  // ------------------------------------------
+  // ⭐ IMPORTANT: Convert sampleSummary to the format LabResults expects
+  // ------------------------------------------
+  const sampleType = sampleSummary.map(s => ({
+    type: s.type.toLowerCase(),
+    count: s.count
+  }));
+
+  // ------------------------------------------
+  // ⭐ Create default reportsProgress for each selected type
+  // ------------------------------------------
+  const reportsProgress: { [key: string]: string } = {};
+  sampleSummary.forEach(s => {
+    reportsProgress[s.type.toLowerCase()] = "pending";
+  });
+
+  // ------------------------------------------
+  // ⭐ Final invoice object to save in Firestore
+  // ------------------------------------------
   const invoiceData = {
-    id : invoiceId,
+    id: invoiceId,
     farmerName,
     farmerId,
     farmerPhone: mobile,
     locationId,
     technicianName,
     technicianId,
-    dateOfCulture, // string, e.g., "2025-11-01"
+    dateOfCulture,
     tests: groupedItems,
     total,
     village,
     mobile,
     paymentMode,
-    sampleType: selectedSampleTypes, // your array of sample types
+
+    // NEW FIXED FIELDS REQUIRED BY LabResults
+    sampleType,         // [{ type: 'soil', count: 2 }, { type: 'water', count: 1 }]
+    reportsProgress,    // { soil: "pending", water: "pending" }
+
     createdAt: serverTimestamp(),
   };
 
   try {
-    // Add invoice to Firestore
-    const docRef = await addDoc(collection(db, "locations", locationId, "invoices"), invoiceData);
+    // Add to Firestore
+    await addDoc(
+      collection(db, "locations", locationId, "invoices"),
+      invoiceData
+    );
 
-    // Navigate to invoice template with state
-    navigate("/invoice-template", { state: { ...invoiceData, formattedDate } });
+    // Navigate to invoice template
+    navigate("/invoice-template", {
+      state: { ...invoiceData, formattedDate }
+    });
+
     toast({ title: "Success", description: "Invoice generated successfully!" });
+
   } catch (error) {
     console.error("Error adding invoice: ", error);
-    toast({ title: "Error", description: "Failed to generate invoice", variant: "destructive" });
+    toast({
+      title: "Error",
+      description: "Failed to generate invoice",
+      variant: "destructive"
+    });
   }
 };
+
 
   return (
     <DashboardLayout>
