@@ -3,7 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
- import {query, orderBy } from "firebase/firestore";
+import { query, orderBy, where } from "firebase/firestore";
 import {
   Card,
   CardContent,
@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, User } from "lucide-react";
+import { Plus, Search, User, Edit } from "lucide-react";
 import { toast } from "sonner";
 
 import { db } from "./firebase";
@@ -36,10 +36,12 @@ import {
   collection,
   getDocs,
   Timestamp,
+  doc,
+  updateDoc,
+  getDoc,
 } from "firebase/firestore";
 
 import { useUserSession } from "../contexts/UserSessionContext";
-import { doc, getDoc } from "firebase/firestore";
 
 interface Farmer {
   id: string;
@@ -64,31 +66,33 @@ const Farmers = () => {
   const { session } = useUserSession();
 
   const [open, setOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editFarmerId, setEditFarmerId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [farmers, setFarmers] = useState<Farmer[]>([]);
 
   const [locationCode, setLocationCode] = useState<string | null>(null);
 
-useEffect(() => {
-  const fetchLocationCode = async () => {
-    if (!session.locationId) return; // No location selected
+  useEffect(() => {
+    const fetchLocationCode = async () => {
+      if (!session.locationId) return;
 
-    try {
-      const ref = doc(db, "locations", session.locationId);
-      const snap = await getDoc(ref);
+      try {
+        const ref = doc(db, "locations", session.locationId);
+        const snap = await getDoc(ref);
 
-      if (snap.exists()) {
-        setLocationCode(snap.data().code);  // <-- get code field
-      } else {
-        console.warn("Location doc does not exist");
+        if (snap.exists()) {
+          setLocationCode(snap.data().code);
+        } else {
+          console.warn("Location doc does not exist");
+        }
+      } catch (err) {
+        console.error("Error fetching location code:", err);
       }
-    } catch (err) {
-      console.error("Error fetching location code:", err);
-    }
-  };
+    };
 
-  fetchLocationCode();
-}, [session.locationId]);
+    fetchLocationCode();
+  }, [session.locationId]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -103,35 +107,50 @@ useEffect(() => {
     species: "",
   });
 
-  // 🔢 Generate FarmerId like FAR001, FAR002...
+  // Generate FarmerId like FAR001, FAR002...
   const generateFarmerId = (locationCode: string) => {
-  const nextNumber = farmers.length + 1;
+    const nextNumber = farmers.length + 1;
+    return `WBDC_${locationCode}_FR_${String(nextNumber).padStart(3, "0")}`;
+  };
 
-  return `WBDC_${locationCode}_FR_${String(nextNumber).padStart(3, "0")}`;
-};
+  const fetchFarmers = async () => {
+    if (!session.locationId) return;
 
-const fetchFarmers = async () => {
-  if (!session.locationId) return;
+    const ref = collection(db, "locations", session.locationId, "farmers");
+    const q = query(ref, orderBy("farmerId", "asc"));
 
-  const ref = collection(db, "locations", session.locationId, "farmers");
+    const snap = await getDocs(q);
 
-  // 🔥 Order by farmerId ascending
-  const q = query(ref, orderBy("farmerId", "asc"));
+    const list: Farmer[] = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as Farmer[];
 
-  const snap = await getDocs(q);
+    setFarmers(list);
+  };
 
-  const list: Farmer[] = snap.docs.map((d) => ({
-    id: d.id,
-    ...d.data(),
-  })) as Farmer[];
+  useEffect(() => {
+    fetchFarmers();
+  }, [session.locationId]);
 
-  setFarmers(list);
-};
-
-useEffect(() => {
-  fetchFarmers();
-}, [session.locationId]);
-
+  // Edit handlers
+  const handleEdit = (farmer: Farmer) => {
+    setEditMode(true);
+    setEditFarmerId(farmer.id);
+    setFormData({
+      name: farmer.name,
+      phone: farmer.phone,
+      address: farmer.address,
+      state: farmer.state,
+      district: farmer.district,
+      city: farmer.city,
+      pincode: farmer.pincode,
+      waterSource: farmer.waterSource,
+      cultureAreas: farmer.cultureAreas.toString(),
+      species: farmer.species,
+    });
+    setOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,33 +160,79 @@ useEffect(() => {
       return;
     }
 
-    const newFarmer = {
-      farmerId: generateFarmerId(locationCode),
-      name: formData.name,
-      phone: formData.phone,
-      address: formData.address,
-      state: formData.state,
-      district: formData.district,
-      city: formData.city,
-      pincode: formData.pincode,
-      waterSource: formData.waterSource,
-      cultureAreas: Number(formData.cultureAreas),
-      species: formData.species,
-      createdAt: Timestamp.now(),
-      createdBy: {
-        technicianId: session.technicianId!,
-        technicianName: session.technicianName!,
-      },
-    };
+    if (editMode && editFarmerId) {
+      // Update existing farmer
+      const farmerRef = doc(db, "locations", session.locationId!, "farmers", editFarmerId);
+      
+      const updatedFarmer = {
+        name: formData.name,
+        phone: formData.phone,
+        address: formData.address,
+        state: formData.state,
+        district: formData.district,
+        city: formData.city,
+        pincode: formData.pincode,
+        waterSource: formData.waterSource,
+        cultureAreas: Number(formData.cultureAreas),
+        species: formData.species,
+        updatedAt: Timestamp.now(),
+      };
 
-    await addDoc(
-      collection(db, "locations", session.locationId!, "farmers"),
-      newFarmer
-    );
+      await updateDoc(farmerRef, updatedFarmer);
 
-    toast.success(`Farmer registered successfully! ID: ${newFarmer.farmerId}`);
+      // 🔥 Sync updated name & phone to all related invoices 🔥
+      try {
+        const invoicesRef = collection(db, "locations", session.locationId!, "invoices");
+        const invoiceQuery = query(invoicesRef, where("farmerId", "==", editFarmerId));
+        const invoiceSnap = await getDocs(invoiceQuery);
+
+        if (!invoiceSnap.empty) {
+          const updatePromises = invoiceSnap.docs.map((invDoc) =>
+            updateDoc(invDoc.ref, {
+              farmerName: formData.name,
+              farmerPhone: formData.phone,
+            })
+          );
+          await Promise.all(updatePromises);
+        }
+      } catch (err) {
+        console.error("Failed to sync farmer details to invoices:", err);
+        // Do not block main success — farmer was still updated
+      }
+
+      toast.success("Farmer updated successfully! Related invoices synced.");
+    } else {
+      // Create new farmer (unchanged)
+      const newFarmer = {
+        farmerId: generateFarmerId(locationCode!),
+        name: formData.name,
+        phone: formData.phone,
+        address: formData.address,
+        state: formData.state,
+        district: formData.district,
+        city: formData.city,
+        pincode: formData.pincode,
+        waterSource: formData.waterSource,
+        cultureAreas: Number(formData.cultureAreas),
+        species: formData.species,
+        createdAt: Timestamp.now(),
+        createdBy: {
+          technicianId: session.technicianId!,
+          technicianName: session.technicianName!,
+        },
+      };
+
+      await addDoc(
+        collection(db, "locations", session.locationId!, "farmers"),
+        newFarmer
+      );
+
+      toast.success(`Farmer registered successfully! ID: ${newFarmer.farmerId}`);
+    }
 
     setOpen(false);
+    setEditMode(false);
+    setEditFarmerId(null);
     setFormData({
       name: "",
       phone: "",
@@ -215,16 +280,18 @@ useEffect(() => {
 
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Register New Farmer</DialogTitle>
+                <DialogTitle>
+                  {editMode ? "Edit Farmer" : "Register New Farmer"}
+                </DialogTitle>
                 <DialogDescription>
-                  Enter farmer details. A unique ID will be generated automatically.
+                  {editMode 
+                    ? "Update farmer details." 
+                    : "Enter farmer details. A unique ID will be generated automatically."
+                  }
                 </DialogDescription>
               </DialogHeader>
 
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                {/* ALL FORM FIELDS SAME AS YOUR FILE */}
-                {/* No change to UI structure — only saving to Firestore */}
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Name *</Label>
@@ -250,7 +317,6 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* Address */}
                 <div className="space-y-2">
                   <Label>Address *</Label>
                   <Input
@@ -262,7 +328,6 @@ useEffect(() => {
                   />
                 </div>
 
-                {/* State / District */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>State *</Label>
@@ -287,7 +352,6 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* City / Pincode */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>City *</Label>
@@ -312,7 +376,6 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {/* Water Source / Culture / Species */}
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Water Source *</Label>
@@ -353,10 +416,32 @@ useEffect(() => {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                  <Button 
+                    variant="outline" 
+                    type="button" 
+                    onClick={() => {
+                      setOpen(false);
+                      setEditMode(false);
+                      setEditFarmerId(null);
+                      setFormData({
+                        name: "",
+                        phone: "",
+                        address: "",
+                        state: "",
+                        district: "",
+                        city: "",
+                        pincode: "",
+                        waterSource: "",
+                        cultureAreas: "",
+                        species: "",
+                      });
+                    }}
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit">Register Farmer</Button>
+                  <Button type="submit">
+                    {editMode ? "Update Farmer" : "Register Farmer"}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -393,6 +478,7 @@ useEffect(() => {
                   <TableHead>Location</TableHead>
                   <TableHead>Species</TableHead>
                   <TableHead>Culture Areas</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
@@ -400,7 +486,6 @@ useEffect(() => {
                 {filteredFarmers.map((farmer) => (
                   <TableRow key={farmer.id}>
                     <TableCell>{farmer.farmerId}</TableCell>
-
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -409,13 +494,22 @@ useEffect(() => {
                         {farmer.name}
                       </div>
                     </TableCell>
-
                     <TableCell>{farmer.phone}</TableCell>
                     <TableCell>
                       {farmer.city}, {farmer.state}
                     </TableCell>
                     <TableCell>{farmer.species}</TableCell>
                     <TableCell>{farmer.cultureAreas}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-16 border border-b-2 bg-cyan-500 text-white hover:bg-cyan-600 p-0"
+                        onClick={() => handleEdit(farmer)}
+                      >
+                        Edit
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

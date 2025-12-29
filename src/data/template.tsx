@@ -1,6 +1,8 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
+import ADC from "@/assets/ADC.jpg";
+import AV from "@/assets/AV.jpg"
 interface TestItem {
   name: string;
   quantity: number;
@@ -111,7 +113,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
     >
       {/* HEADER */}
       <header className="flex items-center justify-between border-b pb-4">
-        <img src="/adc-logo.png" alt="ADC Logo" style={{ width: "100px" }} />
+        <img src={ADC} alt="ADC Logo" style={{ width: "100px" }} />
         <div className="text-center">
           <h2 style={{ fontSize: "18px", fontWeight: "bold" }}>వాటర్‌బేస్ ఆక్వా డయాగ్నస్టిక్ సెంటర్</h2>
           <h3 style={{ fontSize: "16px", fontWeight: "600" }}>WATERBASE AQUA DIAGNOSTIC CENTER</h3>
@@ -120,7 +122,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
             Phone: +91 76088 88001 | E-mail: adcl@waterbaseindia.com
           </p>
         </div>
-        <img src="/twl-logo.png" alt="TWL Logo" style={{ width: "80px" }} />
+        <img src={AV} alt="TWL Logo" style={{ width: "80px" }} />
       </header>
 
       {/* INVOICE META */}

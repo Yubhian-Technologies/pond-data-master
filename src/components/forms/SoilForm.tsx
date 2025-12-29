@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { db } from "../../pages/firebase"; // update path if needed
-import { collection, doc, getDoc, setDoc,updateDoc } from "firebase/firestore";
+import { db } from "../../pages/firebase";
+import { collection, doc, getDoc, setDoc, updateDoc, getDocs } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../../contexts/UserSessionContext";
 
@@ -15,6 +14,9 @@ interface FormData {
   mobile: string;
   sampleDate: string;
   reportDate: string;
+  sampleCollectionTime: string;
+  sampleTime: string;
+  reportTime: string;
   reportedBy: string;
   checkedBy: string;
   cmisBy: string;
@@ -37,220 +39,207 @@ interface SoilFormProps {
   invoice: any;
   invoiceId: string;
   locationId: string;
-  onSubmit: (data: FormData, samples: Sample[]) => void;
+  onSubmit: () => void; // Now simplified — parent handles navigation/report
 }
 
 export default function SoilForm({
-  onSubmit,
   invoice,
   invoiceId,
   locationId,
+  onSubmit,
 }: SoilFormProps) {
+  const navigate = useNavigate();
+  const { session } = useUserSession();
+  const technicianName = session?.technicianName || "";
+
+  const today = new Date().toISOString().split('T')[0];
+  const currentTime = new Date().toTimeString().slice(0, 5);
+
   const [formData, setFormData] = useState<FormData>({
     farmerName: '',
     farmerUID: '',
     farmerAddress: '',
     soilType: '',
     sourceOfSoil: '',
-    noOfSamples: '',
+    noOfSamples: '1',
     mobile: '',
-    sampleDate: new Date().toISOString().split('T')[0],
-    reportDate: new Date().toISOString().split('T')[0],
-    reportedBy: '',
-    checkedBy: '',
-    cmisBy: ''
+    sampleDate: today,
+    reportDate: today,
+    sampleCollectionTime: '',
+    sampleTime: '',
+    reportTime: currentTime,
+    reportedBy: technicianName,
+    checkedBy: technicianName,
+    cmisBy: technicianName,
   });
-  const navigate = useNavigate();
 
-  const [loading, setLoading] = useState(false);
-  const [samples, setSamples] = useState<Sample[]>([
-    {
-      pondNo: '',
-      pH: '',
-      ec: '',
-      caco3: '',
-      soilTexture: '',
-      organicCarbon: '',
-      availableNitrogen: '',
-      availablePhosphorus: '',
-      redoxPotential: '',
-      remarks: ''
-    }
-  ]);
-  const [soilType, setSoilType] = useState("");
-const [sourceOfSoil, setSourceOfSoil] = useState("");
-  const { session } = useUserSession();
-  let technicianName = session.technicianName;
-  const [currentPondIndex, setCurrentPondIndex] = useState(0);
+  const [samples, setSamples] = useState<Sample[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Derived value: total number of samples
-  const totalSamples = Number(formData.noOfSamples) || 1;
+  const totalSamples = Number(
+    invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")?.count || 1
+  );
 
-  // Handle form field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle pond/sample field changes
   const handleSampleChange = (index: number, field: keyof Sample, value: string) => {
-    const newSamples = [...samples];
-    newSamples[index][field] = value;
-    setSamples(newSamples);
+    setSamples(prev => {
+      const newSamples = [...prev];
+      newSamples[index] = { ...newSamples[index], [field]: value };
+      return newSamples;
+    });
   };
 
-  // Fetch farmer details from invoice
   useEffect(() => {
-    
-    const fetchFarmerFromInvoice = async () => {
-      if (!invoice || !locationId) return;
+    if (formData.sampleCollectionTime && !formData.sampleTime) {
+      setFormData(prev => ({ ...prev, sampleTime: formData.sampleCollectionTime }));
+    }
+  }, [formData.sampleCollectionTime]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!invoice || !locationId || !invoiceId) {
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
-        const farmerId = invoice.farmerId;
-        if (!farmerId) return;
 
-        const farmerRef = doc(db, "locations", locationId, "farmers", farmerId);
-        const farmerSnap = await getDoc(farmerRef);
-        if (!farmerSnap.exists()) return;
+        // Load farmer info
+        if (invoice.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+          const farmerSnap = await getDoc(farmerRef);
+          if (farmerSnap.exists()) {
+            const farmer = farmerSnap.data();
+            setFormData(prev => ({
+              ...prev,
+              farmerName: farmer.name || "",
+              farmerUID: farmer.farmerUID || "",
+              farmerAddress: `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
+              mobile: farmer.phone || "",
+              noOfSamples: String(totalSamples),
+            }));
+          }
+        }
 
-        const farmer = farmerSnap.data();
-        const soilSample = invoice.sampleType?.find((s: any) => s.type === "soil");
+        // Load existing report header
+        const reportHeaderRef = doc(db, "locations", locationId, "reports", invoiceId);
+        const headerSnap = await getDoc(reportHeaderRef);
+        if (headerSnap.exists()) {
+          const headerData = headerSnap.data();
+          setFormData(prev => ({
+            ...prev,
+            soilType: headerData.soilType || "",
+            sourceOfSoil: headerData.sourceOfSoil || "",
+            sampleCollectionTime: headerData.sampleCollectionTime || "",
+            sampleTime: headerData.sampleTime || "",
+            reportTime: headerData.reportTime || currentTime,
+            reportedBy: headerData.technicianName || technicianName,
+            checkedBy: headerData.technicianName || technicianName,
+            cmisBy: headerData.technicianName || technicianName,
+          }));
+        }
 
-        setFormData(prev => ({
-          ...prev,
-          cmisBy : technicianName,
-          checkedBy: technicianName,
-          reportedBy: technicianName,
-          farmerName: farmer.name || "",
-          farmerUID: farmer.farmerUID || "",
-          farmerAddress: (farmer.address || "") + ", " + (farmer.city || ""),
-          mobile: farmer.phone || "",
-          noOfSamples: soilSample?.count || "1",
-        }));
+        // Load all soil samples
+        const samplesCollection = collection(
+          db,
+          "locations",
+          locationId,
+          "reports",
+          invoiceId,
+          "soil samples"
+        );
+        const samplesSnap = await getDocs(samplesCollection);
+
+        const loadedSamples: Sample[] = [];
+
+        for (let i = 1; i <= totalSamples; i++) {
+          const sampleDoc = samplesSnap.docs.find(d => d.id === `sample_${i}`);
+          if (sampleDoc) {
+            loadedSamples.push(sampleDoc.data() as Sample);
+          } else {
+            loadedSamples.push({
+              pondNo: '',
+              pH: '',
+              ec: '',
+              caco3: '',
+              soilTexture: '',
+              organicCarbon: '',
+              availableNitrogen: '',
+              availablePhosphorus: '',
+              redoxPotential: '',
+              remarks: ''
+            });
+          }
+        }
+
+        setSamples(loadedSamples);
       } catch (err) {
-        console.error("Error fetching farmer:", err);
+        console.error("Error loading soil report data:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchFarmerFromInvoice();
-  }, [invoice, locationId]);
+    loadData();
+  }, [invoice, invoiceId, locationId, technicianName, currentTime, totalSamples]);
 
-  // Save a single pond/sample to Firestore
-  const savePondReport = async (
-  pondData: Sample,
-  sampleIndex: number,
-  sourceOfSoil: string,
-  soilType: string,
-  technicianName: string
-) => {
-  if (!locationId || !invoiceId) return;
+  const saveAllData = async () => {
+    if (!locationId || !invoiceId) return;
 
-  try {
-    // 1️⃣ Save HEADER INFORMATION at: locations/{id}/reports/{invoiceId}
-    const reportHeaderRef = doc(
-      db,
-      "locations",
-      locationId,
-      "reports",
-      invoiceId
-    );
+    try {
+      // Save shared header
+      const reportHeaderRef = doc(db, "locations", locationId, "reports", invoiceId);
+      await setDoc(reportHeaderRef, {
+        soilType: formData.soilType,
+        sourceOfSoil: formData.sourceOfSoil,
+        sampleCollectionTime: formData.sampleCollectionTime,
+        sampleTime: formData.sampleTime,
+        reportTime: formData.reportTime,
+        technicianName: technicianName,
+      }, { merge: true });
 
-    await setDoc(
-      reportHeaderRef,
-      {
-        sourceOfSoil,
-        soilType,
-        technicianName,
-      },
-      { merge: true } // prevents overwriting existing data
-    );
+      // Save all samples
+      const savePromises = samples.map((sample, index) => {
+        const sampleDocRef = doc(
+          collection(db, "locations", locationId, "reports", invoiceId, "soil samples"),
+          `sample_${index + 1}`
+        );
+        return setDoc(sampleDocRef, sample);
+      });
 
-    // 2️⃣ Save SAMPLE DATA inside subcollection
-    const samplesCollectionRef = collection(
-      db,
-      "locations",
-      locationId,
-      "reports",
-      invoiceId,
-      "soil samples"
-    );
+      await Promise.all(savePromises);
 
-    const sampleDocRef = doc(samplesCollectionRef, `sample_${sampleIndex + 1}`);
-    await setDoc(sampleDocRef, pondData);
+      // Mark as completed
+      const invoiceRef = doc(db, "locations", locationId, "invoices", invoice.docId || invoiceId);
+      await updateDoc(invoiceRef, {
+        "reportsProgress.soil": "completed",
+      });
 
-    console.log(
-      `Sample ${sampleIndex + 1} & report metadata saved successfully`
-    );
-  } catch (err) {
-    console.error("Error saving sample report:", err);
-  }
-};
-
-
-  // Handle next pond/sample
-  const handleNextPond = async () => {
-    await savePondReport(samples[currentPondIndex],currentPondIndex,sourceOfSoil,soilType,technicianName)
-    if (currentPondIndex < totalSamples - 1) {
-      if (!samples[currentPondIndex + 1]) {
-        setSamples(prev => [
-          ...prev,
-          {
-            pondNo: '',
-            pH: '',
-            ec: '',
-            caco3: '',
-            soilTexture: '',
-            organicCarbon: '',
-            availableNitrogen: '',
-            availablePhosphorus: '',
-            redoxPotential: '',
-            remarks: ''
-
-          }
-        ]);
-      }
-      setCurrentPondIndex(currentPondIndex + 1);
+    } catch (err) {
+      console.error("Error saving soil data:", err);
+      alert("Failed to save. Please try again.");
     }
   };
 
-  // Final submit
   const handleSubmit = async () => {
-  try {
-    // Save the last pond
-    await savePondReport(
-  samples[currentPondIndex],
-  currentPondIndex,
-  sourceOfSoil,
-  soilType,
-  technicianName
-);
+    await saveAllData();
+    onSubmit(); 
+  };
 
-    // Mark water report as completed in invoice.progressReports
-    if (invoiceId && locationId) {
-      const invoiceRef = doc(db, "locations", locationId, "invoices", invoice.docId);
-
-      await updateDoc(invoiceRef, {
-    [`reportsProgress.soil`]: "completed",
-    });
-      navigate(`/soil-report/${invoice.id}/${locationId}`);
-
-      console.log("Report progress updated -> Soil Completed");
-    }
-
-    onSubmit(formData, samples);
-
-  } catch (error) {
-    console.error("Error updating water report status:", error);
+  if (loading) {
+    return <div className="p-8 text-center">Loading report data...</div>;
   }
-};
-
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-bold mb-4" style={{color: '#1e40af'}}>Enter Report Details</h2>
+      <h2 className="text-xl font-bold mb-4" style={{ color: '#1e40af' }}>
+        Enter Soil Report Details - All Samples ({totalSamples})
+      </h2>
 
       {/* Farmer Details */}
       <div className="mb-6">
@@ -258,28 +247,24 @@ const [sourceOfSoil, setSourceOfSoil] = useState("");
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Farmer Name</label>
-            <input type="text" name="farmerName" value={formData.farmerName} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input type="text" value={formData.farmerName} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Farmer UID</label>
-            <input type="text" name="farmerUID" value={formData.farmerUID} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input type="text" value={formData.farmerUID} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Mobile</label>
-            <input type="text" name="mobile" value={formData.mobile} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input type="text" value={formData.mobile} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
           <div className="md:col-span-3">
             <label className="block text-sm font-medium mb-1">Farmer Address</label>
-            <input type="text" name="farmerAddress" value={formData.farmerAddress} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input type="text" value={formData.farmerAddress} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
         </div>
       </div>
 
-      {/* Sample Details */}
+      {/* Sample Details + Time Fields */}
       <div className="mb-6">
         <h3 className="font-bold mb-3 text-gray-700">Sample Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -295,81 +280,80 @@ const [sourceOfSoil, setSourceOfSoil] = useState("");
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">No. of Samples</label>
-            <input type="text" name="noOfSamples" value={formData.noOfSamples} onChange={handleChange}
+            <input type="text" value={totalSamples} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Sample Collection Time</label>
+            <input type="time" name="sampleCollectionTime" value={formData.sampleCollectionTime} onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           </div>
-        </div>
-      </div>
-
-      {/* Test Results - Only current pond */}
-      <div className="mb-6">
-        <h3 className="font-bold mb-3 text-gray-700">Test Results - Sample {currentPondIndex + 1}</h3>
-        <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {Object.entries(samples[currentPondIndex]).map(([key, value]) => (
-              <div key={key}>
-                <label className="block text-xs font-medium mb-1">{key}</label>
-                <input
-                  type="text"
-                  value={value}
-                  onChange={(e) => handleSampleChange(currentPondIndex, key as keyof Sample, e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            ))}
+          <div>
+            <label className="block text-sm font-medium mb-1">Sample Time</label>
+            <input type="time" name="sampleTime" value={formData.sampleTime} onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Report Time</label>
+            <input type="time" value={formData.reportTime} readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
         </div>
-        
       </div>
 
-      {/* Verification Details */}
+      {/* All Samples - One Section Per Sample */}
+      {samples.map((sample, index) => (
+        <div key={index} className="mb-10">
+          <h3 className="font-bold mb-3 text-gray-700">
+            Test Results - Sample {index + 1} of {totalSamples}
+          </h3>
+          <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {Object.entries(sample).map(([key, value]) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium mb-1 capitalize">
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </label>
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => handleSampleChange(index, key as keyof Sample, e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* Verification */}
       <div className="mb-6">
         <h3 className="font-bold mb-3 text-gray-700">Verification</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Reported By</label>
-            <input type="text" name="reportedBy" value={formData.reportedBy} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input type="text" value={formData.reportedBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Checked By</label>
-            <input type="text" name="checkedBy" value={formData.checkedBy} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input type="text" value={formData.checkedBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">CMIS By</label>
-            <input type="text" name="cmisBy" value={formData.cmisBy} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input type="text" value={formData.cmisBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
         </div>
       </div>
 
-      {/* Navigation Buttons */}
-      <div className="flex justify-between mt-4">
-        {currentPondIndex > 0 && (
-          <button
-            onClick={() => setCurrentPondIndex(currentPondIndex - 1)}
-            className="px-4 py-2 rounded bg-gray-400 text-white hover:opacity-90"
-          >
-            Previous
-          </button>
-        )}
-
-        {currentPondIndex < totalSamples - 1 ? (
-          <button
-            onClick={handleNextPond}
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:opacity-90"
-          >
-            Next
-          </button>
-        ) : (
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 rounded bg-green-600 text-white hover:opacity-90"
-          >
-            Generate Report
-          </button>
-        )}
+      {/* Final Submit Button */}
+      <div className="flex justify-center mt-8">
+        <button
+          onClick={handleSubmit}
+          className="px-8 py-4 rounded bg-green-600 text-white hover:bg-green-700 font-semibold text-lg"
+        >
+          Complete & Generate Report
+        </button>
       </div>
     </div>
   );

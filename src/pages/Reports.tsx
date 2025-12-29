@@ -1,164 +1,192 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, ChevronDown } from "lucide-react";
+import { FileCheck2, Calendar, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, Timestamp } from "firebase/firestore";
 import { db } from "./firebase";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useUserSession } from "../contexts/UserSessionContext";
+
+type ReportType = "Soil" | "Water" | "PL" | "PCR" | "Microbiology";
 
 interface ReportEntry {
   invoiceId: string;
-  types: ("Soil" | "Water")[];
-  createdAt: string;
+  farmerName: string;
+  farmerInitials: string;
+  types: ReportType[];
+  createdAt: Timestamp | null;
+  displayDate: string;
 }
 
 const Reports = () => {
   const { session } = useUserSession();
   const navigate = useNavigate();
   const [reports, setReports] = useState<ReportEntry[]>([]);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null); // dropdown state
 
   const locationId = session.locationId;
 
   useEffect(() => {
     const fetchReports = async () => {
-      console.log("[Reports] Starting fetchReports()");
-      if (!locationId) {
-        console.warn("[Reports] No locationId found in session", { session });
-        return;
-      }
-
-      console.log("[Reports] Using locationId", locationId);
+      if (!locationId) return;
 
       try {
-        const reportsRef = collection(db, "locations", locationId, "reports");
-        console.log("[Reports] Fetching reports collection at path:", `locations/${locationId}/reports`);
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+        const snap = await getDocs(invoicesRef);
 
-        const snap = await getDocs(reportsRef);
-        console.log("[Reports] Raw snapshot", {
-          size: snap.size,
-          ids: snap.docs.map((d) => d.id),
-        });
+        const list: ReportEntry[] = [];
 
-        const reportList: ReportEntry[] = [];
+        for (const doc of snap.docs) {
+          const data = doc.data();
+          const invoiceId = data.invoiceId || doc.id;
+          const farmerName = data.farmerName || "Unknown Farmer";
+          const createdAt = data.createdAt as Timestamp | null;
 
-        for (const invoiceDoc of snap.docs) {
-          const invoiceId = invoiceDoc.id;
-          console.log(`[Reports] Checking invoiceId: ${invoiceId}`);
+          const progress = data.reportsProgress || {};
+          const types: ReportType[] = [];
 
-          const availableTypes: ("Soil" | "Water")[] = [];
+          if (progress.soil === "completed") types.push("Soil");
+          if (progress.water === "completed") types.push("Water");
+          if (progress.pl === "completed") types.push("PL");
+          if (progress.pcr === "completed") types.push("PCR");
+          if (progress.microbiology === "completed") types.push("Microbiology");
 
-          // Soil Samples
-          const soilRef = collection(db, "locations", locationId, "reports", invoiceId, "soil samples");
-          const soilSnap = await getDocs(soilRef);
-          console.log(`[Reports] Invoice ${invoiceId} soil samples count:`, soilSnap.size);
-          if (!soilSnap.empty) availableTypes.push("Soil");
+          if (types.length > 0) {
+            const farmerInitials = farmerName
+              .split(" ")
+              .map((n: string) => n[0])
+              .join("")
+              .toUpperCase()
+              .slice(0, 2);
 
-          // Water Samples
-          const waterRef = collection(db, "locations", locationId, "reports", invoiceId, "water samples");
-          const waterSnap = await getDocs(waterRef);
-          console.log(`[Reports] Invoice ${invoiceId} water samples count:`, waterSnap.size);
-          if (!waterSnap.empty) availableTypes.push("Water");
-
-          if (availableTypes.length > 0) {
-            const createdAt = invoiceDoc.data()?.createdAt || "--";
-            console.log(`[Reports] Invoice ${invoiceId} available types: ${availableTypes.join(", ")}`);
-            reportList.push({ invoiceId, types: availableTypes, createdAt });
+            list.push({
+              invoiceId,
+              farmerName,
+              farmerInitials,
+              types,
+              createdAt,
+              displayDate: createdAt
+                ? createdAt.toDate().toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "Unknown",
+            });
           }
         }
 
-        console.log("[Reports] Final report list:", reportList);
-        setReports(reportList);
-      } catch (error) {
-        console.error("[Reports] Error fetching reports:", error);
+        list.sort((a, b) => {
+          if (!a.createdAt || !b.createdAt) return 0;
+          return b.createdAt.toMillis() - a.createdAt.toMillis();
+        });
+
+        setReports(list);
+      } catch (err) {
+        console.error("Failed to load reports:", err);
       }
     };
 
     fetchReports();
   }, [locationId]);
 
-  const handleView = (invoiceId: string, type: "Soil" | "Water") => {
-    console.log(`[Reports] Navigating to ${type} report for invoice ${invoiceId}`);
-    if (type === "Soil") navigate(`/soil-report/${invoiceId}/${locationId}`);
-    else navigate(`/water-report/${invoiceId}/${locationId}`);
+  const openReport = (invoiceId: string) => {
+    navigate(`/lab-results/${invoiceId}?mode=view`);
   };
 
   return (
     <DashboardLayout>
-      <div className="p-8">
-        <h1 className="text-3xl font-bold mb-2">Reports</h1>
-        <p className="text-muted-foreground mb-6">View and manage laboratory reports</p>
+      <div className="p-6 md:p-8 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-10">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+            
+            Completed Reports
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            View all finalized laboratory reports for your farmers
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center">
-              <FileText className="w-6 h-6 text-success" />
-            </div>
-            <div>
-              <CardTitle>Report Management</CardTitle>
-              <CardDescription>View soil and water reports</CardDescription>
-            </div>
-          </CardHeader>
+        {reports.length === 0 ? (
+          <Card className="border-dashed border-2 shadow-sm">
+            <CardContent className="text-center py-16">
+              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                <FileText className="w-10 h-10 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-medium text-muted-foreground mb-2">
+                No completed reports yet
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Reports will appear here once lab analysis is fully completed and finalized.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4 ">
+            {reports.map((report) => (
+              <Card
+                key={report.invoiceId}
+                className="overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300 border bg-gradient-to-br from-white to-cyan-50/30"
+              >
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50/50 py-4 border">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        {report.farmerName}
+                      </h3>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+                        <FileText className="w-3.5 h-3.5" />
+                        Invoice: <span className="font-mono text-gray-700">{report.invoiceId}</span>
+                      </p>
+                    </div>
 
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice ID</TableHead>
-                  <TableHead>Report Types</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground flex items-center justify-end gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {report.displayDate}
+                      </p>
+                      <Badge variant="secondary" className="mt-2 text-xs px-3 py-1">
+                        {report.types.length} report{report.types.length > 1 ? "s" : ""} ready
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
 
-              <TableBody>
-                {reports.map((r, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{r.invoiceId}</TableCell>
-                    <TableCell>{r.types.join(", ")}</TableCell>
-                    <TableCell>{r.createdAt}</TableCell>
-
-                    <TableCell>
-                      <div className="relative inline-block text-left">
-                        <button
-                          onClick={() =>
-                            setOpenDropdown(openDropdown === r.invoiceId ? null : r.invoiceId)
-                          }
-                          className="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-1 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
-                        >
-                          View Reports
-                          <ChevronDown className="ml-2 -mr-1 h-5 w-5" />
-                        </button>
-
-                        {openDropdown === r.invoiceId && (
-                          <div className="origin-top-right absolute right-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                            <div className="py-1">
-                              {r.types.map((type) => (
-                                <button
-                                  key={type}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                  onClick={() => handleView(r.invoiceId, type)}
-                                >
-                                  {type} Report
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                <CardContent className="py-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Completed Analysis:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {report.types.map((type) => (
+                          <Badge
+                            key={type}
+                            variant="outline"
+                            className="px-3 py-1 text-xs font-medium border-blue-200 bg-blue-50/70 text-cyan-800"
+                          >
+                            {type}
+                          </Badge>
+                        ))}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
 
-            {!reports.length && (
-              <p className="text-center py-4 text-muted-foreground">No reports found.</p>
-            )}
-          </CardContent>
-        </Card>
+                    <Button
+                      onClick={() => openReport(report.invoiceId)}
+                      size="sm"
+                      className="bg-cyan-600 hover:bg-cyan-700 text-white font-medium shadow-sm px-5"
+                    >
+                      
+                      View Reports
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

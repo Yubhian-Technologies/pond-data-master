@@ -3,18 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { availableTests } from "@/data/tests";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
-
-
 
 interface SampleSummaryItem {
   type: string;
@@ -24,13 +21,22 @@ interface SampleSummaryItem {
 interface LocationState {
   sampleSummary: SampleSummaryItem[];
   dateOfCulture: string;
-  farmer: string | { name: string,address : string, phone : string,id: string};
+  farmer: { name: string; address: string; phone: string; id: string };
 }
+
+const PCR_PATHOGEN_MAP: Record<string, string> = {
+  pl_ehp: "PL EHP",
+  soil_ehp: "Soil EHP",
+  water_ehp: "Water EHP",
+  pl_wssv: "WSSV",
+  pl_vibrio_pcr: "VIBRIO",
+  pl_ihhnv: "IHHNV",
+};
 
 const InvoicePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { session, setSession } = useUserSession();
+  const { session } = useUserSession();
 
   const location = useLocation();
   const state = location.state as LocationState | undefined;
@@ -39,326 +45,515 @@ const InvoicePage = () => {
   const locationId = session.locationId;
   const technicianId = session.technicianId;
   const technicianName = session.technicianName;
+
   const sampleSummary = state?.sampleSummary || [];
   const dateOfCulture = state?.dateOfCulture || "";
-  const farmerName = typeof state?.farmer === "string" ? state.farmer : state?.farmer?.name || "Unknown";
-  const farmerId = typeof state?.farmer === "string" ? state.farmer : state?.farmer?.id || "Unknown";
-  const village = typeof state?.farmer === "string" ? state.farmer : state?.farmer?.address || "Unknown";
-  const mobile = typeof state?.farmer === "string" ? state.farmer : state?.farmer?.phone || "Unknown";
-  
-  // Track active sample per sample type
-  const [activeSampleIndex, setActiveSampleIndex] = useState<{ [type: string]: number }>(() => {
-    const obj: { [type: string]: number } = {};
-    sampleSummary.forEach(s => (obj[s.type] = 0));
-    return obj;
-  });
+  const farmerName = state?.farmer?.name || "Unknown";
+  const farmerId = state?.farmer?.id || "Unknown";
+  const village = state?.farmer?.address || "Unknown";
+  const mobile = state?.farmer?.phone || "Unknown";
 
-  // Default tests that propagate to all samples
-  const [defaultTests, setDefaultTests] = useState<{ [type: string]: Set<string> }>(() => {
-    const obj: { [type: string]: Set<string> } = {};
-    sampleSummary.forEach(s => (obj[s.type] = new Set()));
-    return obj;
-  });
+  // Fixed number of PL/PCR tabs (based on input PCR count)
+  const pcrCount = sampleSummary.find((s) => s.type === "pcr")?.count || 0;
+  const plPcrSampleCount = pcrCount;
 
-  // Per sample overrides (add/remove tests individually)
-  const [perSampleTests, setPerSampleTests] = useState<{
-    [type: string]: { [index: number]: Set<string> };
-  }>(() => {
-    const obj: { [type: string]: { [index: number]: Set<string> } } = {};
-    sampleSummary.forEach(s => {
-      obj[s.type] = {};
-      for (let i = 0; i < s.count; i++) obj[s.type][i] = new Set();
+  // Active sample index for each group
+  const [activeSampleIndex, setActiveSampleIndex] = useState<{ [key: string]: number }>(() => {
+    const init: { [key: string]: number } = {};
+    sampleSummary.forEach((s) => {
+      if (s.type !== "pl" && s.type !== "pcr") {
+        init[s.type] = 0;
+      }
     });
-    return obj;
-  });
-  const generateInvoiceId = (): string => {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let id = "";
-  for (let i = 0; i < 8; i++) {
-    id += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return id;
-};
-
-
-  // Toggle test selection
-  const handleToggleTest = (sampleType: string, index: number, testId: string) => {
-    const effectiveSet = new Set([
-      ...defaultTests[sampleType],
-      ...perSampleTests[sampleType][index],
-    ]);
-
-    if (effectiveSet.has(testId)) {
-      // Remove from per-sample override
-      setPerSampleTests(prev => {
-        const newSet = new Set(prev[sampleType][index]);
-        newSet.delete(testId);
-        return {
-          ...prev,
-          [sampleType]: { ...prev[sampleType], [index]: newSet },
-        };
-      });
-    } else {
-      // Add to default to propagate to other samples
-      setDefaultTests(prev => {
-        const newSet = new Set(prev[sampleType]);
-        newSet.add(testId);
-        return { ...prev, [sampleType]: newSet };
-      });
+    if (plPcrSampleCount > 0) {
+      init["pl_pcr"] = 0;
     }
+    return init;
+  });
+
+  // Store selected tests per sample
+  const [perSampleTests, setPerSampleTests] = useState<{
+    pl: Set<string>[];
+    pcr: Set<string>[];
+    [other: string]: Set<string>[];
+  }>(() => {
+    const init: any = { pl: [], pcr: [] };
+
+    // Initialize for all PL/PCR samples (tabs)
+    for (let i = 0; i < plPcrSampleCount; i++) {
+      init.pl.push(new Set<string>());
+      init.pcr.push(new Set<string>());
+    }
+
+    // Other sample types
+    sampleSummary.forEach((s) => {
+      if (s.type !== "pl" && s.type !== "pcr") {
+        init[s.type] = [];
+        for (let i = 0; i < s.count; i++) {
+          init[s.type].push(new Set<string>());
+        }
+      }
+    });
+
+    return init;
+  });
+
+  // === Dynamically calculate actual PL count (samples with at least one PL test) ===
+  const actualPlCount = useMemo(() => {
+    const samplesWithPlTests = new Set<number>();
+    perSampleTests.pl.forEach((set, index) => {
+      if (set.size > 0) {
+        samplesWithPlTests.add(index);
+      }
+    });
+    return samplesWithPlTests.size;
+  }, [perSampleTests.pl]);
+
+  // === Dynamically calculate actual PCR count (samples with at least one PCR test) ===
+  const actualPcrCount = useMemo(() => {
+    const samplesWithPcrTests = new Set<number>();
+    perSampleTests.pcr.forEach((set, index) => {
+      if (set.size > 0) {
+        samplesWithPcrTests.add(index);
+      }
+    });
+    return samplesWithPcrTests.size;
+  }, [perSampleTests.pcr]);
+
+  const samplePathogens = useMemo(() => {
+    const result: Record<number, string[]> = {};
+
+    perSampleTests.pcr.forEach((set, index) => {
+      const pathogens = new Set<string>();
+
+      set.forEach((testId) => {
+        const pathogen = PCR_PATHOGEN_MAP[testId];
+        if (pathogen) pathogens.add(pathogen);
+      });
+
+      if (pathogens.size > 0) {
+        result[index + 1] = Array.from(pathogens); // sample numbers start from 1
+      }
+    });
+
+    return result;
+  }, [perSampleTests.pcr]);
+
+  const generateInvoiceId = (): string => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let id = "";
+    for (let i = 0; i < 8; i++) {
+      id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return id;
   };
 
-  // Get effective selection for a sample
-  const getEffectiveSelection = (sampleType: string, index: number) =>
-    new Set([...defaultTests[sampleType], ...perSampleTests[sampleType][index]]);
+  const toggleTest = (sampleType: "pl" | "pcr" | string, sampleIndex: number, testId: string) => {
+    setPerSampleTests((prev) => {
+      const newSets = [...(prev[sampleType] || [])];
+      const set = newSets[sampleIndex];
+      if (set.has(testId)) {
+        set.delete(testId);
+      } else {
+        set.add(testId);
+      }
+      return { ...prev, [sampleType]: newSets };
+    });
+  };
 
-  // Calculate invoice totals grouped by sample type
-  const calculateGroupedTotal = () => {
-    const groupedItems: { [type: string]: { name: string; quantity: number; total: number; price: number }[] } = {};
+  const applyToAll = (sampleType: "pl" | "pcr", testId: string) => {
+    setPerSampleTests((prev) => {
+      const newSets = prev[sampleType].map((set) => {
+        const newSet = new Set(set);
+        newSet.add(testId);
+        return newSet;
+      });
+      return { ...prev, [sampleType]: newSets };
+    });
+  };
+
+  const isAppliedToAll = (sampleType: "pl" | "pcr", testId: string): boolean => {
+    return perSampleTests[sampleType].every((set) => set.has(testId));
+  };
+
+  // Calculate totals
+  const calculateTotal = () => {
+    const groupedItems: {
+      [type: string]: { name: string; quantity: number; total: number; price: number }[];
+    } = {};
     let total = 0;
 
-    sampleSummary.forEach(s => {
-      const type = s.type;
-      groupedItems[type] = [];
-      const testTotals: { [testId: string]: { quantity: number; price: number } } = {};
+    // === PCR Tests: only on samples that have at least one PCR test selected ===
+    if (actualPcrCount > 0) {
+      const pcrTestCount: { [testId: string]: number } = {};
 
-      for (let i = 0; i < s.count; i++) {
-        getEffectiveSelection(type, i).forEach(testId => {
-          const test = availableTests.find(t => t.id === testId);
-          if (!test) return;
-          if (!testTotals[testId]) testTotals[testId] = { quantity: 0, price: test.price };
-          testTotals[testId].quantity += 1;
-        });
-      }
-
-      Object.entries(testTotals).forEach(([testId, data]) => {
-        groupedItems[type].push({ name: availableTests.find(t => t.id === testId)!.name, quantity: data.quantity, price: data.price, total: data.quantity * data.price });
-        total += data.quantity * data.price;
+      perSampleTests.pcr.forEach((set, index) => {
+        if (set.size > 0) {
+          set.forEach((testId) => {
+            pcrTestCount[testId] = (pcrTestCount[testId] || 0) + 1;
+          });
+        }
       });
+
+      groupedItems["pcr"] = Object.entries(pcrTestCount)
+        .map(([testId, qty]) => {
+          const test = availableTests.find((t) => t.id === testId && t.sampleType === "pcr");
+          if (!test) return null;
+          const itemTotal = qty * test.price;
+          total += itemTotal;
+          return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
+        })
+        .filter(Boolean) as any;
+    }
+
+    // === PL Tests: only on samples where at least one PL test is selected ===
+    if (actualPlCount > 0) {
+      const plTestCount: { [testId: string]: number } = {};
+
+      perSampleTests.pl.forEach((set, index) => {
+        if (set.size > 0) {
+          set.forEach((testId) => {
+            plTestCount[testId] = (plTestCount[testId] || 0) + 1;
+          });
+        }
+      });
+
+      groupedItems["pl"] = Object.entries(plTestCount)
+        .map(([testId, qty]) => {
+          const test = availableTests.find((t) => t.id === testId && t.sampleType === "pl");
+          if (!test) return null;
+          const itemTotal = qty * test.price;
+          total += itemTotal;
+          return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
+        })
+        .filter(Boolean) as any;
+    }
+
+    // === Other sample types ===
+    sampleSummary.forEach((s) => {
+      if (s.type === "pl" || s.type === "pcr") return;
+      const testCount: { [testId: string]: number } = {};
+      perSampleTests[s.type]?.forEach((set) => {
+        set.forEach((testId) => {
+          testCount[testId] = (testCount[testId] || 0) + 1;
+        });
+      });
+      groupedItems[s.type] = Object.entries(testCount)
+        .map(([testId, qty]) => {
+          const test = availableTests.find((t) => t.id === testId);
+          if (!test) return null;
+          const itemTotal = qty * test.price;
+          total += itemTotal;
+          return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
+        })
+        .filter(Boolean) as any;
     });
 
     return { total, groupedItems };
   };
 
-  const { total, groupedItems } = calculateGroupedTotal();
-const handleGenerateInvoice = async () => {
-  if (total === 0) {
-    toast({
-      title: "Error",
-      description: "Please select at least one test",
-      variant: "destructive"
+  const { total, groupedItems } = calculateTotal();
+
+  const handleGenerateInvoice = async () => {
+    if (total === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one test",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!paymentMode) {
+      toast({
+        title: "Error",
+        description: "Please select a payment mode",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const today = new Date();
+    const formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(
+      today.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}-${today.getFullYear()}`;
+
+    const invoiceId = generateInvoiceId();
+
+    // Save actual used sample counts
+    const sampleType = sampleSummary.map((s) => ({
+      type: s.type.toLowerCase(),
+      count:
+        s.type === "pl" ? actualPlCount :
+        s.type === "pcr" ? actualPcrCount :
+        s.count,
+    }));
+
+    const reportsProgress: { [key: string]: string } = {};
+
+    // PL
+    if (actualPlCount > 0) {
+      reportsProgress["pl"] = "pending";
+    }
+
+    // PCR
+    if (actualPcrCount > 0) {
+      reportsProgress["pcr"] = "pending";
+    }
+
+    // OTHER TYPES
+    sampleSummary.forEach((s) => {
+      if (s.type !== "pl" && s.type !== "pcr") {
+        const hasTests = perSampleTests[s.type]?.some((set) => set.size > 0);
+        if (hasTests) {
+          reportsProgress[s.type.toLowerCase()] = "pending";
+        }
+      }
     });
-    return;
-  }
 
-  if (!paymentMode) {
-    toast({
-      title: "Error",
-      description: "Please select a payment mode",
-      variant: "destructive"
-    });
-    return;
-  }
+    const invoiceData = {
+      id: invoiceId,
+      invoiceId,
+      farmerName,
+      farmerId,
+      farmerPhone: mobile,
+      locationId,
+      technicianName,
+      technicianId,
+      dateOfCulture,
+      tests: groupedItems,
+      total,
+      village,
+      mobile,
+      paymentMode,
+      sampleType,
+      reportsProgress,
+      samplePathogens,
+      createdAt: serverTimestamp(),
+    };
 
-  // format date
-  const today = new Date();
-  const formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(today.getMonth()+1)
-    .toString().padStart(2,"0")}-${today.getFullYear()}`;
+    try {
+      await addDoc(collection(db, "locations", locationId, "invoices"), invoiceData);
 
-  const invoiceId = generateInvoiceId();
+      navigate("/invoice-template", {
+        state: { ...invoiceData, formattedDate },
+      });
 
-  // ------------------------------------------
-  // ⭐ IMPORTANT: Convert sampleSummary to the format LabResults expects
-  // ------------------------------------------
-  const sampleType = sampleSummary.map(s => ({
-    type: s.type.toLowerCase(),
-    count: s.count
-  }));
-
-  // ------------------------------------------
-  // ⭐ Create default reportsProgress for each selected type
-  // ------------------------------------------
-  const reportsProgress: { [key: string]: string } = {};
-  sampleSummary.forEach(s => {
-    reportsProgress[s.type.toLowerCase()] = "pending";
-  });
-
-  // ------------------------------------------
-  // ⭐ Final invoice object to save in Firestore
-  // ------------------------------------------
-  const invoiceData = {
-    id: invoiceId,
-    farmerName,
-    farmerId,
-    farmerPhone: mobile,
-    locationId,
-    technicianName,
-    technicianId,
-    dateOfCulture,
-    tests: groupedItems,
-    total,
-    village,
-    mobile,
-    paymentMode,
-
-    // NEW FIXED FIELDS REQUIRED BY LabResults
-    sampleType,         // [{ type: 'soil', count: 2 }, { type: 'water', count: 1 }]
-    reportsProgress,    // { soil: "pending", water: "pending" }
-
-    createdAt: serverTimestamp(),
+      toast({ title: "Success", description: "Invoice generated successfully!" });
+    } catch (error) {
+      console.error("Error adding invoice: ", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate invoice",
+        variant: "destructive",
+      });
+    }
   };
-
-  try {
-    // Add to Firestore
-    await addDoc(
-      collection(db, "locations", locationId, "invoices"),
-      invoiceData
-    );
-
-    // Navigate to invoice template
-    navigate("/invoice-template", {
-      state: { ...invoiceData, formattedDate }
-    });
-
-    toast({ title: "Success", description: "Invoice generated successfully!" });
-
-  } catch (error) {
-    console.error("Error adding invoice: ", error);
-    toast({
-      title: "Error",
-      description: "Failed to generate invoice",
-      variant: "destructive"
-    });
-  }
-};
-
 
   return (
     <DashboardLayout>
       <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left side: Samples & Tests */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Samples for {farmerName} ({dateOfCulture})</CardTitle>
+              <CardTitle>
+                Samples for {farmerName} ({dateOfCulture})
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {sampleSummary.map(s => (
-                <div key={s.type}>
-                  <h4 className="font-semibold mb-2 capitalize">{s.type} Samples</h4>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {Array.from({ length: s.count }).map((_, i) => (
+            <CardContent className="space-y-8">
+              {/* Non PL/PCR samples */}
+              {sampleSummary
+                .filter((s) => s.type !== "pl" && s.type !== "pcr")
+                .map((s) => (
+                  <div key={s.type}>
+                    <h4 className="font-semibold mb-3 capitalize">
+                      {s.type} Samples ({s.count})
+                    </h4>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {Array.from({ length: s.count }).map((_, i) => (
+                        <Button
+                          key={i}
+                          variant={activeSampleIndex[s.type] === i ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setActiveSampleIndex((prev) => ({ ...prev, [s.type]: i }))}
+                        >
+                          Sample {i + 1}
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="space-y-3">
+                      {availableTests
+                        .filter((t) => t.sampleType === s.type)
+                        .map((test) => {
+                          const currentIdx = activeSampleIndex[s.type] ?? 0;
+                          const isChecked = perSampleTests[s.type]?.[currentIdx]?.has(test.id) || false;
+                          const appliedToAll = perSampleTests[s.type]?.every((set) => set.has(test.id)) || false;
+
+                          return (
+                            <div
+                              key={test.id}
+                              className="flex items-center justify-between p-4 border rounded-lg bg-muted/30"
+                            >
+                              <div className="flex items-center gap-4 flex-1">
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={() => toggleTest(s.type, currentIdx, test.id)}
+                                />
+                                <div>
+                                  <p className="font-medium">{test.name}</p>
+                                  <p className="text-sm text-muted-foreground">₹{test.price}</p>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant={appliedToAll ? "default" : "outline"}
+                                onClick={() => applyToAll(s.type as any, test.id)}
+                                disabled={appliedToAll}
+                              >
+                                {appliedToAll ? "Applied to All" : "Apply to All"}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ))}
+
+              {/* PL/PCR Group */}
+              {plPcrSampleCount > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3">PL / PCR Samples ({plPcrSampleCount})</h4>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {Array.from({ length: plPcrSampleCount }).map((_, i) => (
                       <Button
                         key={i}
-                        variant={activeSampleIndex[s.type] === i ? "default" : "outline"}
+                        variant={activeSampleIndex["pl_pcr"] === i ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setActiveSampleIndex(prev => ({ ...prev, [s.type]: i }))}
+                        onClick={() => setActiveSampleIndex((prev) => ({ ...prev, pl_pcr: i }))}
                       >
                         Sample {i + 1}
                       </Button>
                     ))}
                   </div>
+                  <div className="space-y-3">
+                    {availableTests
+                      .filter((t) => t.sampleType === "pl" || t.sampleType === "pcr")
+                      .map((test) => {
+                        const currentIdx = activeSampleIndex["pl_pcr"] ?? 0;
+                        const sampleType = test.sampleType as "pl" | "pcr";
+                        const isChecked = perSampleTests[sampleType][currentIdx]?.has(test.id) || false;
+                        const appliedToAll = isAppliedToAll(sampleType, test.id);
 
-                  {/* Tests for active sample */}
-                  {activeSampleIndex[s.type] !== undefined && (
-                    <div className="space-y-2">
-                      {availableTests
-                        .filter(t => t.sampleType.toLowerCase() === s.type.toLowerCase())
-                        .map(test => (
-                          <div key={test.id} className="flex items-center gap-4 p-2 border rounded">
-                            <Checkbox
-                              checked={getEffectiveSelection(s.type, activeSampleIndex[s.type]).has(test.id)}
-                              onCheckedChange={() =>
-                                handleToggleTest(s.type, activeSampleIndex[s.type], test.id)
-                              }
-                            />
-                            <div className="flex-1">{test.name} (₹{test.price})</div>
+                        return (
+                          <div
+                            key={test.id}
+                            className="flex items-center justify-between p-4 border rounded-lg bg-muted/30"
+                          >
+                            <div className="flex items-center gap-4 flex-1">
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={() => toggleTest(sampleType, currentIdx, test.id)}
+                              />
+                              <div>
+                                <p className="font-medium">
+                                  {test.name}{" "}
+                                  <span className="text-xs font-normal text-muted-foreground">
+                                    ({test.sampleType.toUpperCase()})
+                                  </span>
+                                </p>
+                                <p className="text-sm text-muted-foreground">₹{test.price}</p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant={appliedToAll ? "default" : "outline"}
+                              onClick={() => applyToAll(sampleType, test.id)}
+                              disabled={appliedToAll}
+                            >
+                              {appliedToAll ? "Applied to All" : "Apply to All"}
+                            </Button>
                           </div>
-                        ))}
-                    </div>
-                  )}
+                        );
+                      })}
+                  </div>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Side: Grouped Invoice & Payment */}
+        {/* Invoice Summary */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Invoice Summary</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {Object.entries(groupedItems).length > 0 ? (
+            <CardContent className="space-y-4">
+              {Object.keys(groupedItems).length > 0 ? (
                 <>
                   {Object.entries(groupedItems).map(([type, items]) => (
                     <div key={type} className="mb-4">
-                      <h5 className="font-semibold capitalize mb-2">{type} Tests</h5>
-                      {items.map((item, idx) => (
+                      <h5 className="font-semibold capitalize mb-2">
+                        {type === "pl" ? "PL" : type === "pcr" ? "PCR" : type} Tests
+                      </h5>
+                      {items.map((item: any, idx: number) => (
                         <div key={idx} className="flex justify-between text-sm">
-                          <span>{item.name} x {item.quantity}</span>
+                          <span>
+                            {item.name} × {item.quantity}
+                          </span>
                           <span>₹{item.total}</span>
                         </div>
                       ))}
-                      <Separator className="my-2" />
+                      <Separator className="my-3" />
                     </div>
                   ))}
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total</span>
+                  <div className="flex justify-between font-bold text-lg pt-2">
+                    <span>Total Amount</span>
                     <span>₹{total}</span>
                   </div>
                 </>
               ) : (
-                <p className="text-center text-muted-foreground text-sm">Select tests to see invoice</p>
+                <p className="text-center text-muted-foreground py-8">
+                  Select tests to generate invoice
+                </p>
               )}
             </CardContent>
           </Card>
 
-          {/* Payment Section */}
-                <Card>
-  <CardHeader>
-    <CardTitle>Payment Details</CardTitle>
-  </CardHeader>
-  <CardContent className="space-y-4">
-    <div>
-      <Label>Payment Mode</Label>
-      <Select
-        value={paymentMode}
-        onValueChange={(value: "cash" | "qr" | "neft") => setPaymentMode(value)}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="cash">Cash</SelectItem>
-          <SelectItem value="qr">QR Code / UPI</SelectItem>
-          <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Payment Mode</Label>
+                <Select
+                  value={paymentMode}
+                  onValueChange={(value: "cash" | "qr" | "neft" | "") => setPaymentMode(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="qr">QR Code / UPI</SelectItem>
+                    <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-    {/* These inputs are just shown for UI, no state tracking */}
-    {paymentMode === "qr" && (
-      <div>
-        <Label>Transaction ID</Label>
-        <Input placeholder="Enter UPI transaction ID" />
-      </div>
-    )}
-
-    {paymentMode === "neft" && (
-      <div>
-        <Label>Reference ID</Label>
-        <Input placeholder="Enter NEFT reference ID" />
-      </div>
-    )}
-
-    <Button onClick={handleGenerateInvoice} className="w-full" size="lg">
-      Generate Invoice & Proceed
-    </Button>
-  </CardContent>
-</Card>
-
+              <Button
+                onClick={handleGenerateInvoice}
+                className="w-full"
+                size="lg"
+                disabled={total === 0 || !paymentMode}
+              >
+                Generate Invoice & Proceed
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </DashboardLayout>
