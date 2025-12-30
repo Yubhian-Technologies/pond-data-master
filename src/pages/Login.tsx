@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";  
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,15 +14,27 @@ const Login = () => {
   const navigate = useNavigate();
   const [credentials, setCredentials] = useState({ email: "", password: "" });
 
+  
+  useEffect(() => {
+    const loggedIn = localStorage.getItem("isLoggedIn") === "true";
+    if (loggedIn) {
+      navigate("/locations", { replace: true });
+    }
+  }, [navigate]);
+  
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      const userCredential = await signInWithEmailAndPassword(
+      await signInWithEmailAndPassword(
         auth,
-        credentials.email,
+        credentials.email.trim(),
         credentials.password
       );
+
+     
+      localStorage.setItem("isLoggedIn", "true");
 
       toast.success("Login successful!");
       navigate("/locations");
@@ -33,10 +46,22 @@ const Login = () => {
       if (error.code === "auth/user-not-found") message = "User not found";
       if (error.code === "auth/wrong-password") message = "Wrong password";
       if (error.code === "auth/invalid-email") message = "Invalid email format";
+      if (error.code === "auth/invalid-credential") message = "Invalid email or password";
 
       toast.error(message);
     }
   };
+
+  useEffect(() => {
+  const checkLoginStatus = () => {
+    const loggedIn = localStorage.getItem("isLoggedIn") === "true";
+    if (loggedIn) {
+      navigate("/locations", { replace: true });
+    }
+  };
+
+  checkLoginStatus();
+}, [navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
@@ -55,7 +80,6 @@ const Login = () => {
 
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
-            
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -65,6 +89,7 @@ const Login = () => {
                 value={credentials.email}
                 onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                 required
+                autoFocus
               />
             </div>
 

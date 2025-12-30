@@ -407,7 +407,7 @@ export default function LabResults() {
 
       {/* Individual Report Previews */}
       {step === "soilReport" && (
-        <div>
+        <div id="printable-report">
           <SoilReport
             invoiceId={invoiceId!}
             locationId={session.locationId}
@@ -425,7 +425,7 @@ export default function LabResults() {
       )}
 
       {step === "waterReport" && (
-        <div>
+        <div id="printable-report">
           <WaterReport
             invoiceId={invoiceId!}
             locationId={session.locationId}
@@ -443,7 +443,7 @@ export default function LabResults() {
       )}
 
       {step === "microbiologyReport" && (
-        <div>
+        <div id="printable-report">
           <MicrobiologyReport
             invoiceId={invoiceId!}
             locationId={session.locationId}
@@ -461,34 +461,28 @@ export default function LabResults() {
       )}
 
       {step === "pathologyReport" && (
-        <div>
-          {hasPL && (
-            <div className="mb-16">
-              <PLReport
-                invoiceId={invoiceId!}
-                locationId={session.locationId}
-                allSampleCount={plCount}
-              />
-            </div>
-          )}
-          {hasPCR && (
-            <PCRReport
-              invoiceId={invoiceId!}
-              locationId={session.locationId}
-              allSampleCount={pcrCount}
-              compact={hasPL}
-            />
-          )}
-          {/* <div className="mt-12 text-center">
-            <button
-              onClick={() => setStep("viewReports")}
-              className="bg-green-600 text-white px-10 py-5 rounded-xl text-xl font-bold hover:bg-green-700 shadow-lg"
-            >
-              View All Final Reports
-            </button>
-          </div> */}
-        </div>
-      )}
+  <div id="printable-report" className={hasPL && hasPCR ? "combined-pathology-print" : ""}>
+    {hasPL && (
+      <div>
+        <PLReport
+          invoiceId={invoiceId!}
+          locationId={session.locationId}
+          allSampleCount={plCount}
+        />
+      </div>
+    )}
+    {hasPCR && (
+      <div>
+        <PCRReport
+          invoiceId={invoiceId!}
+          locationId={session.locationId}
+          allSampleCount={pcrCount}
+          compact={hasPL && hasPCR}
+        />
+      </div>
+    )}
+  </div>
+)}
 
       {/* FINAL REPORTS VIEW */}
       {isViewingReports && (
@@ -498,7 +492,7 @@ export default function LabResults() {
               {hasSoil && (
                 <button
                   onClick={() => setActiveEnvReport("soil")}
-                  className={`px-6 py-3 rounded-xl border-4 font-bold text-lg transition-all shadow-lg ${
+                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
                     activeEnvReport === "soil"
                       ? "bg-green-700 text-white border-green-900"
                       : "bg-green-600 text-white hover:bg-green-700 border-green-800"
@@ -511,7 +505,7 @@ export default function LabResults() {
               {hasWater && (
                 <button
                   onClick={() => setActiveEnvReport("water")}
-                  className={`px-6 py-3 rounded-xl border-4 font-bold text-lg transition-all shadow-lg ${
+                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
                     activeEnvReport === "water"
                       ? "bg-green-700 text-white border-green-900"
                       : "bg-green-600 text-white hover:bg-green-700 border-green-800"
@@ -524,7 +518,7 @@ export default function LabResults() {
               {hasMicro && (
                 <button
                   onClick={() => setActiveEnvReport("microbiology")}
-                  className={`px-6 py-3 rounded-xl border-4 font-bold text-lg transition-all shadow-lg ${
+                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
                     activeEnvReport === "microbiology"
                       ? "bg-green-700 text-white border-green-900"
                       : "bg-green-600 text-white hover:bg-green-700 border-green-800"
@@ -537,7 +531,7 @@ export default function LabResults() {
               {hasPathology && (
                 <button
                   onClick={() => setActiveEnvReport("pathology")}
-                  className={`px-6 py-3 rounded-xl border-4 font-bold text-lg transition-all shadow-lg ${
+                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
                     activeEnvReport === "pathology"
                       ? "bg-green-700 text-white border-green-900"
                       : "bg-green-600 text-white hover:bg-green-700 border-green-800"
@@ -549,7 +543,7 @@ export default function LabResults() {
             </div>
           </div>
 
-          <div className="mt-8">
+          <div id="printable-report" className="mt-8 ">
             {activeEnvReport === "soil" && (
               <SoilReport
                 invoiceId={invoiceId!}
@@ -572,26 +566,28 @@ export default function LabResults() {
               />
             )}
             {activeEnvReport === "pathology" && (
-              <div>
-                {hasPL && (
-                  <div className="mb-16">
-                    <PLReport
-                      invoiceId={invoiceId!}
-                      locationId={session.locationId}
-                      allSampleCount={plCount}
-                    />
-                  </div>
-                )}
-                {hasPCR && (
-                  <PCRReport
-                    invoiceId={invoiceId!}
-                    locationId={session.locationId}
-                    allSampleCount={pcrCount}
-                    compact={hasPL}
-                  />
-                )}
-              </div>
-            )}
+  <div className={hasPL && hasPCR ? "combined-pathology-print" : ""}>
+    {hasPL && (
+      <div>
+        <PLReport
+          invoiceId={invoiceId!}
+          locationId={session.locationId}
+          allSampleCount={plCount}
+        />
+      </div>
+    )}
+    {hasPCR && (
+      <div>
+        <PCRReport
+          invoiceId={invoiceId!}
+          locationId={session.locationId}
+          allSampleCount={pcrCount}
+          compact={hasPL && hasPCR}
+        />
+      </div>
+    )}
+  </div>
+)}
           </div>
         </div>
       )}

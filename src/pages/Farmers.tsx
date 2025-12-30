@@ -258,7 +258,9 @@ const Farmers = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-8">
+      <div className="h-screen flex flex-col">
+  <div className="flex-1 overflow-y-auto p-6 md:p-8">
+    <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -516,6 +518,8 @@ const Farmers = () => {
             </Table>
           </CardContent>
         </Card>
+      </div>
+      </div>
       </div>
     </DashboardLayout>
   );

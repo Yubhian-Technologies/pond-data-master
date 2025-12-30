@@ -49,6 +49,7 @@ const Samples = () => {
 
   const [openFarmerPopover, setOpenFarmerPopover] = useState(false);
   const [openTypePopover, setOpenTypePopover] = useState(false);
+  const [loadingInvoices, setLoadingInvoices] = useState(true);
 
   useEffect(() => {
     const fetchFarmers = async () => {
@@ -71,6 +72,7 @@ const Samples = () => {
 
   useEffect(() => {
     const fetchInvoices = async () => {
+      setLoadingInvoices(true);
       try {
         const locationId = session.locationId;
         if (!locationId) return;
@@ -82,6 +84,9 @@ const Samples = () => {
         setInvoices(data);
       } catch (err) {
         console.error("Error fetching invoices:", err);
+      }
+      finally{
+        setLoadingInvoices(false);
       }
     };
     fetchInvoices();
@@ -150,7 +155,9 @@ const isReportFullyCompleted = (sample: any) => {
 
   return (
     <DashboardLayout>
-      <div className="p-8">
+      <div className="h-screen flex flex-col">
+  <div className="flex-1 overflow-y-auto p-6 md:p-8">
+    <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Sample Submission</h1>
@@ -181,13 +188,22 @@ const isReportFullyCompleted = (sample: any) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedInvoices.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
-                      No samples submitted yet
-                    </TableCell>
-                  </TableRow>
-                ) : (
+                {loadingInvoices ? (
+    <TableRow>
+      <TableCell colSpan={7} className="h-32 text-center">
+        <div className="flex flex-col items-center justify-center gap-3">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-primary"></div>
+          <p className="text-muted-foreground">Loading samples...</p>
+        </div>
+      </TableCell>
+    </TableRow>
+  ) : sortedInvoices.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={7} className="text-center text-muted-foreground">
+        No samples submitted yet
+      </TableCell>
+    </TableRow>
+  ): (
                   sortedInvoices.map((sample) => {
                     const fullyCompleted = isReportFullyCompleted(sample);
                     const invoiceId = sample.invoiceId ?? sample.id;
@@ -458,6 +474,8 @@ const isReportFullyCompleted = (sample: any) => {
             )}
           </DialogContent>
         </Dialog>
+      </div>
+      </div>
       </div>
     </DashboardLayout>
   );

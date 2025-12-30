@@ -116,16 +116,16 @@ export default function MicrobiologyReport({
 
       {/* Header */}
       <div className="flex justify-between items-start mb-8 border-b-4 border-black pb-6">
-        <img src={ADC} alt="ADC Logo" className="w-40" />
+        <img src={ADC} alt="ADC Logo" className="w-32" />
         <div className="text-center flex-1">
-          <h1 className="text-3xl font-bold text-blue-700">
+          <h1 className="text-2xl font-bold text-blue-700">
             WATERBASE AQUA DIAGNOSTIC CENTER
           </h1>
           <h2 className="text-2xl font-bold text-red-600 mt-3">
             Microbiology Analysis Report
           </h2>
         </div>
-        <img src={AV} alt="AV Logo" className="w-40" />
+        <img src={AV} alt="AV Logo" className="w-32" />
       </div>
 
       {/* Report ID - Exactly like other reports */}

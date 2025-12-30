@@ -316,7 +316,7 @@ export default function PLForm({
             >
               {plData[row.key].map((value: string, i: number) => (
                 <div key={i} className="flex flex-col">
-                  <span className="text-xs text-gray-500 mb-1 text-center">Sample {i + 1}</span>
+                  <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
                   <input
                     className="border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder={`S${i + 1}`}

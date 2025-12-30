@@ -124,3 +124,129 @@ All colors MUST be HSL.
 }
   }
 }
+@media print {
+  /* Hide everything by default when printing */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Only show the report container and its children */
+  #printable-report,
+  #printable-report * {
+    visibility: visible;
+  }
+
+  /* Position the report at the top-left of the printed page */
+  #printable-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Optional: Ensure no page breaks inside reports */
+  #printable-report {
+    page-break-inside: avoid;
+  }
+}
+
+@media print {
+  /* Hide everything except the report */
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-report,
+  #printable-report * {
+    visibility: visible;
+  }
+
+  #printable-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* THIS IS THE KEY FIX: Force colors and backgrounds to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}
+
+
+@media print {
+  /* Existing rules you already have */
+  body * {
+    visibility: hidden;
+  }
+
+  #printable-report,
+  #printable-report * {
+    visibility: visible;
+  }
+
+  #printable-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Force colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* NEW: A4 page setup */
+  @page {
+    size: A4;
+    margin: 0.5cm; /* Small margin for printer safety */
+  }
+
+  /* NEW: Special styling ONLY for PL + PCR combined report */
+  .combined-pathology-print {
+    max-width: 210mm; /* A4 width */
+    min-height: 297mm; /* A4 height */
+    padding: 10mm 12mm;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4mm; /* Reduced gap between PL and PCR */
+    page-break-after: avoid;
+  }
+
+  .combined-pathology-print > div {
+    flex-shrink: 0;
+  }
+
+  /* Reduce font sizes and spacing inside tables for better fit */
+  .combined-pathology-print table {
+    font-size: 10px !important;
+  }
+
+  .combined-pathology-print th,
+  .combined-pathology-print td {
+    padding: 4px 6px !important;
+  }
+
+  .combined-pathology-print h1,
+  .combined-pathology-print h2 {
+    margin: 4px 0 !important;
+    font-size: 18px !important;
+  }
+
+  .combined-pathology-print h2 {
+    font-size: 16px !important;
+  }
+
+  /* Reduce space around farmer info table */
+  .combined-pathology-print .flex.justify-center {
+    margin: 6px 0 !important;
+  }
+}

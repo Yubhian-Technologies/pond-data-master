@@ -31,11 +31,9 @@ export default function PCRReport({
       try {
         setLoading(true);
 
-        // Decide whether to fetch all samples
         const shouldShowAll = showAllSamples || (allSampleCount && allSampleCount > 1);
 
         if (shouldShowAll) {
-          // === FETCH ALL SAMPLES ===
           const collectionRef = collection(
             db,
             "locations",
@@ -71,21 +69,18 @@ export default function PCRReport({
             };
           });
 
-          // Sort samples numerically by sampleCode
           allReports.sort((a, b) => {
             const numA = parseInt(a.sampleCode.toString().replace(/\D/g, "")) || 0;
             const numB = parseInt(b.sampleCode.toString().replace(/\D/g, "")) || 0;
             return numA - numB;
           });
 
-          // Set farmer info only in full mode and if at least one report exists
           if (!compact && allReports.length > 0) {
             setFarmerInfo(allReports[0].farmerInfo);
           }
 
           setReports(allReports);
         } else {
-          // === FETCH SINGLE SAMPLE ===
           const docRef = doc(
             db,
             "locations",
@@ -145,15 +140,11 @@ export default function PCRReport({
     return <p className="text-center py-12 text-red-600 text-xl">No PCR report found.</p>;
   }
 
-  // Safe extraction of pathogen names
   const allPathogens = Array.from(
     new Set(reports.flatMap((r) => (r.pathogens || []).map((p: any) => p.name)))
   );
   const singlePathogen = allPathogens.length === 1;
 
-  /* =========================
-     RESULT TABLE
-  ========================= */
   const ResultTable = () => (
     <div className="overflow-x-auto mb-8">
       <table className="w-full border-2 border-gray-800 text-sm">
@@ -226,18 +217,52 @@ export default function PCRReport({
   );
 
   /* =========================
-     COMPACT MODE (Table only)
+     GEL IMAGES SECTION (Reusable)
   ========================= */
+  const GelImagesSection = () => {
+    if (!reports.some((r) => r.gelImageUrl)) return null;
+
+    return (
+      <div className="mt-12">
+        <h3 className="text-2xl font-bold text-center mb-8 text-gray-800">
+          Report Images
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {reports
+            .filter((r) => r.gelImageUrl)
+            .map((r, idx) => (
+              <div
+                key={idx}
+                className="border-2 border-gray-300 rounded-lg overflow-hidden shadow-md"
+              >
+                <p className="text-center font-bold text-lg py-3 bg-gray-100">
+                  Sample {r.sampleCode}
+                </p>
+                <img
+                  src={r.gelImageUrl}
+                  alt={`Gel Image - Sample ${r.sampleCode}`}
+                  className="w-full h-auto object-contain"
+                />
+              </div>
+            ))}
+        </div>
+      </div>
+    );
+  };
+
   if (compact) {
-    return <ResultTable />;
+    return (
+      <div className="bg-white">
+        <ResultTable />
+        <GelImagesSection />
+      </div>
+    );
   }
 
-  /* =========================
-     FULL REPORT MODE
-  ========================= */
+  
   return (
     <div className="bg-white p-8 shadow-lg rounded-lg" id="report">
-      {/* Print Button */}
+      
       <div className="print:hidden mb-8 text-right">
         <button
           onClick={() => window.print()}
@@ -248,7 +273,6 @@ export default function PCRReport({
         </button>
       </div>
 
-      {/* Header */}
       <div className="flex justify-between items-center border-b-4 border-blue-700 pb-8 mb-10">
         <img src={ADC} alt="ADC Logo" className="h-28" />
         <div className="text-center">
@@ -262,10 +286,11 @@ export default function PCRReport({
         <img src={AV} alt="AV Logo" className="h-28" />
       </div>
 
- <div className="text-right mb-6">
+      <div className="text-right mb-6">
         <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
       </div>
-      {/* Farmer Information */}
+
+    
       {farmerInfo && (
         <table className="w-full mb-10 border-2 border-gray-800 text-sm">
           <tbody>
@@ -289,31 +314,8 @@ export default function PCRReport({
         </table>
       )}
 
-      {/* Results Table */}
       <ResultTable />
-
-      {/* Gel Images */}
-      {reports.some((r) => r.gelImageUrl) && (
-        <div className="mt-12">
-          <h3 className="text-2xl font-bold text-center mb-8 text-gray-800">Gel Images</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {reports
-              .filter((r) => r.gelImageUrl)
-              .map((r, idx) => (
-                <div key={idx} className="border-2 border-gray-300 rounded-lg overflow-hidden shadow-md">
-                  <p className="text-center font-bold text-lg py-3 bg-gray-100">
-                    Sample {r.sampleCode}
-                  </p>
-                  <img
-                    src={r.gelImageUrl}
-                    alt={`Gel Image - Sample ${r.sampleCode}`}
-                    className="w-full h-auto"
-                  />
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
+      <GelImagesSection />
     </div>
   );
 }

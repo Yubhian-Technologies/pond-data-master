@@ -1,8 +1,11 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+
 import Login from "./pages/Login";
 import LocationSelection from "./pages/LocationSelection";
 import TechnicianSelection from "./pages/TechnicianSelection";
@@ -15,20 +18,35 @@ import Reports from "./pages/Reports";
 import CMIS from "./pages/CMIS";
 import NotFound from "./pages/NotFound";
 import InvoiceTemplate from "../src/data/template";
-import { UserSessionProvider, useUserSession } from "./contexts/UserSessionContext";
+import { UserSessionProvider } from "./contexts/UserSessionContext";
 import InvoiceView from "./pages/InvoiceViewer";
 import SoilReport from "../../pond-data-master/src/components/reports/SoilReport";
 import WaterReport from "../../pond-data-master/src/components/reports/WaterReport";
 
 const queryClient = new QueryClient();
 
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  const { session } = useUserSession();
-  const location = useLocation();
 
-  if (!session.locationId) {
-    return <Navigate to="/" replace state={{ from: location }} />;
-  }
+const AuthLoading = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-primary"></div>
+  </div>
+);
+
+const Protected = ({ children }: { children: JSX.Element }) => {
+  const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("isLoggedIn");
+    const loggedIn = stored === "true";
+    setIsLoggedIn(loggedIn);
+    if (!loggedIn) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
+
+  if (isLoggedIn === null) return <AuthLoading />;
+  if (!isLoggedIn) return null;
 
   return children;
 };
@@ -41,116 +59,20 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            
             <Route path="/" element={<Login />} />
-
-            
-            <Route
-              path="/locations"
-              element={
-                <ProtectedRoute>
-                  <LocationSelection />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/technicians/:locationId"
-              element={
-                <ProtectedRoute>
-                  <TechnicianSelection />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/farmers"
-              element={
-                <ProtectedRoute>
-                  <Farmers />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/samples"
-              element={
-                <ProtectedRoute>
-                  <Samples />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/invoice"
-              element={
-                <ProtectedRoute>
-                  <Invoice />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/lab-results/:invoiceId"
-              element={
-                <ProtectedRoute>
-                  <LabResults />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/soil-report/:invoiceId/:locationId"
-              element={
-                <ProtectedRoute>
-                  <SoilReport />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/water-report/:invoiceId/:locationId"
-              element={
-                <ProtectedRoute>
-                  <WaterReport />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute>
-                  <Reports />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cmis"
-              element={
-                <ProtectedRoute>
-                  <CMIS />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/invoice/:invoiceId/:locationId"
-              element={
-                <ProtectedRoute>
-                  <InvoiceView />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/invoice-template"
-              element={
-                <ProtectedRoute>
-                  <InvoiceTemplate />
-                </ProtectedRoute>
-              }
-            />
-
-            
+            <Route path="/locations" element={<Protected><LocationSelection /></Protected>} />
+            <Route path="/technicians/:locationId" element={<Protected><TechnicianSelection /></Protected>} />
+            <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+            <Route path="/farmers" element={<Protected><Farmers /></Protected>} />
+            <Route path="/samples" element={<Protected><Samples /></Protected>} />
+            <Route path="/invoice" element={<Protected><Invoice /></Protected>} />
+            <Route path="/lab-results/:invoiceId" element={<Protected><LabResults /></Protected>} />
+            <Route path="/soil-report/:invoiceId/:locationId" element={<Protected><SoilReport /></Protected>} />
+            <Route path="/water-report/:invoiceId/:locationId" element={<Protected><WaterReport /></Protected>} />
+            <Route path="/invoice-template" element={<Protected><InvoiceTemplate /></Protected>} />
+            <Route path="/reports" element={<Protected><Reports /></Protected>} />
+            <Route path="/cmis" element={<Protected><CMIS /></Protected>} />
+            <Route path="/invoice/:invoiceId/:locationId" element={<Protected><InvoiceView /></Protected>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

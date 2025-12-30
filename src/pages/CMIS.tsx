@@ -331,7 +331,9 @@ const CMIS = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-8">
+      <div className="h-screen flex flex-col">
+  <div className="flex-1 overflow-y-auto p-6 md:p-8">
+    <div className="max-w-7xl mx-auto">
         <div className="mb-12">
           <h1 className="text-3xl font-bold text-foreground mb-2">CMIS - Lab Management</h1>
           <p className="text-muted-foreground">Manage laboratory expenses, assets, and payments</p>
@@ -643,6 +645,8 @@ const CMIS = () => {
             </div>
           </CardContent>
         </Card>
+      </div>
+      </div>
       </div>
     </DashboardLayout>
   );

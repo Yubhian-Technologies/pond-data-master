@@ -86,7 +86,7 @@ export default function PLReport({
           const savedPlData = data.plData || {};
 
           const normalized: PLData = {
-            testCode: Array.from({ length: allSampleCount }, (_, i) => savedPlData.testCode?.[i] || `Sample ${i + 1}`),
+            testCode: Array.from({ length: allSampleCount }, (_, i) => savedPlData.testCode?.[i] || `${i + 1}`),
             rostralSpines: Array.from({ length: allSampleCount }, (_, i) => savedPlData.rostralSpines?.[i] || "-"),
             avgLength: Array.from({ length: allSampleCount }, (_, i) => savedPlData.avgLength?.[i] || "-"),
             plAge: Array.from({ length: allSampleCount }, (_, i) => savedPlData.plAge?.[i] || "-"),
@@ -180,7 +180,7 @@ export default function PLReport({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-8" id="report">
-      <div className="mb-6 print:hidden">
+      <div className="mb-5 print:hidden">
         <button
           onClick={handlePrint}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
@@ -190,7 +190,7 @@ export default function PLReport({
       </div>
 
       
-      <div className="flex justify-between items-start mb-8 border-b-2 border-black pb-6">
+      <div className="flex justify-between items-start mb-8  border-b-2 border-black ">
         <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
         <div className="text-center flex-1">
           <h1 className="text-3xl font-bold text-blue-700">
@@ -204,12 +204,12 @@ export default function PLReport({
       </div>
 
       
-      <div className="text-right mb-6">
+      <div className="text-right mb-4 ">
         <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
       </div>
 
       {/* Farmer Information Table */}
-      <div className="flex justify-center mb-10">
+      <div className="flex justify-center mb-12">
         <table className="border-2 border-gray-800 text-sm">
           <tbody>
             <tr>

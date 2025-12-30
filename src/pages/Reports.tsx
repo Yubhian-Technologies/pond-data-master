@@ -24,13 +24,14 @@ const Reports = () => {
   const { session } = useUserSession();
   const navigate = useNavigate();
   const [reports, setReports] = useState<ReportEntry[]>([]);
+   const [loadingInvoices, setLoadingInvoices] = useState(true);
 
   const locationId = session.locationId;
 
   useEffect(() => {
     const fetchReports = async () => {
       if (!locationId) return;
-
+      setLoadingInvoices(true);
       try {
         const invoicesRef = collection(db, "locations", locationId, "invoices");
         const snap = await getDocs(invoicesRef);
@@ -86,6 +87,9 @@ const Reports = () => {
       } catch (err) {
         console.error("Failed to load reports:", err);
       }
+      finally{
+        setLoadingInvoices(false);
+      }
     };
 
     fetchReports();
@@ -97,7 +101,9 @@ const Reports = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="h-screen flex flex-col">
+  <div className="flex-1 overflow-y-auto p-6 md:p-8">
+    <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-10">
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
@@ -109,7 +115,15 @@ const Reports = () => {
           </p>
         </div>
 
-        {reports.length === 0 ? (
+        {loadingInvoices==true? (
+          <div className="flex flex-col items-center justify-center gap-3">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-primary"></div>
+          <p className="text-muted-foreground">Loading Reports...</p>
+          <p className="text-sm text-muted-foreground max-w-lg mx-auto">
+                Reports will appear here once lab analysis is fully completed and finalized.
+              </p>
+        </div>
+        ):reports.length === 0 ? (
           <Card className="border-dashed border-2 shadow-sm">
             <CardContent className="text-center py-16">
               <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
@@ -187,6 +201,8 @@ const Reports = () => {
             ))}
           </div>
         )}
+      </div>
+      </div>
       </div>
     </DashboardLayout>
   );

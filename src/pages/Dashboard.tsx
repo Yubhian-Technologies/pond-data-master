@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { signOut } from "firebase/auth";
+import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search,
@@ -38,6 +40,7 @@ import {
 import { db } from "./firebase";
 import { formatDistanceToNow, startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 import * as XLSX from "xlsx";
+import {auth} from "@/pages/firebase"
 
 interface Location {
   id: string;
@@ -369,13 +372,27 @@ const Dashboard = () => {
     XLSX.writeFile(wb, fileName);
   };
 
+
+const handleLogout = async () => {
+  try {
+    await signOut(auth);
+    localStorage.setItem("isLoggedIn", "false");  // ← ADD THIS
+    toast.success("Logged out successfully");
+  } catch (error) {
+    toast.error("Logout failed");
+    console.error(error);
+  }
+};
+
   const hasAnyFilter = !!startDate || !!endDate || !!searchTerm;
 
   const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Loading...";
 
   return (
     <DashboardLayout>
-      <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="h-screen flex flex-col">
+  <div className="flex-1 overflow-y-auto p-6 md:p-8">
+    <div className="max-w-7xl mx-auto"></div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
           <div>
@@ -383,16 +400,19 @@ const Dashboard = () => {
             <p className="text-muted-foreground mt-1">Laboratory operations overview</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-blue-50 px-4 py-2.5 rounded-full shadow-sm">
-              <User className="w-5 h-5 text-blue-600" />
-              <span className="font-medium text-gray-700">
-                {session.technicianName || "Technician"}
-              </span>
-            </div>
-            <Button variant="destructive" size="sm" onClick={handleExit}>
-              Exit Technician
-            </Button>
-          </div>
+  <div className="flex items-center gap-3 bg-blue-50 px-4 py-2.5 rounded-full shadow-sm">
+    <User className="w-5 h-5 text-blue-600" />
+    <span className="font-medium text-gray-700">
+      {session.technicianName || "Technician"}
+    </span>
+  </div>
+  {/* <div className="flex gap-3">
+    <Button variant="destructive" size="sm" onClick={handleExit}>
+      Exit Technician
+    </Button>
+    
+  </div> */}
+</div>
         </div>
 
         {/* Filters */}
@@ -619,6 +639,9 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+    </div>
+  
+
     </DashboardLayout>
   );
 };
