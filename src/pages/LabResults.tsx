@@ -460,10 +460,11 @@ export default function LabResults() {
         </div>
       )}
 
-      {step === "pathologyReport" && (
+    {step === "pathologyReport" && (
   <div id="printable-report" className={hasPL && hasPCR ? "combined-pathology-print" : ""}>
+    {/* PL Report */}
     {hasPL && (
-      <div>
+      <div className="mb-32">
         <PLReport
           invoiceId={invoiceId!}
           locationId={session.locationId}
@@ -471,14 +472,38 @@ export default function LabResults() {
         />
       </div>
     )}
+
+    {/* PCR Report */}
     {hasPCR && (
-      <div>
+      <div className="mb-20">
         <PCRReport
           invoiceId={invoiceId!}
           locationId={session.locationId}
           allSampleCount={pcrCount}
           compact={hasPL && hasPCR}
         />
+      </div>
+    )}
+
+    {/* SINGLE SIGNATURE & NOTE - ONLY once, at the very bottom after PCR */}
+    {(hasPL || hasPCR) && (
+      <div className="mt-20 border-t-2 border-black pt-8">
+        <div className="flex justify-between text-sm px-10 mb-10">
+          <div>
+            <p className="font-semibold">Reported by:</p>
+            <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
+          </div>
+          <div>
+            <p className="font-semibold">Checked by:</p>
+            <p className="mt-8">______________________</p>
+          </div>
+        </div>
+
+        <div className="text-center text-xs text-gray-700">
+          <p>
+            <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
+          </p>
+        </div>
       </div>
     )}
   </div>
@@ -568,7 +593,7 @@ export default function LabResults() {
             {activeEnvReport === "pathology" && (
   <div className={hasPL && hasPCR ? "combined-pathology-print" : ""}>
     {hasPL && (
-      <div>
+      <div className="mb-32">
         <PLReport
           invoiceId={invoiceId!}
           locationId={session.locationId}
@@ -576,14 +601,36 @@ export default function LabResults() {
         />
       </div>
     )}
+
     {hasPCR && (
-      <div>
+      <div className="mb-20">
         <PCRReport
           invoiceId={invoiceId!}
           locationId={session.locationId}
           allSampleCount={pcrCount}
           compact={hasPL && hasPCR}
         />
+      </div>
+    )}
+
+    {(hasPL || hasPCR) && (
+      <div className="mt-20 border-t-2 border-black pt-8">
+        <div className="flex justify-between text-sm px-10 mb-10">
+          <div>
+            <p className="font-semibold">Reported by:</p>
+            <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
+          </div>
+          <div>
+            <p className="font-semibold">Checked by:</p>
+            <p className="mt-8">______________________</p>
+          </div>
+        </div>
+
+        <div className="text-center text-xs text-gray-700">
+          <p>
+            <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
+          </p>
+        </div>
       </div>
     )}
   </div>

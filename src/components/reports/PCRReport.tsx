@@ -1,9 +1,12 @@
+// src/components/reports/PCRReport.tsx
+
 import React, { useEffect, useState } from "react";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "@/pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import { Printer } from "lucide-react";
+import { useUserSession } from "@/contexts/UserSessionContext"; // ← Added
 
 interface PCRReportProps {
   invoiceId: string;
@@ -22,8 +25,11 @@ export default function PCRReport({
   allSampleCount = 1,
   compact = false,
 }: PCRReportProps) {
+  const { session } = useUserSession(); // ← Get current technician from session
+
   const [farmerInfo, setFarmerInfo] = useState<any>(null);
   const [reports, setReports] = useState<any[]>([]);
+  const [technicianName, setTechnicianName] = useState<string>(""); // ← Added
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,6 +38,8 @@ export default function PCRReport({
         setLoading(true);
 
         const shouldShowAll = showAllSamples || (allSampleCount && allSampleCount > 1);
+
+        let techName = "";
 
         if (shouldShowAll) {
           const collectionRef = collection(
@@ -54,6 +62,11 @@ export default function PCRReport({
           const allReports = snap.docs.map((d) => {
             const data = d.data();
             const sampleId = d.id.replace(/^sample_/, "");
+
+            // Try to get technician name from any of the PCR documents
+            if (!techName && (data.technicianName || data.reportedBy)) {
+              techName = data.technicianName || data.reportedBy || "";
+            }
 
             return {
               sampleCode: data.sampleCode || sampleId || "Unknown",
@@ -95,6 +108,10 @@ export default function PCRReport({
 
           if (snap.exists()) {
             const data = snap.data();
+
+            // Get technician name from this single document
+            techName = data.technicianName || data.reportedBy || "";
+
             setFarmerInfo({
               farmerName: data.farmerName || "",
               village: data.village || "",
@@ -115,17 +132,29 @@ export default function PCRReport({
             setFarmerInfo(null);
           }
         }
+
+        // Fallback to current logged-in technician if nothing found in documents
+        if (!techName && session?.technicianName) {
+          techName = session.technicianName;
+        }
+
+        setTechnicianName(techName);
+
       } catch (err) {
         console.error("Error fetching PCR report:", err);
         setReports([]);
         setFarmerInfo(null);
+        // On error, fallback to session name
+        if (session?.technicianName) {
+          setTechnicianName(session.technicianName);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchPCRReport();
-  }, [invoiceId, locationId, sampleNumber, showAllSamples, allSampleCount, compact]);
+  }, [invoiceId, locationId, sampleNumber, showAllSamples, allSampleCount, compact, session]);
 
   if (loading) {
     return (
@@ -259,10 +288,8 @@ export default function PCRReport({
     );
   }
 
-  
   return (
     <div className="bg-white p-8 shadow-lg rounded-lg" id="report">
-      
       <div className="print:hidden mb-8 text-right">
         <button
           onClick={() => window.print()}
@@ -279,6 +306,8 @@ export default function PCRReport({
           <h1 className="text-4xl font-bold text-blue-800">
             WATERBASE AQUA DIAGNOSTIC CENTER
           </h1>
+          <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
+          <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
           <h2 className="text-2xl font-bold text-red-700 mt-4">
             RT-q PCR Analysis Test Report
           </h2>
@@ -290,7 +319,6 @@ export default function PCRReport({
         <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
       </div>
 
-    
       {farmerInfo && (
         <table className="w-full mb-10 border-2 border-gray-800 text-sm">
           <tbody>
@@ -316,6 +344,27 @@ export default function PCRReport({
 
       <ResultTable />
       <GelImagesSection />
+
+      {/* Signature Section - Added exactly like other reports */}
+      <div className="mt-16 mb-8 border-t-2 border-black pt-6">
+        <div className="flex justify-between text-sm px-10">
+          <div>
+            <p className="font-semibold">Reported by:</p>
+            <p className="mt-8 font-medium">{technicianName}</p>
+          </div>
+          <div>
+            <p className="font-semibold">Checked by:</p>
+            <p className="mt-8">______________________</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Note */}
+      <div className="text-center text-xs text-gray-700 mt-10 mb-4">
+        <p>
+          <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
+        </p>
+      </div>
     </div>
   );
 }

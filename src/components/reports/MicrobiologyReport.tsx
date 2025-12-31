@@ -6,6 +6,7 @@ import { db } from "../../pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import { Printer } from "lucide-react";
+import { useUserSession } from "@/contexts/UserSessionContext"; // <-- Added this
 
 interface FarmerInfo {
   farmerName: string;
@@ -32,8 +33,11 @@ export default function MicrobiologyReport({
   locationId,
   allSampleCount,
 }: MicrobiologyReportProps) {
+  const { session } = useUserSession(); // <-- Get current technician from session
+
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo | null>(null);
   const [data, setData] = useState<MicrobiologyData | null>(null);
+  const [technicianName, setTechnicianName] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,11 +54,15 @@ export default function MicrobiologyReport({
           "microbiologyReports",
           "data"
         );
-
         const snap = await getDoc(reportRef);
+
+        let techName = "";
 
         if (snap.exists()) {
           const reportData = snap.data();
+
+          // Try to get technician name from the microbiology report document
+          techName = reportData.technicianName || reportData.reportedBy || "";
 
           setFarmerInfo(reportData.farmerInfo || null);
 
@@ -83,16 +91,30 @@ export default function MicrobiologyReport({
           setData(empty);
           setFarmerInfo(null);
         }
+
+        // Fallback: If no name in document, use the currently logged-in technician's name
+        if (!techName && session?.technicianName) {
+          techName = session.technicianName;
+        }
+
+        setTechnicianName(techName);
+
       } catch (e) {
         console.error("Error fetching microbiology report:", e);
         setData(null);
+        // On error, still try to show current technician name as fallback
+        if (session?.technicianName) {
+          setTechnicianName(session.technicianName);
+        } else {
+          setTechnicianName("");
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchReport();
-  }, [invoiceId, locationId, allSampleCount]);
+  }, [invoiceId, locationId, allSampleCount, session]);
 
   const handlePrint = () => window.print();
 
@@ -116,7 +138,7 @@ export default function MicrobiologyReport({
         </button>
       </div>
 
-      {/* Main report container - NO max-width, NO padding, NO mx-auto */}
+      {/* Main report container */}
       <div className="bg-white" id="report">
         {/* Header */}
         <div className="flex justify-between items-start mb-8 border-b-4 border-black pb-6">
@@ -125,6 +147,8 @@ export default function MicrobiologyReport({
             <h1 className="text-2xl font-bold text-blue-700">
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
+            <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
+            <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
             <h2 className="text-2xl font-bold text-red-600 mt-3">
               Microbiology Analysis Report
             </h2>
@@ -198,6 +222,25 @@ export default function MicrobiologyReport({
           </table>
         </div>
 
+        {/* Signature Section */}
+        <div className="mt-16 mb-8 border-t-2 border-black pt-6">
+          <div className="flex justify-between text-sm px-10">
+            <div>
+              <p className="font-semibold">Reported by:</p>
+              <p className="mt-8 font-medium">{technicianName}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Checked by:</p>
+              <p className="mt-8">______________________</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Note */}
+        <div className="text-center text-xs text-gray-700 mt-10 mb-4">
+          <p><strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.</p>
+        </div>
+
         <div className="mt-12 text-center text-sm text-gray-600 print:hidden">
           Report generated on {new Date().toLocaleDateString()}
         </div>
@@ -236,7 +279,7 @@ export default function MicrobiologyReport({
             top: 0 !important;
             width: 210mm !important;
             height: 297mm !important;
-            padding: 0 !important; /* Zero padding - full bleed */
+            padding: 0 !important;
             box-sizing: border-box !important;
             margin: 0 !important;
             background: white !important;
@@ -245,7 +288,7 @@ export default function MicrobiologyReport({
           #report > div, table {
             width: 100% !important;
             max-width: none !important;
-            margin: 0 0 12px 0 !important; /* Only small vertical spacing between sections */
+            margin: 0 0 12px 0 !important;
             padding: 0 !important;
           }
 

@@ -1,3 +1,5 @@
+// src/components/reports/PLReport.tsx
+
 import React, { useState, useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../pages/firebase";
@@ -189,13 +191,14 @@ export default function PLReport({
         </button>
       </div>
 
-      
-      <div className="flex justify-between items-start mb-8  border-b-2 border-black ">
+      <div className="flex justify-between items-start mb-8 border-b-2 border-black">
         <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
         <div className="text-center flex-1">
           <h1 className="text-3xl font-bold text-blue-700">
             WATERBASE AQUA DIAGNOSTIC CENTER
           </h1>
+          <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
+          <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
           <h2 className="text-2xl font-bold text-red-600 mt-3">
             Post Larvae General Observation Report
           </h2>
@@ -203,8 +206,7 @@ export default function PLReport({
         <img src={AV} alt="AV Logo" className="w-40 object-contain" />
       </div>
 
-      
-      <div className="text-right mb-4 ">
+      <div className="text-right mb-4">
         <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
       </div>
 
@@ -240,7 +242,7 @@ export default function PLReport({
         </table>
       </div>
 
-      
+      {/* PL Data Table */}
       <div className="flex justify-center overflow-x-auto">
         <table className="inline-table border-2 border-gray-800 text-xs whitespace-nowrap">
           <thead>
@@ -296,6 +298,8 @@ export default function PLReport({
           </tbody>
         </table>
       </div>
+
+      {/* REMOVED SIGNATURE AND NOTE - Now handled only in LabResults.tsx when combined */}
 
       <div className="mt-12 text-center text-sm text-gray-600 print:hidden">
         <p>Report generated on {new Date().toLocaleDateString()}</p>

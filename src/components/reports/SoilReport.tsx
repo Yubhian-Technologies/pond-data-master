@@ -12,6 +12,8 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
+import AV from "@/assets/AV.jpg";
+import ADC from "@/assets/ADC.jpg"
 
 interface FormData {
   farmerName: string;
@@ -27,8 +29,8 @@ interface FormData {
   sampleTime: string;
   reportTime: string;
   reportedBy: string;
-  checkedBy: string;
-  cmisBy: string;
+  checkedBy: string;        // We keep this but always leave it blank
+  // Remove cmisBy completely
 }
 
 interface FarmerData {
@@ -70,7 +72,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
     reportTime: new Date().toTimeString().slice(0, 5),
     reportedBy: "",
     checkedBy: "",
-    cmisBy: "",
+   
   });
 
   const [samples, setSamples] = useState<any[]>([]);
@@ -126,9 +128,9 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
         setFormData((prev) => ({
           ...prev,
-          cmisBy: technicianName || "",
+          
           reportedBy: technicianName || "",
-          checkedBy: technicianName || "",
+          checkedBy:"",
           farmerName: data.farmerName || "",
           farmerUID: data.farmerUID || data.farmerId || "",
           farmerAddress: data.farmerAddress || "",
@@ -206,11 +208,11 @@ const SoilReport: React.FC<SoilReportProps> = ({
       </div>
 
       <div className="bg-white" id="report">
-        <div className="text-center py-2 mb-4" style={{ backgroundColor: '#1e3a8a', color: '#ffffff' }}>
+        {/* <div className="text-center py-2 mb-4" style={{ backgroundColor: '#1e3a8a', color: '#ffffff' }}>
           <h1 className="text-xl font-bold">SOIL ANALYSIS REPORT</h1>
-        </div>
+        </div> */}
 
-        <div className="flex justify-between items-start mb-4 pb-4" style={{ borderBottom: '2px solid #374151' }}>
+        {/* <div className="flex justify-between items-start mb-4 pb-4" style={{ borderBottom: '2px solid #374151' }}>
           <div className="flex items-start gap-4">
             <div className="px-4 py-3 rounded font-bold text-2xl" style={{ backgroundColor: '#dc2626', color: '#ffffff' }}>
               <div>KC</div>
@@ -231,8 +233,21 @@ const SoilReport: React.FC<SoilReportProps> = ({
             <div className="mt-2">Ph : 08816-297707</div>
             <div>Email:bhimavaram@kctgroup.com</div>
           </div>
+        </div> */}
+ <div className="flex justify-between items-start mb-8  border-b-2 border-black ">
+        <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
+        <div className="text-center flex-1">
+          <h1 className="text-3xl font-bold text-blue-700">
+            WATERBASE AQUA DIAGNOSTIC CENTER
+          </h1>
+          <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
+            <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
+          <h2 className="text-2xl font-bold text-red-600 mt-3">
+            Soil Analysis Report
+          </h2>
         </div>
-
+        <img src={AV} alt="AV Logo" className="w-40 object-contain" />
+      </div>
         <div className="text-right mb-4">
           <span className="font-bold">Report Id:- {invoiceId || "-"}</span>
         </div>
@@ -319,6 +334,9 @@ const SoilReport: React.FC<SoilReportProps> = ({
             <div className="px-2 py-1 text-xs" style={{ width: '33.33%', borderRight: '1px solid #1f2937' }}>
               <span className="font-semibold">Reported by :</span> {formData.reportedBy}
             </div>
+            <div className="px-2 py-2 text-xs font-medium" style={{ width: '50%' }}>
+      Checked by: ______________________
+    </div>
           </div>
         </div>
 
