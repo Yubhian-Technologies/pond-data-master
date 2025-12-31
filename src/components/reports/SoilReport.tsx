@@ -175,12 +175,12 @@ const SoilReport: React.FC<SoilReportProps> = ({
         }));
 
         const formattedSamples = list.map((s: any, i: number) => ({
-  id: s.id,
-  ...s,
-  pondNo: (s as any).pondNo || `Sample ${i + 1}`, 
-}));
+          id: s.id,
+          ...s,
+          pondNo: (s as any).pondNo || `Sample ${i + 1}`, 
+        }));
 
-setSamples(formattedSamples);
+        setSamples(formattedSamples);
 
       } catch (error) {
         console.error("Error loading soil report:", error);
@@ -196,7 +196,6 @@ setSamples(formattedSamples);
 
   return (
     <>
-      {/* Print Button - Visible only on screen, matches Water Report style */}
       <div className="mb-6 print:hidden text-center">
         <button
           onClick={handlePrint}
@@ -206,13 +205,11 @@ setSamples(formattedSamples);
         </button>
       </div>
 
-      <div className="bg-white p-8 max-w-[1400px] mx-auto print:p-4" id="report">
-        {/* Header with Blue Background */}
+      <div className="bg-white" id="report">
         <div className="text-center py-2 mb-4" style={{ backgroundColor: '#1e3a8a', color: '#ffffff' }}>
           <h1 className="text-xl font-bold">SOIL ANALYSIS REPORT</h1>
         </div>
 
-        {/* Organization Details + Report ID (exactly like Water Report) */}
         <div className="flex justify-between items-start mb-4 pb-4" style={{ borderBottom: '2px solid #374151' }}>
           <div className="flex items-start gap-4">
             <div className="px-4 py-3 rounded font-bold text-2xl" style={{ backgroundColor: '#dc2626', color: '#ffffff' }}>
@@ -236,12 +233,10 @@ setSamples(formattedSamples);
           </div>
         </div>
 
-        {/* Report ID - Exactly like Water Report */}
         <div className="text-right mb-4">
           <span className="font-bold">Report Id:- {invoiceId || "-"}</span>
         </div>
 
-        {/* Farmer Info Grid - Already matching Water Report */}
         <div className="grid grid-cols-10 gap-0 text-sm mb-6 border border-black">
           <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Name</div>
           <div className="col-span-2 border-r border-black p-0.5">{formData.farmerName || "-"}</div>
@@ -271,7 +266,6 @@ setSamples(formattedSamples);
           <div className="col-span-1 border-r border-t border-black p-0.5">{formData.reportTime}</div>
         </div>
 
-        {/* Test Results Table */}
         <table className="w-full mb-4 text-xs" style={{ border: '2px solid #1f2937' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #1f2937', backgroundColor: '#d1d5db' }}>
@@ -317,7 +311,6 @@ setSamples(formattedSamples);
           </tbody>
         </table>
 
-        {/* Footer */}
         <div className="mb-4" style={{ border: '2px solid #1f2937' }}>
           <div className="text-xs px-2 py-1" style={{ borderBottom: '1px solid #1f2937' }}>
             <span className="font-bold">Note :</span> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation
@@ -326,12 +319,6 @@ setSamples(formattedSamples);
             <div className="px-2 py-1 text-xs" style={{ width: '33.33%', borderRight: '1px solid #1f2937' }}>
               <span className="font-semibold">Reported by :</span> {formData.reportedBy}
             </div>
-            {/* <div className="px-2 py-1 text-xs" style={{ width: '33.33%', borderRight: '1px solid #1f2937' }}>
-              <span className="font-semibold">Checked by :</span> {formData.checkedBy}
-            </div>
-            <div className="px-2 py-1 text-xs" style={{ width: '33.33%' }}>
-              <span className="font-semibold">CMIS by :</span> {formData.cmisBy}
-            </div> */}
           </div>
         </div>
 
@@ -340,12 +327,60 @@ setSamples(formattedSamples);
         </div>
       </div>
 
+      {/* FINAL PRINT CSS - ZERO WHITE SPACE ON SIDES/TOP/BOTTOM */}
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #report, #report * { visibility: visible; }
-          #report { position: absolute; left: 0; top: 0; width: 100%; }
-          .print\\:hidden { display: none !important; }
+          @page {
+            size: A4 portrait;
+            margin: 0 !important;
+          }
+
+          html, body {
+            width: 210mm !important;
+            height: 297mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+          }
+
+          body * {
+            visibility: hidden;
+          }
+
+          #report, #report * {
+            visibility: visible !important;
+          }
+
+          #report {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            padding: 0 !important; /* ZERO padding - content to the edge */
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            background: white !important;
+          }
+
+          #report > div, table, .grid {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 0 8px 0 !important; /* Minimal vertical spacing only */
+            padding: 0 !important;
+          }
+
+          table {
+            table-layout: fixed;
+            width: 100% !important;
+          }
+
+          .print\\:hidden {
+            display: none !important;
+          }
         }
       `}</style>
     </>
