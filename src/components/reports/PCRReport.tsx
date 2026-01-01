@@ -289,82 +289,135 @@ export default function PCRReport({
   }
 
   return (
-    <div className="bg-white p-8 shadow-lg rounded-lg" id="report">
-      <div className="print:hidden mb-8 text-right">
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg shadow-md transition"
-        >
-          <Printer size={24} />
-          Print Report
-        </button>
-      </div>
+    <>
+      {/* Print-specific styles: reduce sizes and spacing only when printing to help fit on one page */}
+      <style >{`
+        @media print {
+          #report {
+            padding: 4px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+          }
 
-      <div className="flex justify-between items-center border-b-4 border-blue-700 pb-8 mb-10">
-        <img src={ADC} alt="ADC Logo" className="h-28" />
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-blue-800">
-            WATERBASE AQUA DIAGNOSTIC CENTER
-          </h1>
-          <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
-          <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
-          <h2 className="text-2xl font-bold text-red-700 mt-4">
-            RT-q PCR Analysis Test Report
-          </h2>
+          /* Reduce font sizes */
+          h1 { font-size: 1.8rem !important; }
+          h2 { font-size: 1.3rem !important; }
+          h3 { font-size: 1.4rem !important; }
+
+          /* Smaller text */
+          p, td, th, span { font-size: 0.75rem !important; line-height: 1.3 !important; }
+
+          /* Reduce padding/margins */
+          .px-8 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+          .py-4 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+          .px-6 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+          .py-3 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+          .mb-8, .mb-10, .mt-12, .mt-16 { margin-bottom: 1rem !important; margin-top: 1rem !important; }
+
+          /* Logos smaller */
+          img.h-28 { height: 3.5rem !important; }
+
+          /* Table tighter */
+          table td, table th { padding: 0.25rem !important; }
+
+          /* Gel images smaller grid */
+          .grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 0.5rem !important;
+          }
+          .grid div img {
+            max-height: 200px !important;
+            object-fit: contain !important;
+          }
+
+          /* Avoid unwanted breaks */
+          table, div, section { page-break-inside: avoid !important; }
+
+          /* Page setup for A4 */
+          @page {
+            size: A4 portrait;
+            margin: 0.5cm;
+          }
+        }
+      `}</style>
+
+      <div className="bg-white p-8 shadow-lg rounded-lg" id="report">
+        <div className="print:hidden mb-8 text-right">
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg shadow-md transition"
+          >
+            <Printer size={24} />
+            Print Report
+          </button>
         </div>
-        <img src={AV} alt="AV Logo" className="h-28" />
-      </div>
 
-      <div className="text-right mb-6">
-        <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
-      </div>
-
-      {farmerInfo && (
-        <table className="w-full mb-10 border-2 border-gray-800 text-sm">
-          <tbody>
-            <tr>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Farmer Name</td>
-              <td className="border px-6 py-3">{farmerInfo.farmerName || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Village</td>
-              <td className="border px-6 py-3">{farmerInfo.village || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Date</td>
-              <td className="border px-6 py-3">{farmerInfo.date || "-"}</td>
-            </tr>
-            <tr>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
-              <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">No. of Samples</td>
-              <td className="border px-6 py-3">{reports.length}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Test</td>
-              <td className="border px-6 py-3 font-medium">RT-qPCR</td>
-            </tr>
-          </tbody>
-        </table>
-      )}
-
-      <ResultTable />
-      <GelImagesSection />
-
-      {/* Signature Section - Added exactly like other reports */}
-      <div className="mt-16 mb-8 border-t-2 border-black pt-6">
-        <div className="flex justify-between text-sm px-10">
-          <div>
-            <p className="font-semibold">Reported by:</p>
-            <p className="mt-8 font-medium">{technicianName}</p>
+        <div className="flex justify-between items-center border-b-4 border-blue-700 pb-8 mb-10">
+          <img src={ADC} alt="ADC Logo" className="h-28" />
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-blue-800">
+              WATERBASE AQUA DIAGNOSTIC CENTER
+            </h1>
+            <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
+            <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
+            <h2 className="text-2xl font-bold text-red-700 mt-4">
+              RT-q PCR Analysis Test Report
+            </h2>
           </div>
-          <div>
-            <p className="font-semibold">Checked by:</p>
-            <p className="mt-8">______________________</p>
-          </div>
+          <img src={AV} alt="AV Logo" className="h-28" />
         </div>
-      </div>
 
-      {/* Note */}
-      <div className="text-center text-xs text-gray-700 mt-10 mb-4">
-        <p>
-          <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
-        </p>
+        <div className="text-right mb-6">
+          <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
+        </div>
+
+        {farmerInfo && (
+          <table className="w-full mb-10 border-2 border-gray-800 text-sm">
+            <tbody>
+              <tr>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Farmer Name</td>
+                <td className="border px-6 py-3">{farmerInfo.farmerName || "-"}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Village</td>
+                <td className="border px-6 py-3">{farmerInfo.village || "-"}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Date</td>
+                <td className="border px-6 py-3">{farmerInfo.date || "-"}</td>
+              </tr>
+              <tr>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
+                <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">No. of Samples</td>
+                <td className="border px-6 py-3">{reports.length}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Test</td>
+                <td className="border px-6 py-3 font-medium">RT-qPCR</td>
+              </tr>
+            </tbody>
+          </table>
+        )}
+
+        <ResultTable />
+        <GelImagesSection />
+
+        {/* Signature Section - Added exactly like other reports */}
+        {/* <div className="mt-16 mb-8 border-t-2 border-black pt-6">
+          <div className="flex justify-between text-sm px-10">
+            <div>
+              <p className="font-semibold">Reported by:</p>
+              <p className="mt-8 font-medium">{technicianName}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Checked by:</p>
+              <p className="mt-8">______________________</p>
+            </div>
+          </div>
+        </div> */}
+
+        {/* Note */}
+        {/* <div className="text-center text-xs text-gray-700 mt-10 mb-4">
+          <p>
+            <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
+          </p>
+        </div> */}
       </div>
-    </div>
+    </>
   );
 }

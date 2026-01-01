@@ -141,7 +141,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
       try {
         setLoading(true);
 
-        // 1. Find the correct invoice document using the custom 'id' field
         const invoicesRef = collection(db, "locations", locationId, "invoices");
         const q = query(invoicesRef, where("id", "==", invoiceId));
         const invoiceSnap = await getDocs(q);
@@ -155,11 +154,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
         const invoiceDoc = invoiceSnap.docs[0];
         const invoiceData = invoiceDoc.data();
 
-        // Extract water sample count
         const waterType = invoiceData.sampleType?.find((s: any) => s.type?.toLowerCase() === "water");
         const waterCount = waterType?.count || allSampleCount || 1;
 
-        // 2. Fetch farmer details
         let farmerName = invoiceData.farmerName || "";
         let mobile = invoiceData.farmerPhone || "";
         let farmerUID = invoiceData.farmerUID || invoiceData.farmerId || "";
@@ -181,7 +178,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
           }
         }
 
-        // 3. Set form data — now correctly pulling all time fields from invoice
         setFormData({
           farmerName,
           mobile,
@@ -198,18 +194,16 @@ const WaterReport: React.FC<WaterReportProps> = ({
           technicianName: invoiceData.technicianName || "",
         });
 
-        // 4. Fetch water samples
-        // 4. Fetch water samples - CORRECT PATH
-const samplesCollection = collection(
-  db,
-  "locations",
-  locationId,
-  "invoices",
-  invoiceId,
-  "water_reports"
-);
+        const samplesCollection = collection(
+          db,
+          "locations",
+          locationId,
+          "invoices",
+          invoiceId,
+          "water_reports"
+        );
 
-const samplesSnap = await getDocs(samplesCollection);
+        const samplesSnap = await getDocs(samplesCollection);
 
         const pondList: Pond[] = [];
 
@@ -327,10 +321,10 @@ const samplesSnap = await getDocs(samplesCollection);
         </div>
 
         <div className="text-right mb-2">
-  <span className="font-bold">Report Id:- {invoiceId || "-"}</span>
-</div>
+          <span className="font-bold">Report Id:- {invoiceId || "-"}</span>
+        </div>
 
-        {/* Farmer Info Grid - Now shows Sample Collection Time, Sample Time, Report Time */}
+        {/* Farmer Info Grid - YOUR ORIGINAL FORMAT - UNCHANGED */}
         <div className="grid grid-cols-10 gap-0 text-sm mb-4 border border-black">
           <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Name</div>
           <div className="col-span-2 border-r border-black p-0.5">{formData.farmerName || "-"}</div>
@@ -460,7 +454,6 @@ const samplesSnap = await getDocs(samplesCollection);
                       <th className="h-[39px] border border-black" colSpan={4}>Vibrio CFU /ml</th>
                     </tr>
                     <tr className="bg-gray-200">
-                  
                       <th className="border border-black p-1">Yellow Colonies</th>
                       <th className="border border-black p-1">Green Colonies</th>
                       <th className="border border-black p-1">TPC</th>
@@ -469,14 +462,12 @@ const samplesSnap = await getDocs(samplesCollection);
                   <tbody>
                     {ponds.map((pond) => (
                       <tr key={pond.id}>
-                        
                         <td className="border border-black p-1 text-center">{pond.yellowColonies || "-"}</td>
                         <td className="border border-black p-1 text-center">{pond.greenColonies || "-"}</td>
                         <td className="border border-black p-1 text-center">{pond.tpc || "-"}</td>
                       </tr>
                     ))}
                     <tr className="font-bold h-[40px]">
-                      
                       <td className="border border-black p-1 text-center text-red-500">&lt;300</td>
                       <td className="border border-black p-1 text-center text-red-500">&lt;10</td>
                       <td className="border border-black p-1 text-center text-red-500">&lt;300</td>
@@ -509,33 +500,6 @@ const samplesSnap = await getDocs(samplesCollection);
                   <th className="border border-black p-1 text-center" colSpan={3}>Diatom</th>
                   <th className="border border-black p-1 text-center" colSpan={4}>Dinoflagellate</th>
                   <th className="border border-black p-1 text-center" colSpan={3}>Protozoa</th>
-                </tr>
-                <tr className="bg-gray-50">
-                  <th className="border border-black p-1"></th>
-                  <th className="border border-black p-0.5 text-xs">Phacus</th>
-                  <th className="border border-black p-0.5 text-xs">Chlorella</th>
-                  <th className="border border-black p-0.5 text-xs">Desmids</th>
-                  <th className="border border-black p-0.5 text-xs">Scenedesmus</th>
-                  <th className="border border-black p-0.5 text-xs">Copepod</th>
-                  <th className="border border-black p-0.5 text-xs">Rotifer</th>
-                  <th className="border border-black p-0.5 text-xs">Nauplius</th>
-                  <th className="border border-black p-0.5 text-xs">Spirulina</th>
-                  <th className="border border-black p-0.5 text-xs">Chaetoceros</th>
-                  <th className="border border-black p-0.5 text-xs">Skeletonema</th>
-                  <th className="border border-black p-0.5 text-xs">Rhizosolenia</th>
-                  <th className="border border-black p-0.5 text-xs">Anabaena</th>
-                  <th className="border border-black p-0.5 text-xs">Oscillatoria</th>
-                  <th className="border border-black p-0.5 text-xs">Microcystis</th>
-                  <th className="border border-black p-0.5 text-xs">Coscinodiscus</th>
-                  <th className="border border-black p-0.5 text-xs">Nitzchia</th>
-                  <th className="border border-black p-0.5 text-xs">Navicula</th>
-                  <th className="border border-black p-0.5 text-xs">Noctiluca</th>
-                  <th className="border border-black p-0.5 text-xs">Ceratium</th>
-                  <th className="border border-black p-0.5 text-xs">Dinophysis</th>
-                  <th className="border border-black p-0.5 text-xs">Gymnodinium</th>
-                  <th className="border border-black p-0.5 text-xs">Zoothamnium</th>
-                  <th className="border border-black p-0.5 text-xs">Tintinnopsis</th>
-                  <th className="border border-black p-0.5 text-xs">Favella</th>
                 </tr>
                 <tr className="bg-gray-50">
                   <th className="border border-black p-1"></th>
@@ -619,11 +583,28 @@ const samplesSnap = await getDocs(samplesCollection);
         </div>
       </div>
 
+      {/* ONLY ADDED: Print CSS to force everything on ONE A4 page */}
       <style>{`
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 0.5cm;
+          }
           body * { visibility: hidden; }
           #report, #report * { visibility: visible; }
-          #report { position: absolute; left: 0; top: 0; width: 100%; }
+          #report {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            page-break-after: avoid;
+            page-break-before: avoid;
+          }
+          table { page-break-inside: avoid; }
+          .overflow-x-auto { overflow: visible !important; }
+          img { max-width: 100% !important; height: auto !important; }
           .print\\:hidden { display: none !important; }
         }
       `}</style>

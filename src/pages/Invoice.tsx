@@ -354,7 +354,10 @@ const InvoicePage = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="h-screen flex flex-col">
+  <div className="flex-1 overflow-y-auto md:p-8">
+    <div className="max-w-7xl mx-auto">
+      <div className=" grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
@@ -556,6 +559,7 @@ const InvoicePage = () => {
           </Card>
         </div>
       </div>
+      </div></div></div>
     </DashboardLayout>
   );
 };

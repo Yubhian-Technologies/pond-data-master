@@ -35,7 +35,7 @@ export default function LabResults() {
   const [searchParams] = useSearchParams();
   const isEditMode = searchParams.get("mode") === "edit";
 
-  const [activeEnvReport, setActiveEnvReport] = useState<string>(null);
+  const [activeEnvReport, setActiveEnvReport] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.locationId || !invoiceId) return;
@@ -69,9 +69,7 @@ export default function LabResults() {
     const water = types.find((t: any) => t?.type?.toLowerCase() === "water");
     const pl = types.find((t: any) => t?.type?.toLowerCase() === "pl");
     const pcr = types.find((t: any) => t?.type?.toLowerCase() === "pcr");
-    const micro = types.find(
-      (t: any) => t?.type?.toLowerCase() === "microbiology"
-    );
+    const micro = types.find((t: any) => t?.type?.toLowerCase() === "microbiology");
 
     const allCompleted =
       (!soil || progress.soil === "completed") &&
@@ -81,31 +79,11 @@ export default function LabResults() {
       (!micro || progress.microbiology === "completed");
 
     if (isEditMode) {
-      if (soil) {
-        setCurrentType("soil");
-        setStep("soilForm");
-        return;
-      }
-      if (water) {
-        setCurrentType("water");
-        setStep("waterForm");
-        return;
-      }
-      if (pl) {
-        setCurrentType("pl");
-        setStep("plForm");
-        return;
-      }
-      if (pcr) {
-        setCurrentType("pcr");
-        setStep("pcrForm");
-        return;
-      }
-      if (micro) {
-        setCurrentType("microbiology");
-        setStep("microbiologyForm");
-        return;
-      }
+      if (soil) { setCurrentType("soil"); setStep("soilForm"); return; }
+      if (water) { setCurrentType("water"); setStep("waterForm"); return; }
+      if (pl) { setCurrentType("pl"); setStep("plForm"); return; }
+      if (pcr) { setCurrentType("pcr"); setStep("pcrForm"); return; }
+      if (micro) { setCurrentType("microbiology"); setStep("microbiologyForm"); return; }
     }
 
     if (allCompleted) {
@@ -117,22 +95,16 @@ export default function LabResults() {
       return;
     }
 
-    // Default: go to first incomplete type
     if (soil && progress.soil !== "completed") {
-      setCurrentType("soil");
-      setStep("soilForm");
+      setCurrentType("soil"); setStep("soilForm");
     } else if (water && progress.water !== "completed") {
-      setCurrentType("water");
-      setStep("waterForm");
+      setCurrentType("water"); setStep("waterForm");
     } else if (pl && progress.pl !== "completed") {
-      setCurrentType("pl");
-      setStep("plForm");
+      setCurrentType("pl"); setStep("plForm");
     } else if (pcr && progress.pcr !== "completed") {
-      setCurrentType("pcr");
-      setStep("pcrForm");
+      setCurrentType("pcr"); setStep("pcrForm");
     } else if (micro && progress.microbiology !== "completed") {
-      setCurrentType("microbiology");
-      setStep("microbiologyForm");
+      setCurrentType("microbiology"); setStep("microbiologyForm");
     } else {
       setStep("viewReports");
     }
@@ -140,80 +112,27 @@ export default function LabResults() {
 
   const updateProgress = async (type: string) => {
     if (!invoice?.docId) return;
-    const ref = doc(
-      db,
-      "locations",
-      session.locationId,
-      "invoices",
-      invoice.docId
-    );
+    const ref = doc(db, "locations", session.locationId, "invoices", invoice.docId);
     await updateDoc(ref, {
-      reportsProgress: {
-        ...(invoice.reportsProgress || {}),
-        [type]: "completed",
-      },
+      reportsProgress: { ...(invoice.reportsProgress || {}), [type]: "completed" },
     });
-
     setInvoice((prev: any) => ({
       ...prev,
       reportsProgress: { ...(prev.reportsProgress || {}), [type]: "completed" },
     }));
   };
 
-  const handleSaveAllReports = async () => {
-    if (!invoice?.docId) return;
-
-    const updates: any = {};
-    if (hasSoil) updates.soil = "completed";
-    if (hasWater) updates.water = "completed";
-    if (hasPL) updates.pl = "completed";
-    if (hasPCR) updates.pcr = "completed";
-    if (hasMicro) updates.microbiology = "completed";
-
-    if (Object.keys(updates).length > 0) {
-      const ref = doc(
-        db,
-        "locations",
-        session.locationId,
-        "invoices",
-        invoice.docId
-      );
-      await updateDoc(ref, {
-        reportsProgress: {
-          ...(invoice.reportsProgress || {}),
-          ...updates,
-        },
-      });
-
-      setInvoice((prev: any) => ({
-        ...prev,
-        reportsProgress: { ...(prev.reportsProgress || {}), ...updates },
-      }));
-    }
-
-    setStep("viewReports");
-    if (hasSoil) setActiveEnvReport("soil");
-    else if (hasWater) setActiveEnvReport("water");
-    else if (hasMicro) setActiveEnvReport("microbiology");
-    else if (hasPathology) setActiveEnvReport("pathology");
-  };
-
   const handleTypeClick = (type: string) => {
-  setCurrentType(type);
-
-  // === NEW: In edit mode, ALWAYS go to the form, ignore completion ===
-  if (isEditMode) {
-    setStep(type + "Form");
-    return;
-  }
-
-  // === Existing logic for normal (non-edit) mode only ===
-  const progress = invoice.reportsProgress?.[type];
-  if (progress === "completed" && ["soil", "water", "microbiology"].includes(type)) {
-    setStep(type + "Report");
-  } else if (progress === "completed" && ["pl", "pcr"].includes(type)) {
-    if ((hasPL && invoice.reportsProgress?.pl === "completed") || !hasPL) {
-      if ((hasPCR && invoice.reportsProgress?.pcr === "completed") || !hasPCR) {
+    setCurrentType(type);
+    if (isEditMode) {
+      setStep(type + "Form");
+      return;
+    }
+    const progress = invoice.reportsProgress?.[type];
+    if (["soil", "water", "microbiology"].includes(type) && progress === "completed") {
+      setStep(type + "Report");
+    } else if (["pl", "pcr"].includes(type) && progress === "completed") {
+      if ((!hasPL || invoice.reportsProgress?.pl === "completed") && (!hasPCR || invoice.reportsProgress?.pcr === "completed")) {
         setStep("pathologyReport");
       } else {
         setStep(type + "Form");
@@ -221,114 +140,145 @@ export default function LabResults() {
     } else {
       setStep(type + "Form");
     }
-  } else {
-    setStep(type + "Form");
-  }
-};
-
-  const handleSoilSubmit = async () => {
-    await updateProgress("soil");
-    setStep("soilReport");
-  };
-
-  const handleWaterSubmit = async () => {
-    await updateProgress("water");
-    setStep("waterReport");
-  };
-
-  const handleMicroSubmit = async () => {
-    await updateProgress("microbiology");
-    setStep("microbiologyReport");
-  };
-
-  const handlePLSubmit = async () => {
-    await updateProgress("pl");
-    checkPathologyCompletion("pl");
-  };
-
-  const handlePCRSubmit = async () => {
-    await updateProgress("pcr");
-    checkPathologyCompletion("pcr");
   };
 
   const checkPathologyCompletion = (justCompletedType?: string) => {
     let tempProgress = { ...(invoice.reportsProgress || {}) };
-    if (justCompletedType) {
-      tempProgress[justCompletedType] = "completed";
-    }
+    if (justCompletedType) tempProgress[justCompletedType] = "completed";
 
-    const plCompleted = !hasPL || tempProgress.pl === "completed";
-    const pcrCompleted = !hasPCR || tempProgress.pcr === "completed";
+    const plDone = !hasPL || tempProgress.pl === "completed";
+    const pcrDone = !hasPCR || tempProgress.pcr === "completed";
 
-    if (plCompleted && pcrCompleted) {
+    if (plDone && pcrDone) {
       setStep("pathologyReport");
-    } else if (!plCompleted) {
-      setCurrentType("pl");
-      setStep("plForm");
-    } else if (!pcrCompleted) {
-      setCurrentType("pcr");
-      setStep("pcrForm");
-    } else {
-      setStep(null); // Go back to buttons
+    } else if (!plDone) {
+      setCurrentType("pl"); setStep("plForm");
+    } else if (!pcrDone) {
+      setCurrentType("pcr"); setStep("pcrForm");
     }
   };
 
-  // === UPDATED: Use actual counts saved in invoice (only samples with selected tests) ===
-  const soilCount = Number(
-    invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "soil")
-      ?.count || 0
-  );
-  const waterCount = Number(
-    invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "water")
-      ?.count || 0
-  );
-  const plCount = Number(
-    invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "pl")
-      ?.count || 0
-  );
-  const pcrCount = Number(
-    invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "pcr")
-      ?.count || 0
-  );
-  const microCount = Number(
-    invoice?.sampleType?.find(
-      (t: any) => t.type?.toLowerCase() === "microbiology"
-    )?.count || 0
-  );
+  const soilCount = Number(invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "soil")?.count || 0);
+  const waterCount = Number(invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "water")?.count || 0);
+  const plCount = Number(invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "pl")?.count || 0);
+  const pcrCount = Number(invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "pcr")?.count || 0);
+  const microCount = Number(invoice?.sampleType?.find((t: any) => t.type?.toLowerCase() === "microbiology")?.count || 0);
 
   const hasSoil = soilCount > 0;
   const hasWater = waterCount > 0;
   const hasPL = plCount > 0;
   const hasPCR = pcrCount > 0;
   const hasMicro = microCount > 0;
-
-  const hasEnvironmental = hasSoil || hasWater;
   const hasPathology = hasPL || hasPCR;
 
   const isViewingReports = step === "viewReports";
 
-  if (!invoice || step === "loading")
-    return <p className="text-center py-12 text-lg">Loading invoice...</p>;
-  if (step === "error")
-    return (
-      <p className="text-center py-12 text-red-600 text-xl">
-        Invoice or samples not found.
-      </p>
-    );
+  if (!invoice || step === "loading") return <p className="text-center py-12 text-lg">Loading invoice...</p>;
+  if (step === "error") return <p className="text-center py-12 text-red-600 text-xl">Invoice or samples not found.</p>;
 
   const showTopButtons = !isViewingReports;
 
+  const combinedPrintStyles = `
+  @media print {
+    .pl-page { 
+      ${hasPL && hasPCR ? 'page-break-after: always !important;' : ''} 
+    }
+    .pcr-page { 
+      ${hasPL && hasPCR ? 'page-break-before: always !important;' : ''} 
+    }
+    .pl-tight-bottom { 
+      margin-bottom: 1rem !important; 
+      padding-bottom: 0 !important; 
+    }
+    .signature-section {
+      page-break-before: avoid !important;
+      page-break-inside: avoid !important;
+    }
+
+    /* REMOVE BROWSER HEADER/FOOTER (TITLE, URL, DATE, PAGE NO) */
+    @page {
+      size: A4 portrait;
+      margin: 1cm;
+      /* These rules remove the default header/footer */
+      @top-left { content: none; }
+      @top-center { content: none; }
+      @top-right { content: none; }
+      @bottom-left { content: none; }
+      @bottom-center { content: none; }
+      @bottom-right { content: none; }
+    }
+
+    table, img, div, section { 
+      page-break-inside: avoid !important; 
+    }
+
+    /* Hide any accidental headers */
+    .print\\:hidden { display: none !important; }
+  }
+`;
+
+  const renderSignatureAndNote = () => (
+    <div className="mt-20 border-t-2 border-black pt-8 signature-section">
+      <div className="flex justify-between text-sm px-10 mb-10">
+        <div>
+          <p className="font-semibold">Reported by:</p>
+          <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
+        </div>
+        <div>
+          <p className="font-semibold">Checked by:</p>
+          <p className="mt-8">______________________</p>
+        </div>
+      </div>
+      <div className="text-center text-xs text-gray-700">
+        <p>
+          <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
+        </p>
+      </div>
+    </div>
+  );
+
+  const renderPathologyReport = () => (
+    <>
+      <style>{combinedPrintStyles}</style>
+{hasPL && (
+  <div className={hasPL && hasPCR ? "pl-page" : ""}>
+    <div className={hasPL && hasPCR ? "pl-tight-bottom" : ""}>
+      {/* Hide signature in PLReport when combined with PCR */}
+      <PLReport 
+        invoiceId={invoiceId!} 
+        locationId={session.locationId} 
+        allSampleCount={plCount}
+        showSignature={!hasPCR}
+      />
+    </div>
+  </div>
+)}
+
+      {hasPCR && (
+        <div className={hasPL && hasPCR ? "pcr-page" : ""}>
+          <PCRReport
+            invoiceId={invoiceId!}
+            locationId={session.locationId}
+            allSampleCount={pcrCount}
+            compact={hasPL && hasPCR}
+          />
+
+          {/* Single signature — always shown after PCR */}
+          {renderSignatureAndNote()}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="p-6 max-w-7xl mx-auto relative pb-24">
-      {/* Data Entry Buttons - Always show unless in full viewReports */}
       {showTopButtons && (
         <>
           <div className="overflow-x-auto pb-4 mb-8">
             <div className="flex gap-4 justify-center min-w-max px-4">
               {invoice.sampleType?.map((s: any) => {
                 const type = s.type.toLowerCase();
-                const completed =
-                  invoice?.reportsProgress?.[type] === "completed";
+                const completed = invoice?.reportsProgress?.[type] === "completed";
                 const count = s.count || 0;
                 if (count === 0) return null;
 
@@ -344,8 +294,7 @@ export default function LabResults() {
                         : "bg-yellow-300 hover:bg-yellow-400 border-yellow-600 text-gray-800"
                     }`}
                   >
-                    {s.type.toUpperCase()} ({count}) -{" "}
-                    {completed ? "Completed" : "Pending"}
+                    {s.type.toUpperCase()} ({count}) - {completed ? "Completed" : "Pending"}
                   </button>
                 );
               })}
@@ -353,303 +302,46 @@ export default function LabResults() {
           </div>
 
           <p className="text-center text-gray-600 mb-8 text-lg">
-            Click a button to enter results for <strong>all samples</strong> of
-            that type on one page.
+            Click a button to enter results for <strong>all samples</strong> of that type on one page.
           </p>
         </>
       )}
 
       {/* Forms */}
-      {step === "soilForm" && hasSoil && (
-        <SoilForm
-          invoice={invoice}
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          onSubmit={handleSoilSubmit}
-        />
-      )}
+      {step === "soilForm" && hasSoil && <SoilForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("soil"); setStep("soilReport"); }} />}
+      {step === "waterForm" && hasWater && <WaterForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("water"); setStep("waterReport"); }} />}
+      {step === "plForm" && hasPL && <PLForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pl"); checkPathologyCompletion("pl"); }} />}
+      {step === "pcrForm" && hasPCR && <PCRForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pcr"); checkPathologyCompletion("pcr"); }} />}
+      {step === "microbiologyForm" && hasMicro && <MicrobiologyForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("microbiology"); setStep("microbiologyReport"); }} />}
 
-      {step === "waterForm" && hasWater && (
-        <WaterForm
-          invoice={invoice}
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          onSubmit={handleWaterSubmit}
-        />
-      )}
+      {/* Individual Previews */}
+      {step === "soilReport" && <div id="printable-report"><SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} /></div>}
+      {step === "waterReport" && <div id="printable-report"><WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} /></div>}
+      {step === "microbiologyReport" && <div id="printable-report"><MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} /></div>}
 
-      {step === "plForm" && hasPL && (
-        <PLForm
-          invoice={invoice}
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          onSubmit={handlePLSubmit}
-        />
-      )}
+      {/* Pathology Preview during entry */}
+      {step === "pathologyReport" && <div id="printable-report">{renderPathologyReport()}</div>}
 
-      {step === "pcrForm" && hasPCR && (
-        <PCRForm
-          invoice={invoice}
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          onSubmit={handlePCRSubmit}
-        />
-      )}
-
-      {step === "microbiologyForm" && hasMicro && (
-        <MicrobiologyForm
-          invoice={invoice}
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          onSubmit={handleMicroSubmit}
-        />
-      )}
-
-      {/* Individual Report Previews */}
-      {step === "soilReport" && (
-        <div id="printable-report">
-          <SoilReport
-            invoiceId={invoiceId!}
-            locationId={session.locationId}
-            allSampleCount={soilCount}
-          />
-          {/* <div className="mt-12 text-center">
-            <button
-              onClick={() => setStep("viewReports")}
-              className="bg-green-600 text-white px-10 py-5 rounded-xl text-xl font-bold hover:bg-green-700 shadow-lg"
-            >
-              View All Final Reports
-            </button>
-          </div> */}
-        </div>
-      )}
-
-      {step === "waterReport" && (
-        <div id="printable-report">
-          <WaterReport
-            invoiceId={invoiceId!}
-            locationId={session.locationId}
-            allSampleCount={waterCount}
-          />
-          {/* <div className="mt-12 text-center">
-            <button
-              onClick={() => setStep("viewReports")}
-              className="bg-green-600 text-white px-10 py-5 rounded-xl text-xl font-bold hover:bg-green-700 shadow-lg"
-            >
-              View All Final Reports
-            </button>
-          </div> */}
-        </div>
-      )}
-
-      {step === "microbiologyReport" && (
-        <div id="printable-report">
-          <MicrobiologyReport
-            invoiceId={invoiceId!}
-            locationId={session.locationId}
-            allSampleCount={microCount}
-          />
-          {/* <div className="mt-12 text-center">
-            <button
-              onClick={() => setStep("viewReports")}
-              className="bg-green-600 text-white px-10 py-5 rounded-xl text-xl font-bold hover:bg-green-700 shadow-lg"
-            >
-              View All Final Reports
-            </button>
-          </div> */}
-        </div>
-      )}
-
-    {step === "pathologyReport" && (
-  <div id="printable-report" className={hasPL && hasPCR ? "combined-pathology-print" : ""}>
-    {/* PL Report */}
-    {hasPL && (
-      <div className="mb-32">
-        <PLReport
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          allSampleCount={plCount}
-        />
-      </div>
-    )}
-
-    {/* PCR Report */}
-    {hasPCR && (
-      <div className="mb-20">
-        <PCRReport
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          allSampleCount={pcrCount}
-          compact={hasPL && hasPCR}
-        />
-      </div>
-    )}
-
-    {/* SINGLE SIGNATURE & NOTE - ONLY once, at the very bottom after PCR */}
-    {(hasPL || hasPCR) && (
-      <div className="mt-20 border-t-2 border-black pt-8">
-        <div className="flex justify-between text-sm px-10 mb-10">
-          <div>
-            <p className="font-semibold">Reported by:</p>
-            <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
-          </div>
-          <div>
-            <p className="font-semibold">Checked by:</p>
-            <p className="mt-8">______________________</p>
-          </div>
-        </div>
-
-        <div className="text-center text-xs text-gray-700">
-          <p>
-            <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
-          </p>
-        </div>
-      </div>
-    )}
-  </div>
-)}
-
-      {/* FINAL REPORTS VIEW */}
+      {/* Final Reports View */}
       {isViewingReports && (
         <div>
           <div className="overflow-x-auto pb-4 mb-10">
             <div className="flex gap-4 justify-center min-w-max px-4">
-              {hasSoil && (
-                <button
-                  onClick={() => setActiveEnvReport("soil")}
-                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                    activeEnvReport === "soil"
-                      ? "bg-green-700 text-white border-green-900"
-                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                  }`}
-                >
-                  SOIL REPORT
-                </button>
-              )}
-
-              {hasWater && (
-                <button
-                  onClick={() => setActiveEnvReport("water")}
-                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                    activeEnvReport === "water"
-                      ? "bg-green-700 text-white border-green-900"
-                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                  }`}
-                >
-                  WATER REPORT
-                </button>
-              )}
-
-              {hasMicro && (
-                <button
-                  onClick={() => setActiveEnvReport("microbiology")}
-                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                    activeEnvReport === "microbiology"
-                      ? "bg-green-700 text-white border-green-900"
-                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                  }`}
-                >
-                  MICROBIOLOGY REPORT
-                </button>
-              )}
-
-              {hasPathology && (
-                <button
-                  onClick={() => setActiveEnvReport("pathology")}
-                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                    activeEnvReport === "pathology"
-                      ? "bg-green-700 text-white border-green-900"
-                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                  }`}
-                >
-                  PL/PCR REPORT
-                </button>
-              )}
+              {hasSoil && <button onClick={() => setActiveEnvReport("soil")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "soil" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>SOIL REPORT</button>}
+              {hasWater && <button onClick={() => setActiveEnvReport("water")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "water" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>WATER REPORT</button>}
+              {hasMicro && <button onClick={() => setActiveEnvReport("microbiology")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "microbiology" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>MICROBIOLOGY REPORT</button>}
+              {hasPathology && <button onClick={() => setActiveEnvReport("pathology")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "pathology" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>PL/PCR REPORT</button>}
             </div>
           </div>
 
-          <div id="printable-report" className="mt-8 ">
-            {activeEnvReport === "soil" && (
-              <SoilReport
-                invoiceId={invoiceId!}
-                locationId={session.locationId}
-                allSampleCount={soilCount}
-              />
-            )}
-            {activeEnvReport === "water" && (
-              <WaterReport
-                invoiceId={invoiceId!}
-                locationId={session.locationId}
-                allSampleCount={waterCount}
-              />
-            )}
-            {activeEnvReport === "microbiology" && (
-              <MicrobiologyReport
-                invoiceId={invoiceId!}
-                locationId={session.locationId}
-                allSampleCount={microCount}
-              />
-            )}
-            {activeEnvReport === "pathology" && (
-  <div className={hasPL && hasPCR ? "combined-pathology-print" : ""}>
-    {hasPL && (
-      <div className="mb-32">
-        <PLReport
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          allSampleCount={plCount}
-        />
-      </div>
-    )}
-
-    {hasPCR && (
-      <div className="mb-20">
-        <PCRReport
-          invoiceId={invoiceId!}
-          locationId={session.locationId}
-          allSampleCount={pcrCount}
-          compact={hasPL && hasPCR}
-        />
-      </div>
-    )}
-
-    {(hasPL || hasPCR) && (
-      <div className="mt-20 border-t-2 border-black pt-8">
-        <div className="flex justify-between text-sm px-10 mb-10">
-          <div>
-            <p className="font-semibold">Reported by:</p>
-            <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
-          </div>
-          <div>
-            <p className="font-semibold">Checked by:</p>
-            <p className="mt-8">______________________</p>
-          </div>
-        </div>
-
-        <div className="text-center text-xs text-gray-700">
-          <p>
-            <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
-          </p>
-        </div>
-      </div>
-    )}
-  </div>
-)}
+          <div id="printable-report" className="mt-8">
+            {activeEnvReport === "soil" && <SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} />}
+            {activeEnvReport === "water" && <WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} />}
+            {activeEnvReport === "microbiology" && <MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} />}
+            {activeEnvReport === "pathology" && renderPathologyReport()}
           </div>
         </div>
       )}
-
-      {/* SAVE CHANGES BUTTON - ONLY IN EDIT MODE
-      {isEditMode && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <button
-            onClick={handleSaveAllReports}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl text-2xl font-bold shadow-2xl transition-all border-4 border-blue-800 flex items-center gap-4"
-          >
-            SAVE CHANGES & GENERATE FINAL REPORTS
-          </button>
-        </div>
-      )} */}
     </div>
   );
 }

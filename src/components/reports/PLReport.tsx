@@ -6,6 +6,7 @@ import { db } from "../../pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import { Printer } from "lucide-react";
+import { useUserSession } from "@/contexts/UserSessionContext"; // For technician name
 
 interface FarmerInfo {
   farmerName: string;
@@ -43,13 +44,16 @@ interface PLReportProps {
   invoiceId: string;
   locationId: string;
   allSampleCount: number;
+  showSignature?: boolean; // NEW: Control whether to show signature (default: true)
 }
 
 export default function PLReport({
   invoiceId,
   locationId,
   allSampleCount,
+  showSignature = true, // Show by default when used alone
 }: PLReportProps) {
+  const { session } = useUserSession(); // Get technician name
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo | null>(null);
   const [plData, setPlData] = useState<PLData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,129 +185,163 @@ export default function PLReport({
   ];
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-8" id="report">
-      <div className="mb-5 print:hidden">
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
-        >
-          <Printer size={20} /> Print Report
-        </button>
-      </div>
+    <>
+      <style>{`
+        @media print {
+          #pl-report {
+            padding: 8px !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+          }
+          h1 { font-size: 1.6rem !important; }
+          h2 { font-size: 1.3rem !important; }
+          p, td, th, span { font-size: 0.7rem !important; line-height: 1.2 !important; }
+          .px-4 { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
+          .py-2 { padding-top: 0.3rem !important; padding-bottom: 0.3rem !important; }
+          .mb-4, .mb-8, .mb-12 { margin-bottom: 0.5rem !important; }
+          img.w-40 { width: 100px !important; }
+          table td, table th { padding: 0.2rem 0.3rem !important; }
+          .text-xs { font-size: 0.6rem !important; }
+          table, div, section { page-break-inside: avoid !important; }
+          @page { size: A4 portrait; margin: 1cm; }
+          .print\\:hidden { display: none !important; }
+        }
+      `}</style>
 
-      <div className="flex justify-between items-start mb-8 border-b-2 border-black">
-        <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
-        <div className="text-center flex-1">
-          <h1 className="text-3xl font-bold text-blue-700">
-            WATERBASE AQUA DIAGNOSTIC CENTER
-          </h1>
-          <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
-          <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
-          <h2 className="text-2xl font-bold text-red-600 mt-3">
-            Post Larvae General Observation Report
-          </h2>
+      <div className="bg-white rounded-lg shadow-md p-8" id="pl-report">
+        <div className="mb-5 print:hidden">
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+          >
+            <Printer size={20} /> Print Report
+          </button>
         </div>
-        <img src={AV} alt="AV Logo" className="w-40 object-contain" />
-      </div>
 
-      <div className="text-right mb-4">
-        <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
-      </div>
+        <div className="flex justify-between items-start mb-8 border-b-2 border-black">
+          <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
+          <div className="text-center flex-1">
+            <h1 className="text-3xl font-bold text-blue-700">
+              WATERBASE AQUA DIAGNOSTIC CENTER
+            </h1>
+            <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
+            <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
+            <h2 className="text-2xl font-bold text-red-600 mt-3">
+              Post Larvae General Observation Report
+            </h2>
+          </div>
+          <img src={AV} alt="AV Logo" className="w-40 object-contain" />
+        </div>
 
-      {/* Farmer Information Table */}
-      <div className="flex justify-center mb-12">
-        <table className="border-2 border-gray-800 text-sm">
-          <tbody>
-            <tr>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer Name</td>
-              <td className="border px-4 py-2">{farmerInfo.farmerName}</td>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Village</td>
-              <td className="border px-4 py-2">{farmerInfo.village}</td>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Date</td>
-              <td className="border px-4 py-2">{farmerInfo.sampleDate}</td>
-            </tr>
-            <tr>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Mobile</td>
-              <td className="border px-4 py-2">{farmerInfo.mobile}</td>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Time</td>
-              <td className="border px-4 py-2">{farmerInfo.sampleTime}</td>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Report Date</td>
-              <td className="border px-4 py-2">{farmerInfo.reportDate}</td>
-            </tr>
-            <tr>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">No. of Samples</td>
-              <td className="border px-4 py-2">{allSampleCount}</td>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Report Time</td>
-              <td className="border px-4 py-2">{farmerInfo.reportTime}</td>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Type</td>
-              <td className="border px-4 py-2">PL</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <div className="text-right mb-4">
+          <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
+        </div>
 
-      {/* PL Data Table */}
-      <div className="flex justify-center overflow-x-auto">
-        <table className="inline-table border-2 border-gray-800 text-xs whitespace-nowrap">
-          <thead>
-            <tr className="bg-blue-100">
-              <th className="border px-4 py-2 font-semibold">TEST CODE</th>
-              {plData.testCode.map((code, i) => (
-                <th key={i} className="border px-4 py-2 font-semibold">
-                  Tank - {code}
-                </th>
+        <div className="flex justify-center mb-12">
+          <table className="border-2 border-gray-800 text-sm">
+            <tbody>
+              <tr>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer Name</td>
+                <td className="border px-4 py-2">{farmerInfo.farmerName}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Village</td>
+                <td className="border px-4 py-2">{farmerInfo.village}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Date</td>
+                <td className="border px-4 py-2">{farmerInfo.sampleDate}</td>
+              </tr>
+              <tr>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Mobile</td>
+                <td className="border px-4 py-2">{farmerInfo.mobile}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Time</td>
+                <td className="border px-4 py-2">{farmerInfo.sampleTime}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Report Date</td>
+                <td className="border px-4 py-2">{farmerInfo.reportDate}</td>
+              </tr>
+              <tr>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">No. of Samples</td>
+                <td className="border px-4 py-2">{allSampleCount}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Report Time</td>
+                <td className="border px-4 py-2">{farmerInfo.reportTime}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Type</td>
+                <td className="border px-4 py-2">PL</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex justify-center overflow-x-auto">
+          <table className="inline-table border-2 border-gray-800 text-xs whitespace-nowrap">
+            <thead>
+              <tr className="bg-blue-100">
+                <th className="border px-4 py-2 font-semibold">TEST CODE</th>
+                {plData.testCode.map((code, i) => (
+                  <th key={i} className="border px-4 py-2 font-semibold">
+                    Tank - {code}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {plRows.map((row) => (
+                <React.Fragment key={row.key}>
+                  <tr>
+                    <td className="border px-4 py-2 font-semibold bg-gray-50">
+                      {row.label}
+                    </td>
+                    {plData[row.key].map((val, i) => (
+                      <td key={i} className="border px-4 py-2 text-center">
+                        {val || "-"}
+                      </td>
+                    ))}
+                  </tr>
+                  {row.key === "shg" && (
+                    <tr className="bg-blue-200">
+                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                        Necrosis
+                      </td>
+                    </tr>
+                  )}
+                  {row.key === "necMuscle" && (
+                    <tr className="bg-blue-200">
+                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                        Fouling
+                      </td>
+                    </tr>
+                  )}
+                  {row.key === "stressTankSalinity" && (
+                    <tr className="bg-blue-200">
+                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                        Stress Test
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
-            </tr>
-          </thead>
+            </tbody>
+          </table>
+        </div>
 
-          <tbody>
-            {plRows.map((row) => (
-              <React.Fragment key={row.key}>
-                <tr>
-                  <td className="border px-4 py-2 font-semibold bg-gray-50">
-                    {row.label}
-                  </td>
-                  {plData[row.key].map((val, i) => (
-                    <td key={i} className="border px-4 py-2 text-center">
-                      {val || "-"}
-                    </td>
-                  ))}
-                </tr>
-
-                {row.key === "shg" && (
-                  <tr className="bg-blue-200">
-                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                      Necrosis
-                    </td>
-                  </tr>
-                )}
-
-                {row.key === "necMuscle" && (
-                  <tr className="bg-blue-200">
-                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                      Fouling
-                    </td>
-                  </tr>
-                )}
-
-                {row.key === "stressTankSalinity" && (
-                  <tr className="bg-blue-200">
-                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                      Stress Test
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
+        {/* Signature & Note — only if showSignature is true */}
+        {showSignature && (
+          <div className="mt-20 border-t-2 border-black pt-8">
+            <div className="flex justify-between text-sm px-10 mb-10">
+              <div>
+                <p className="font-semibold">Reported by:</p>
+                <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
+              </div>
+              <div>
+                <p className="font-semibold">Checked by:</p>
+                <p className="mt-8">______________________</p>
+              </div>
+            </div>
+            <div className="text-center text-xs text-gray-700">
+              <p>
+                <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* REMOVED SIGNATURE AND NOTE - Now handled only in LabResults.tsx when combined */}
-
-      <div className="mt-12 text-center text-sm text-gray-600 print:hidden">
-        <p>Report generated on {new Date().toLocaleDateString()}</p>
-      </div>
-    </div>
+    </>
   );
 }
