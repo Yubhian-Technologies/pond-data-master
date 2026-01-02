@@ -20,7 +20,7 @@ import NotFound from "./pages/NotFound";
 import InvoiceTemplate from "../src/data/template";
 import { UserSessionProvider } from "./contexts/UserSessionContext";
 import InvoiceView from "./pages/InvoiceViewer";
-import SoilReport from "../../pond-data-master/src/components/reports/SoilReport";
+import SoilReport from "./components/reports/SoilReport";
 import WaterReport from "../../pond-data-master/src/components/reports/WaterReport";
 
 const queryClient = new QueryClient();
