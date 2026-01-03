@@ -74,7 +74,7 @@ const TechnicianSelection = () => {
         </div>
 
         {loading ? (
-          <p className="text-muted-foreground">Loading technicians...</p>
+          <p className="text-muted-foreground">Loading technicians....</p>
         ) : technicians.length === 0 ? (
           <p className="text-muted-foreground">No technicians found for this location.</p>
         ) : (
