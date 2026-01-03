@@ -328,7 +328,7 @@ export default function SoilForm({
       ))}
 
       {/* Verification */}
-      <div className="mb-6">
+      {/* <div className="mb-6">
         <h3 className="font-bold mb-3 text-gray-700">Verification</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -344,7 +344,7 @@ export default function SoilForm({
             <input type="text" value={formData.cmisBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Final Submit Button */}
       <div className="flex justify-center mt-8">

@@ -97,11 +97,7 @@ const TechnicianSelection = () => {
                   </div>
                 </CardHeader>
 
-                <CardContent>
-                  <Badge variant="secondary" className="text-xs">
-                    {technician.experience} experience
-                  </Badge>
-                </CardContent>
+                
               </Card>
             ))}
           </div>

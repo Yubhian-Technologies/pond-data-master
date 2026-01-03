@@ -56,6 +56,15 @@ const SoilReport: React.FC<SoilReportProps> = ({
   const routeParams = useParams<{ invoiceId?: string; locationId?: string }>();
   const invoiceId = propInvoiceId || routeParams.invoiceId;
   const locationId = propLocationId || routeParams.locationId;
+  const [locationDetails, setLocationDetails] = useState<{
+  address: string;
+  email: string;
+  contactNumber: string;
+}>({
+  address: "",
+  email: "",
+  contactNumber: "",
+});
 
   const [formData, setFormData] = useState<FormData>({
     farmerName: "",
@@ -193,6 +202,28 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
     fetchData();
   }, [invoiceId, locationId, allSampleCount]);
+  useEffect(() => {
+    const fetchLocationDetails = async () => {
+      if (!locationId) return;
+  
+      try {
+        const locDoc = await getDoc(doc(db, "locations", locationId));
+        if (locDoc.exists()) {
+          const data = locDoc.data();
+          setLocationDetails({
+            address: data.address || "Not available",
+            email: data.email || "Not available",
+            contactNumber: data.contactNumber || "Not available",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching location details:", error);
+        
+      }
+    };
+  
+    fetchLocationDetails();
+  }, [locationId]);
 
   if (loading) return <p className="text-center py-12 text-xl">Loading Soil Report...</p>;
 
@@ -240,8 +271,9 @@ const SoilReport: React.FC<SoilReportProps> = ({
           <h1 className="text-3xl font-bold text-blue-700">
             WATERBASE AQUA DIAGNOSTIC CENTER
           </h1>
-          <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
-            <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
+          <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
+            <p className="text-sm text-black">Contact No: {locationDetails.contactNumber || "Loading..."} | 
+  Mail Id: {locationDetails.email || "Loading..."}</p>
           <h2 className="text-2xl font-bold text-red-600 mt-3">
             Soil Analysis Report
           </h2>

@@ -6,7 +6,7 @@ import { db } from "../../pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import { Printer } from "lucide-react";
-import { useUserSession } from "@/contexts/UserSessionContext"; // <-- Added this
+import { useUserSession } from "@/contexts/UserSessionContext";
 
 interface FarmerInfo {
   farmerName: string;
@@ -33,13 +33,23 @@ export default function MicrobiologyReport({
   locationId,
   allSampleCount,
 }: MicrobiologyReportProps) {
-  const { session } = useUserSession(); // <-- Get current technician from session
+  const { session } = useUserSession();
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo | null>(null);
   const [data, setData] = useState<MicrobiologyData | null>(null);
   const [technicianName, setTechnicianName] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [locationDetails, setLocationDetails] = useState<{
+    address: string;
+    email: string;
+    contactNumber: string;
+  }>({
+    address: "",
+    email: "",
+    contactNumber: "",
+  });
 
+  // Fetch microbiology report data
   useEffect(() => {
     const fetchReport = async () => {
       try {
@@ -61,7 +71,6 @@ export default function MicrobiologyReport({
         if (snap.exists()) {
           const reportData = snap.data();
 
-          // Try to get technician name from the microbiology report document
           techName = reportData.technicianName || reportData.reportedBy || "";
 
           setFarmerInfo(reportData.farmerInfo || null);
@@ -92,17 +101,14 @@ export default function MicrobiologyReport({
           setFarmerInfo(null);
         }
 
-        // Fallback: If no name in document, use the currently logged-in technician's name
         if (!techName && session?.technicianName) {
           techName = session.technicianName;
         }
 
         setTechnicianName(techName);
-
       } catch (e) {
         console.error("Error fetching microbiology report:", e);
         setData(null);
-        // On error, still try to show current technician name as fallback
         if (session?.technicianName) {
           setTechnicianName(session.technicianName);
         } else {
@@ -115,6 +121,29 @@ export default function MicrobiologyReport({
 
     fetchReport();
   }, [invoiceId, locationId, allSampleCount, session]);
+
+  // Fetch location details (address, email, contact)
+  useEffect(() => {
+    const fetchLocationDetails = async () => {
+      if (!locationId) return;
+
+      try {
+        const locDoc = await getDoc(doc(db, "locations", locationId));
+        if (locDoc.exists()) {
+          const data = locDoc.data();
+          setLocationDetails({
+            address: data.address || "Not available",
+            email: data.email || "Not available",
+            contactNumber: data.contactNumber || "Not available",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching location details:", error);
+      }
+    };
+
+    fetchLocationDetails();
+  }, [locationId]);
 
   const handlePrint = () => window.print();
 
@@ -147,8 +176,13 @@ export default function MicrobiologyReport({
             <h1 className="text-2xl font-bold text-blue-700">
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
-            <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
-            <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
+            <p className="text-xs text-black font-semibold">
+              {locationDetails.address || "Loading lab address..."}
+            </p>
+            <p className="text-sm text-black">
+              Contact No: {locationDetails.contactNumber || "Loading..."} | 
+              Mail Id: {locationDetails.email || "Loading..."}
+            </p>
             <h2 className="text-2xl font-bold text-red-600 mt-3">
               Microbiology Analysis Report
             </h2>
@@ -246,7 +280,7 @@ export default function MicrobiologyReport({
         </div>
       </div>
 
-      {/* FULL A4 PRINT STYLES - ZERO WHITE SPACE */}
+      {/* FULL A4 PRINT STYLES */}
       <style>{`
         @media print {
           @page {

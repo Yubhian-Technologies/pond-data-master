@@ -1,7 +1,7 @@
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
+import { useNavigate } from "react-router-dom";
 
 interface TestItem {
   name: string;
@@ -11,6 +11,7 @@ interface TestItem {
 }
 
 interface InvoiceState {
+  invoiceId: string;
   farmerName: string;
   formattedDate: string;
   village: string;
@@ -22,26 +23,57 @@ interface InvoiceState {
   paymentMode: "cash" | "qr" | "neft";
 }
 
+// Allow state to be null/undefined for safety
 interface InvoiceTemplateProps {
-  state?: InvoiceState;
+  state: InvoiceState | null;
 }
 
-const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) => {
-  const location = useLocation();
-  const state = propsState ?? (location.state as InvoiceState);
+const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
+  // Safety check — prevent any crash if state is missing
+  if (!state) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Invoice Data Not Available
+          </h2>
+          <p className="text-gray-600">
+            The invoice could not be loaded. Please try again or contact support.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Dynamic Financial Year (Indian FY: April to March)
+  const getFinancialYear = (): string => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1; // January = 1
+    return month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+  };
+
+  const financialYear = getFinancialYear(); // e.g., "2025-26"
+
+  // GST Calculation
+  const GST_RATE = 18; // 9% CGST + 9% SGST
+  const baseTotal = state.total;
+  const gstAmount = Math.round(baseTotal * (GST_RATE / 100));
+  const halfGst = gstAmount / 2;
+  const grandTotal = baseTotal + gstAmount;
   const Navigate=useNavigate();
 
-  if (!state) return <p>No invoice data available</p>;
-
   const numberToWords = (num: number): string => {
-    const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven",
+    const a = [
+      "", "One", "Two", "Three", "Four", "Five", "Six", "Seven",
       "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen",
-      "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+      "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"
+    ];
     const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
 
     if (num === 0) return "Zero Rupees Only";
 
-    const inWords = (n: number) => {
+    const inWords = (n: number): string => {
       let str = "";
       if (n > 99) {
         str += a[Math.floor(n / 100)] + " Hundred ";
@@ -56,7 +88,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
     };
 
     const integerPart = Math.floor(num);
-    const decimalPart = Math.round((num - integerPart) * 100);
     let n = integerPart;
     const crore = Math.floor(n / 10000000); n %= 10000000;
     const lakh = Math.floor(n / 100000); n %= 100000;
@@ -67,16 +98,14 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
     if (lakh) result += inWords(lakh) + " Lakh ";
     if (thousand) result += inWords(thousand) + " Thousand ";
     if (n) result += inWords(n) + " ";
-    result = result.trim() + " Rupees";
-
-    if (decimalPart) {
-      result += " and " + inWords(decimalPart) + " Paise";
-    }
+    result = result.trim() || "Zero";
+    result += " Rupees";
 
     return result + " Only";
   };
 
-  const tick = (mode: "cash" | "qr" | "neft") => (state.paymentMode === mode ? "☑" : "☐");
+  const tick = (mode: "cash" | "qr" | "neft") =>
+    state.paymentMode === mode ? "Checked" : "Unchecked";
 
   const handlePrint = () => {
     window.print();
@@ -84,7 +113,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
 
   return (
     <>
-      {/* Buttons - visible on screen, hidden when printing */}
+      {/* Screen-only buttons */}
       <div className="mb-6 print:hidden flex justify-end gap-4 px-4">
         <button
           onClick={() => Navigate('/samples')}
@@ -96,11 +125,11 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
           onClick={handlePrint}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
         >
-          🖨️ Print Invoice
+          Print Invoice
         </button>
       </div>
 
-      {/* Printable Invoice - ONLY this part will print */}
+      {/* Printable A4 Invoice */}
       <div
         id="printable-invoice"
         className="bg-white mx-auto"
@@ -118,8 +147,12 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
         <header className="flex items-center justify-between border-b pb-4">
           <img src={ADC} alt="ADC Logo" style={{ width: "100px" }} />
           <div className="text-center">
-            <h2 style={{ fontSize: "18px", fontWeight: "bold" }}>వాటర్‌బేస్ ఆక్వా డయాగ్నస్టిక్ సెంటర్</h2>
-            <h3 style={{ fontSize: "16px", fontWeight: "600" }}>WATERBASE AQUA DIAGNOSTIC CENTER</h3>
+            <h2 style={{ fontSize: "18px", fontWeight: "bold" }}>
+              వాటర్‌బేస్ ఆక్వా డయాగ్నస్టిక్ సెంటర్
+            </h2>
+            <h3 style={{ fontSize: "16px", fontWeight: "600" }}>
+              WATERBASE AQUA DIAGNOSTIC CENTER
+            </h3>
             <p style={{ fontSize: "12px" }}>
               # Flat No:1B, Sriravi Plaza, Ramalingapuram, Nellore - 524 003, Andhra Pradesh<br />
               Phone: +91 76088 88001 | E-mail: adcl@waterbaseindia.com
@@ -129,13 +162,31 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
         </header>
 
         {/* INVOICE META */}
-        <section style={{ display: "flex", justifyContent: "space-between", marginTop: "10px", borderBottom: "1px solid #000", paddingBottom: "5px" }}>
-          <p style={{ fontWeight: "bold" }}>TWL ADC BVRM 202 / 202</p>
-          <p style={{ fontWeight: "bold" }}>INVOICE NO: ADCBVRM</p>
+        <section
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: "10px",
+            borderBottom: "1px solid #000",
+            paddingBottom: "5px",
+          }}
+        >
+          <p style={{ fontWeight: "bold" }}>TWL ADC {financialYear}</p>
+          <p style={{ fontWeight: "bold" }}>INVOICE NO: {state.invoiceId}</p>
         </section>
 
         {/* FARMER DETAILS */}
-        <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px", fontSize: "12px", marginTop: "10px", borderBottom: "1px solid #000", paddingBottom: "5px" }}>
+        <section
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "4px",
+            fontSize: "12px",
+            marginTop: "10px",
+            borderBottom: "1px solid #000",
+            paddingBottom: "5px",
+          }}
+        >
           <p><strong>Farmer Name :</strong> {state.farmerName}</p>
           <p><strong>Date :</strong> {state.formattedDate}</p>
           <p><strong>Village / City :</strong> {state.village}</p>
@@ -146,27 +197,44 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
         {/* DYNAMIC TEST TABLES */}
         {Object.entries(state.tests).map(([type, items]) => (
           <section key={type} style={{ marginTop: "15px", pageBreakInside: "avoid" }}>
-            <h3 style={{ fontWeight: "600", textAlign: "center", background: "#f0f0f0", padding: "2px", fontSize: "12px", textTransform: "uppercase" }}>
-              {type} ANALYSIS
+            <h3
+              style={{
+                fontWeight: "600",
+                textAlign: "center",
+                background: "#f0f0f0",
+                padding: "4px",
+                fontSize: "13px",
+                textTransform: "uppercase",
+              }}
+            >
+              {type === "pl" ? "PL" : type === "pcr" ? "PCR" : type.toUpperCase()} ANALYSIS
             </h3>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
               <thead>
                 <tr>
-                  <th style={{ border: "1px solid #000", padding: "2px" }}>S. No.</th>
-                  <th style={{ border: "1px solid #000", padding: "2px" }}>Descriptions</th>
-                  <th style={{ border: "1px solid #000", padding: "2px" }}>No. of samples</th>
-                  <th style={{ border: "1px solid #000", padding: "2px" }}>Unit Price (₹)</th>
-                  <th style={{ border: "1px solid #000", padding: "2px" }}>Amount (₹)</th>
+                  <th style={{ border: "1px solid #000", padding: "4px" }}>S. No.</th>
+                  <th style={{ border: "1px solid #000", padding: "4px" }}>Descriptions</th>
+                  <th style={{ border: "1px solid #000", padding: "4px" }}>No. of samples</th>
+                  <th style={{ border: "1px solid #000", padding: "4px" }}>Unit Price (₹)</th>
+                  <th style={{ border: "1px solid #000", padding: "4px" }}>Amount (₹)</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, idx) => (
                   <tr key={idx}>
-                    <td style={{ border: "1px solid #000", padding: "2px", textAlign: "center" }}>{idx + 1}</td>
-                    <td style={{ border: "1px solid #000", padding: "2px" }}>{item.name}</td>
-                    <td style={{ border: "1px solid #000", padding: "2px", textAlign: "center" }}>{item.quantity}</td>
-                    <td style={{ border: "1px solid #000", padding: "2px", textAlign: "center" }}>{item.price}</td>
-                    <td style={{ border: "1px solid #000", padding: "2px", textAlign: "center" }}>{item.total}</td>
+                    <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
+                      {idx + 1}
+                    </td>
+                    <td style={{ border: "1px solid #000", padding: "4px" }}>{item.name}</td>
+                    <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
+                      {item.quantity}
+                    </td>
+                    <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
+                      {item.price}
+                    </td>
+                    <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
+                      {item.total}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -174,76 +242,98 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state: propsState }) 
           </section>
         ))}
 
-        {/* TOTALS & PAYMENT */}
-        <section style={{ marginTop: "15px", pageBreakInside: "avoid" }}>
+        {/* TOTALS WITH GST */}
+        <section style={{ marginTop: "20px", pageBreakInside: "avoid" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
             <tbody>
               <tr>
-                <td style={{ border: "1px solid #000", padding: "2px", fontWeight: "600" }}>TOTAL BEFORE TAX (₹)</td>
-                <td style={{ border: "1px solid #000", padding: "2px", textAlign: "right" }}>{state.total}</td>
+                <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                  Subtotal (₹)
+                </td>
+                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                  ₹{baseTotal}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: "1px solid #000", padding: "6px" }}>CGST @ 9% (₹)</td>
+                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                  ₹{halfGst}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: "1px solid #000", padding: "6px" }}>SGST @ 9% (₹)</td>
+                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                  ₹{halfGst}
+                </td>
+              </tr>
+              <tr>
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "6px",
+                    fontWeight: "bold",
+                    background: "#f0f0f0",
+                  }}
+                >
+                  GRAND TOTAL (₹)
+                </td>
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "6px",
+                    textAlign: "right",
+                    fontWeight: "bold",
+                    background: "#f0f0f0",
+                  }}
+                >
+                  ₹{grandTotal}
+                </td>
               </tr>
             </tbody>
           </table>
 
-          <div style={{ marginTop: "10px" }}>
-            <h4 style={{ fontWeight: "600", fontSize: "12px", marginBottom: "2px" }}>MODE OF PAYMENT</h4>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
-              <tbody>
-                <tr>
-                  <td style={{ border: "1px solid #000", padding: "2px" }}>CASH {tick("cash")}</td>
-                  <td style={{ border: "1px solid #000", padding: "2px" }}>SGST/UGST 9%</td>
-                </tr>
-                <tr>
-                  <td style={{ border: "1px solid #000", padding: "2px" }}>QR SCAN {tick("qr")}</td>
-                  <td style={{ border: "1px solid #000", padding: "2px" }}>CGST 9%</td>
-                </tr>
-                <tr>
-                  <td style={{ border: "1px solid #000", padding: "2px" }}>NEFT/RTGS {tick("neft")}</td>
-                  <td style={{ border: "1px solid #000", padding: "2px" }}>IGST 18%</td>
-                </tr>
-              </tbody>
-            </table>
+          <p style={{ marginTop: "12px", fontSize: "12px", fontWeight: "600" }}>
+            Amount in Words: <strong>{numberToWords(grandTotal)}</strong>
+          </p>
+
+          <div
+            style={{
+              marginTop: "15px",
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "12px",
+            }}
+          >
+            <div>
+              <p><strong>Mode of Payment:</strong></p>
+              <p>
+                CASH {tick("cash")} &nbsp;&nbsp;|&nbsp;&nbsp;
+                QR SCAN {tick("qr")} &nbsp;&nbsp;|&nbsp;&nbsp;
+                NEFT/RTGS {tick("neft")}
+              </p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p>For Waterbase Aqua Diagnostic Center</p>
+              <div style={{ height: "70px" }}></div>
+              <p style={{ fontWeight: "600" }}>Authorised Signatory</p>
+            </div>
           </div>
-
-          <p style={{ marginTop: "8px", fontWeight: "600", fontSize: "12px" }}>
-            TOTAL AMOUNT (₹): {state.total}
-          </p>
-
-          <p style={{ marginTop: "2px", fontSize: "12px" }}>
-            <strong>Total in Words:</strong> {numberToWords(state.total)}
-          </p>
         </section>
-
-        {/* SIGNATURE */}
-        <footer style={{ marginTop: "30px", textAlign: "right", fontSize: "12px", fontWeight: "600" }}>
-          <p>Authorised Signature</p>
-          <p>For Waterbase Aqua Diagnostic Center</p>
-        </footer>
       </div>
 
-      {/* CRITICAL PRINT STYLES - This fixes the blank page issue */}
-      <style >{`
+      {/* Print Styles */}
+      <style>{`
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          #printable-invoice,
-          #printable-invoice * {
-            visibility: visible;
-          }
+          body * { visibility: hidden; }
+          #printable-invoice, #printable-invoice * { visibility: visible; }
           #printable-invoice {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
           }
-          .print\\:hidden {
-            display: none !important;
-          }
-          @page {
-            size: A4;
-            margin: 0;
-          }
+          .print\\:hidden { display: none !important; }
+          @page { size: A4; margin: 0; }
         }
       `}</style>
     </>
