@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   MapPin,
   Download,
+  UserCircle,
 } from "lucide-react";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { useEffect, useState } from "react";
@@ -40,12 +41,17 @@ import {
 import { db } from "./firebase";
 import { formatDistanceToNow, startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 import * as XLSX from "xlsx";
-import {auth} from "@/pages/firebase"
+import { auth } from "@/pages/firebase";
 
 interface Location {
   id: string;
   name: string;
   code: string;
+}
+
+interface Technician {
+  id: string;
+  name: string;
 }
 
 const Dashboard = () => {
@@ -68,6 +74,9 @@ const Dashboard = () => {
 
   const [allLocations, setAllLocations] = useState<Location[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+
+  const [branchTechnicians, setBranchTechnicians] = useState<Technician[]>([]);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
 
   const [exportData, setExportData] = useState<any[]>([]);
 
@@ -93,9 +102,27 @@ const Dashboard = () => {
         console.error("Error fetching locations:", err);
       }
     };
-
     fetchLocations();
   }, []);
+
+  // Fetch Technicians for the selected branch
+  useEffect(() => {
+    const fetchTechnicians = async () => {
+      if (!selectedLocationId) return;
+      try {
+        const techRef = collection(db, "locations", selectedLocationId, "technicians");
+        const snap = await getDocs(techRef);
+        const techs: Technician[] = snap.docs.map(d => ({
+          id: d.id,
+          name: d.data().name || "Unknown Technician"
+        }));
+        setBranchTechnicians(techs);
+      } catch (err) {
+        console.error("Error fetching technicians:", err);
+      }
+    };
+    fetchTechnicians();
+  }, [selectedLocationId]);
 
   // Default to technician's location
   useEffect(() => {
@@ -164,9 +191,16 @@ const Dashboard = () => {
 
       invoicesSnap.forEach((doc) => {
         const data = doc.data();
+
+        // Technician Filter check
+        if (selectedTechnicianId !== "all" && data.technicianId !== selectedTechnicianId) {
+          return;
+        }
+
         const createdAt = data.createdAt?.toDate() || new Date();
         const farmerName = data.farmerName || "Unknown Farmer";
         const invoiceId = data.invoiceId || doc.id;
+        const techName = data.technicianName || "Unknown";
 
         let typeDisplay = "";
         let sampleCount = 0;
@@ -206,6 +240,7 @@ const Dashboard = () => {
           isReport,
           sampleCount,
           total: Number(data.total || 0),
+          technicianName: techName,
         };
 
         allInvoices.push(invoiceItem);
@@ -214,6 +249,7 @@ const Dashboard = () => {
           "Invoice ID": invoiceId,
           "Farmer Name": farmerName,
           "Location": locationName,
+          "Technician": techName,
           "Sample Types": typeDisplay || "-",
           "Sample Count": sampleCount,
           "Revenue (₹)": Number(data.total || 0),
@@ -238,6 +274,7 @@ const Dashboard = () => {
       const filteredExportRows = searchTerm
         ? tempExportRows.filter((row, index) => {
             const inv = allInvoices[index];
+            if(!inv) return false;
             return (
               inv.farmerName.toLowerCase().includes(searchLower) ||
               inv.invoiceId.toLowerCase().includes(searchLower) ||
@@ -269,15 +306,16 @@ const Dashboard = () => {
           invoiceId: inv.invoiceId,
           timestamp: inv.createdAt,
           isReport: inv.isReport,
+          technicianName: inv.technicianName,
         }))
         .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
         .slice(0, 5);
 
       setRecentActivities(activities);
 
-      // Revenue change (only when no filters)
+      // Revenue change
       let revenueChange = "";
-      if (!isDateFiltered && !searchTerm) {
+      if (!isDateFiltered && !searchTerm && selectedTechnicianId === "all") {
         const lastMonthStart = Timestamp.fromDate(startOfMonth(subMonths(new Date(), 1)));
         const lastMonthEnd = Timestamp.fromDate(endOfMonth(subMonths(new Date(), 1)));
         const lastQuery = query(
@@ -316,7 +354,7 @@ const Dashboard = () => {
     if (selectedLocationId) {
       fetchDashboardData();
     }
-  }, [selectedLocationId, session.locationId]);
+  }, [selectedLocationId, selectedTechnicianId, session.locationId]);
 
   const handleApply = () => {
     fetchDashboardData();
@@ -340,31 +378,25 @@ const Dashboard = () => {
     );
 
     const summaryRow = {
-      "Invoice ID": "",
+      "Invoice ID": "TOTALS",
       "Farmer Name": "",
       "Location": "",
+      "Technician": "",
       "Sample Types": "",
       "Sample Count": totals.samples,
       "Revenue (₹)": totals.revenue,
-      "Status": `${totals.reports} Reports Completed`,
+      "Status": `${totals.reports} Reports`,
       "Date": `${totals.invoices} Invoices`,
     };
 
-    const worksheetData = [{ "Invoice ID": "" }, ...exportData,summaryRow];
+    const worksheetData = [{}, ...exportData, summaryRow];
 
     const ws = XLSX.utils.json_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Lab Report");
 
     ws["!cols"] = [
-      { wch: 18 },
-      { wch: 25 },
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 14 },
-      { wch: 15 },
-      { wch: 22 },
-      { wch: 15 },
+      { wch: 18 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 14 }, { wch: 15 }, { wch: 22 }, { wch: 15 },
     ];
 
     const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
@@ -372,276 +404,249 @@ const Dashboard = () => {
     XLSX.writeFile(wb, fileName);
   };
 
-
-const handleLogout = async () => {
-  try {
-    await signOut(auth);
-    localStorage.setItem("isLoggedIn", "false");  // ← ADD THIS
-    toast.success("Logged out successfully");
-  } catch (error) {
-    toast.error("Logout failed");
-    console.error(error);
-  }
-};
-
-  const hasAnyFilter = !!startDate || !!endDate || !!searchTerm;
-
+  const hasAnyFilter = !!startDate || !!endDate || !!searchTerm || selectedTechnicianId !== "all";
   const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Loading...";
 
   return (
     <DashboardLayout>
       <div className="h-screen flex flex-col">
-  <div className="flex-1 overflow-y-auto p-6 md:p-8">
-    <div className="max-w-7xl mx-auto"></div>
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Laboratory operations overview</p>
-          </div>
-          <div className="flex items-center gap-4">
-  <div className="flex items-center gap-3 bg-blue-50 px-4 py-2.5 rounded-full shadow-sm">
-    <User className="w-5 h-5 text-blue-600" />
-    <span className="font-medium text-gray-700">
-      {session.technicianName || "Technician"}
-    </span>
-  </div>
-  {/* <div className="flex gap-3">
-    <Button variant="destructive" size="sm" onClick={handleExit}>
-      Exit Technician
-    </Button>
-    
-  </div> */}
-</div>
-        </div>
-
-        {/* Filters */}
-        <Card className="mb-8 shadow-sm border-0">
-          <CardHeader className="from bg-cyan-50 rounded-t-xl">
-            <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
-              <Filter className="w-5 h-5" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by farmer, invoice, or type..."
-                  className="pl-10 h-11"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+                <p className="text-muted-foreground mt-1">Laboratory operations overview</p>
               </div>
-              <Input type="date" className="h-11" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              <Input type="date" className="h-11" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-              <div className="flex gap-2">
-                <Button className="h-11 flex-1" onClick={handleApply}>
-                  Apply Filters
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-11 px-4 bg-green-600 hover:bg-green-700 text-white"
-                  onClick={handleExportToExcel}
-                  disabled={loading || exportData.length === 0}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </div>
-            </div>
-
-            {/* Lab Branch Selector */}
-            <div className="mt-5 pt-4 border-t border-gray-200">
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <MapPin className="w-4 h-4 text-blue-600" />
-                  <span className="font-medium">Lab Branch:</span>
+                <div className="flex items-center gap-3 bg-blue-50 px-4 py-2.5 rounded-full shadow-sm border border-blue-100">
+                  <UserCircle className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-gray-700">
+                    {session.technicianName || "Technician"}
+                  </span>
                 </div>
-                <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                  <SelectTrigger className="w-64 h-11">
-                    <SelectValue placeholder="Select lab branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allLocations.map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id}>
-                        {loc.name} ({loc.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
-              <p className="text-xs text-muted-foreground mt-2 ml-6">
-                Currently viewing: <span className="font-semibold text-blue-800">{currentLocationName}</span>
-              </p>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-blue-50 to-white">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Farmers</CardTitle>
-                <div className="p-2.5 bg-blue-100 rounded-full">
-                  <Users className="w-5 h-5 text-blue-600" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-800">
-                {loading ? "-" : stats.totalFarmers}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                +{stats.newFarmers} new {startDate && endDate ? "in period" : "this month"}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-purple-50 to-white">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Samples Processed</CardTitle>
-                <div className="p-2.5 bg-purple-100 rounded-full">
-                  <FlaskConical className="w-5 h-5 text-purple-600" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-800">
-                {loading ? "-" : stats.samplesProcessed}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {hasAnyFilter ? "In filtered results" : "All time"}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-green-50 to-white">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Fully Finalized Reports</CardTitle>
-                <div className="p-2.5 bg-green-100 rounded-full">
-                  <FileText className="w-5 h-5 text-green-600" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-800">
-                {loading ? "-" : stats.reportsGenerated}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {hasAnyFilter ? "In filtered results" : "All time"}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-emerald-50 to-white">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
-                <div className="p-2.5 bg-emerald-100 rounded-full">
-                  <TrendingUp className="w-5 h-5 text-emerald-600" />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-800">
-                {loading ? "-" : `₹${stats.revenue.toLocaleString("en-IN")}`}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {stats.revenueChange
-                  ? `${stats.revenueChange} vs last month`
-                  : hasAnyFilter
-                  ? "In filtered results"
-                  : "All time"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Activity */}
-        <Card className="shadow-lg border-0 overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-            <CardTitle className="text-xl flex items-center gap-3 text-blue-800">
-              <Calendar className="w-6 h-6" />
-              Recent Activity
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Latest sample submissions and completed reports
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4">
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-200 border-t-blue-600"></div>
-                <p className="mt-4 text-muted-foreground">Loading activity...</p>
-              </div>
-            ) : recentActivities.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                  <FileText className="w-10 h-10 text-gray-400" />
-                </div>
-                <p className="text-lg text-muted-foreground">No recent activity yet</p>
-                <p className="text-sm text-muted-foreground mt-2">New actions will appear here</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentActivities.map((act) => (
-                  <div
-                    key={act.id}
-                    className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl hover:shadow-md hover:border-blue-200 transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-5">
-                      <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                          act.isReport
-                            ? "bg-green-100 text-green-600"
-                            : "bg-blue-100 text-blue-600"
-                        }`}
-                      >
-                        {act.isReport ? (
-                          <CheckCircle2 className="w-6 h-6" />
-                        ) : (
-                          <FlaskConical className="w-6 h-6" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <p className="font-medium text-gray-800">{act.title}</p>
-                          {act.isReport && (
-                            <span className="px-3 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
-                              Completed
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                          <p className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            <span className="font-medium text-gray-700">{act.subtitle}</span>
-                          </p>
-                          <p>
-                            Invoice:{" "}
-                            <span className="font-mono font-medium text-gray-800">{act.invoiceId}</span>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDistanceToNow(act.timestamp, { addSuffix: true })}
-                    </p>
+            {/* Filters */}
+            <Card className="mb-8 shadow-sm border-0">
+              <CardHeader className="from bg-cyan-50 rounded-t-xl">
+                <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
+                  <Filter className="w-5 h-5" />
+                  Filters
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-5">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by farmer, invoice, or type..."
+                      className="pl-10 h-11"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  
+                  <Input type="date" className="h-11" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  <Input type="date" className="h-11" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  <div className="flex gap-2">
+                    <Button className="h-11 flex-1" onClick={handleApply}>
+                      Apply Filters
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-11 px-4 bg-green-600 hover:bg-green-700 text-white border-0"
+                      onClick={handleExportToExcel}
+                      disabled={loading || exportData.length === 0}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Export
+                    </Button>
+                  </div>
+                </div>
 
+                {/* Lab Branch & Technician Selector */}
+                <div className="mt-5 pt-4 border-t border-gray-200 flex flex-wrap gap-6">
+                  {/* <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <MapPin className="w-4 h-4 text-blue-600" />
+                      <span className="font-medium">Lab Branch:</span>
+                    </div>
+                    <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                      <SelectTrigger className="w-64 h-11">
+                        <SelectValue placeholder="Select lab branch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allLocations.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id}>
+                            {loc.name} ({loc.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div> */}
+
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Users className="w-4 h-4 text-purple-600" />
+                      <span className="font-medium">Technician:</span>
+                    </div>
+                    <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
+                      <SelectTrigger className="w-64 h-11">
+                        <SelectValue placeholder="All Technicians" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Technicians</SelectItem>
+                        {branchTechnicians.map((tech) => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 ml-1">
+                  Currently viewing: <span className="font-semibold text-blue-800">{currentLocationName}</span>
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+              <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-blue-50 to-white">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Farmers</CardTitle>
+                    <div className="p-2.5 bg-blue-100 rounded-full">
+                      <Users className="w-5 h-5 text-blue-600" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-800">{loading ? "-" : stats.totalFarmers}</div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    +{stats.newFarmers} new this month
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-purple-50 to-white">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Samples Processed</CardTitle>
+                    <div className="p-2.5 bg-purple-100 rounded-full">
+                      <FlaskConical className="w-5 h-5 text-purple-600" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-800">{loading ? "-" : stats.samplesProcessed}</div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {hasAnyFilter ? "In filtered results" : "All time"}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-green-50 to-white">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Reports Finalized</CardTitle>
+                    <div className="p-2.5 bg-green-100 rounded-full">
+                      <FileText className="w-5 h-5 text-green-600" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-800">{loading ? "-" : stats.reportsGenerated}</div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {hasAnyFilter ? "In filtered results" : "All time"}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-emerald-50 to-white">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
+                    <div className="p-2.5 bg-emerald-100 rounded-full">
+                      <TrendingUp className="w-5 h-5 text-emerald-600" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {loading ? "-" : `₹${stats.revenue.toLocaleString("en-IN")}`}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {stats.revenueChange ? `${stats.revenueChange} vs last month` : "Selected period"}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Activity */}
+            <Card className="shadow-lg border-0 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                <CardTitle className="text-xl flex items-center gap-3 text-blue-800">
+                  <Calendar className="w-6 h-6" />
+                  Recent Activity
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Latest submissions and reports processed by technicians
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {loading ? (
+                  <div className="text-center py-12">
+                    <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-200 border-t-blue-600"></div>
+                  </div>
+                ) : recentActivities.length === 0 ? (
+                  <div className="text-center py-16">
+                    <FileText className="w-10 h-10 text-gray-400 mx-auto mb-4" />
+                    <p className="text-muted-foreground">No recent activity matching filters</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentActivities.map((act) => (
+                      <div
+                        key={act.id}
+                        className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl hover:shadow-md transition-all duration-300"
+                      >
+                        <div className="flex items-center gap-5">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${act.isReport ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"}`}>
+                            {act.isReport ? <CheckCircle2 className="w-6 h-6" /> : <FlaskConical className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-3">
+                              <p className="font-medium text-gray-800">{act.title}</p>
+                              {act.isReport && <span className="px-2 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded-full uppercase">Completed</span>}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
+                              <p className="flex items-center gap-1.5">
+                                <User className="w-3.5 h-3.5" />
+                                <span className="font-medium text-gray-700">{act.subtitle}</span>
+                              </p>
+                              <p className="flex items-center gap-1.5">
+                                <UserCircle className="w-3.5 h-3.5 text-purple-500" />
+                                <span>Submitted by: <span className="font-medium text-gray-700">{act.technicianName}</span></span>
+                              </p>
+                              <p className="font-mono text-xs bg-gray-50 px-2 py-0.5 rounded border">ID: {act.invoiceId}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(act.timestamp, { addSuffix: true })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
     </DashboardLayout>
   );
 };

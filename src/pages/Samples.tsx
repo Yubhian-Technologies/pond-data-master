@@ -5,29 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Check } from "lucide-react";
+import { Plus, Check, Users, Search, X } from "lucide-react";
 import { Farmer } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../contexts/UserSessionContext";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandInput,
-  CommandList,
-} from "@/components/ui/command";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const Samples = () => {
   const navigate = useNavigate();
@@ -35,9 +28,10 @@ const Samples = () => {
   const { session } = useUserSession();
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [branchTechnicians, setBranchTechnicians] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
 
   type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology";
-
   const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology"];
 
   const [open, setOpen] = useState(false);
@@ -47,9 +41,10 @@ const Samples = () => {
   const [selectedTypes, setSelectedTypes] = useState<SampleGroup[]>([]);
   const [quantities, setQuantities] = useState<Record<SampleGroup, number>>(() => ({} as Record<SampleGroup, number>));
 
-  const [openFarmerPopover, setOpenFarmerPopover] = useState(false);
-  const [openTypePopover, setOpenTypePopover] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(true);
+  
+  // Custom Farmer Search State
+  const [farmerSearchQuery, setFarmerSearchQuery] = useState("");
 
   useEffect(() => {
     const fetchFarmers = async () => {
@@ -71,6 +66,25 @@ const Samples = () => {
   }, [session.locationId]);
 
   useEffect(() => {
+    const fetchTechnicians = async () => {
+      const locationId = session.locationId;
+      if (!locationId) return;
+      try {
+        const techRef = collection(db, "locations", locationId, "technicians");
+        const snap = await getDocs(techRef);
+        const techs = snap.docs.map(d => ({
+          id: d.id,
+          name: d.data().name || "Unknown Technician"
+        }));
+        setBranchTechnicians(techs);
+      } catch (err) {
+        console.error("Error fetching technicians:", err);
+      }
+    };
+    fetchTechnicians();
+  }, [session.locationId]);
+
+  useEffect(() => {
     const fetchInvoices = async () => {
       setLoadingInvoices(true);
       try {
@@ -84,8 +98,7 @@ const Samples = () => {
         setInvoices(data);
       } catch (err) {
         console.error("Error fetching invoices:", err);
-      }
-      finally{
+      } finally {
         setLoadingInvoices(false);
       }
     };
@@ -98,384 +111,411 @@ const Samples = () => {
     setDateOfCulture("");
     setSelectedTypes([]);
     setQuantities({} as Record<SampleGroup, number>);
+    setFarmerSearchQuery("");
     setOpen(false);
   };
 
-  // FIXED & ROBUST: Correctly detect if all reports are completed
-const isReportFullyCompleted = (sample: any) => {
-  if (!sample.reportsProgress) return false;
-  if (!sample.sampleType || !Array.isArray(sample.sampleType)) return false;
+  const isReportFullyCompleted = (sample: any) => {
+    if (!sample.reportsProgress) return false;
+    if (!sample.sampleType || !Array.isArray(sample.sampleType)) return false;
 
-  // Extract active types: only those with count > 0
-  const activeTypes = sample.sampleType
-    .map((s: any) => {
-      if (typeof s === "string") {
-        return s.toLowerCase().trim();
-      }
-      if (s && typeof s === "object" && s.type) {
-        return s.type.toString().toLowerCase().trim();
-      }
-      return null;
-    })
-    .filter((type: string | null): type is string => {
-      return type !== null && type !== "" && type !== "pl_pcr";
-    })
-    // Critical: only include types where count > 0 (matches new actual count logic)
-    .filter((type: string, index: number) => {
-      const originalEntry = sample.sampleType[index];
-      let count = 0;
+    const activeTypes = sample.sampleType
+      .map((s: any) => {
+        if (typeof s === "string") return s.toLowerCase().trim();
+        if (s && typeof s === "object" && s.type) return s.type.toString().toLowerCase().trim();
+        return null;
+      })
+      .filter((type: string | null): type is string => {
+        return type !== null && type !== "" && type !== "pl_pcr";
+      })
+      .filter((type: string, index: number) => {
+        const originalEntry = sample.sampleType[index];
+        let count = 0;
+        if (typeof originalEntry === "object" && originalEntry.count !== undefined) {
+          count = Number(originalEntry.count);
+        } else {
+          const match = sample.sampleType.find((t: any) =>
+            (typeof t === "object" ? t.type?.toLowerCase() : t?.toLowerCase()) === type
+          );
+          count = typeof match === "object" ? Number(match?.count || 0) : 0;
+        }
+        return count > 0;
+      });
 
-      if (typeof originalEntry === "object" && originalEntry.count !== undefined) {
-        count = Number(originalEntry.count);
-      } else {
-        // Fallback for old format
-        const match = sample.sampleType.find((t: any) => 
-          (typeof t === "object" ? t.type?.toLowerCase() : t?.toLowerCase()) === type
-        );
-        count = typeof match === "object" ? Number(match?.count || 0) : 0;
-      }
+    if (activeTypes.length === 0) return true;
+    return activeTypes.every((type: string) =>
+      sample.reportsProgress[type] === "completed"
+    );
+  };
 
-      return count > 0;
-    });
+  const filteredInvoices = invoices.filter((inv) => {
+    if (selectedTechnicianId === "all") return true;
+    return inv.technicianId === selectedTechnicianId;
+  });
 
-  // No active samples → report is complete
-  if (activeTypes.length === 0) return true;
-
-  // Every active type must be marked completed
-  return activeTypes.every((type: string) => 
-    sample.reportsProgress[type] === "completed"
-  );
-};
-  // Sort invoices newest first
-  const sortedInvoices = [...invoices].sort((a, b) => {
+  const sortedInvoices = [...filteredInvoices].sort((a, b) => {
     const timeA = a.createdAt?.toMillis() || 0;
     const timeB = b.createdAt?.toMillis() || 0;
     return timeB - timeA;
   });
 
+  // Filtered Farmer List for Selection
+  const filteredFarmerSelection = useMemo(() => {
+    return farmers.filter(f => 
+      f.name.toLowerCase().includes(farmerSearchQuery.toLowerCase()) || 
+      f.phone.includes(farmerSearchQuery) ||
+      f.id.toLowerCase().includes(farmerSearchQuery.toLowerCase())
+    );
+  }, [farmers, farmerSearchQuery]);
+
   return (
     <DashboardLayout>
       <div className="h-screen flex flex-col">
-  <div className="flex-1 overflow-y-auto p-6 md:p-8">
-    <div className="max-w-7xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Sample Submission</h1>
-            <p className="text-muted-foreground">Submit and manage sample testing requests</p>
-          </div>
-          <Button onClick={() => setOpen(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            New Sample Submission
-          </Button>
-        </div>
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-foreground mb-2">Sample Submission</h1>
+                <p className="text-muted-foreground">Submit and manage sample testing requests</p>
+              </div>
+              <Button onClick={() => setOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                New Sample Submission
+              </Button>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Samples</CardTitle>
-            <CardDescription>View all submitted samples</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice ID</TableHead>
-                  <TableHead>Farmer Name</TableHead>
-                  <TableHead>Phone Number</TableHead>
-                  <TableHead>Submitted By</TableHead>
-                  <TableHead>Bill Amount</TableHead>
-                  <TableHead>Pending Amount</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingInvoices ? (
-    <TableRow>
-      <TableCell colSpan={7} className="h-32 text-center">
-        <div className="flex flex-col items-center justify-center gap-3">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-primary"></div>
-          <p className="text-muted-foreground">Loading samples...</p>
-        </div>
-      </TableCell>
-    </TableRow>
-  ) : sortedInvoices.length === 0 ? (
-    <TableRow>
-      <TableCell colSpan={7} className="text-center text-muted-foreground">
-        No samples submitted yet
-      </TableCell>
-    </TableRow>
-  ): (
-                  sortedInvoices.map((sample) => {
-                    const fullyCompleted = isReportFullyCompleted(sample);
-                    const invoiceId = sample.invoiceId ?? sample.id;
-
-                    return (
-                      <TableRow key={sample.id}>
-                        <TableCell className="font-medium">{invoiceId}</TableCell>
-                        <TableCell>{sample.farmerName}</TableCell>
-                        <TableCell>{sample.farmerPhone ?? "N/A"}</TableCell>
-                        <TableCell>{sample.technicianName}</TableCell>
-                        <TableCell>₹{sample.total ?? 0}</TableCell>
-                        <TableCell
-                          className={
-                            (sample.pendingAmount ?? 0) > 0
-                              ? "text-red-600"
-                              : "text-green-600"
-                          }
-                        >
-                          ₹{sample.pendingAmount ?? 0}
-                        </TableCell>
-
-                        <TableCell>
-                          <div className="flex items-center gap-3 flex-nowrap whitespace-nowrap">
-                            {/* Generate / View Report Button */}
-                            <Button
-                              className="bg-transparent text-black border hover:bg-cyan-700 hover:text-white"
-                              size="sm"
-                              onClick={() =>
-                                navigate(`/lab-results/${sample.id}${fullyCompleted ? "?mode=view" : ""}`)
-                              }
-                            >
-                              {fullyCompleted ? "View Report" : "Generate Report"}
-                            </Button>
-
-                            {/* View Invoice Button */}
-                            <Button
-                              className="bg-transparent text-black border hover:bg-green-600 hover:text-white"
-                              size="sm"
-                              onClick={() => navigate(`/invoice/${invoiceId}/${session.locationId}`)}
-                            >
-                              View Invoice
-                            </Button>
-
-                            {/* Edit Button - Only enabled after full report */}
-                            <Button
-                              className="bg-transparent text-black border hover:bg-red-600 hover:text-white"
-                              size="sm"
-                              disabled={!fullyCompleted}
-                              onClick={() => navigate(`/lab-results/${sample.id}?mode=edit`)}
-                              title={!fullyCompleted ? "Edit available only after report is fully generated" : "Edit report data"}
-                            >
-                              Edit
-                            </Button>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle>Recent Samples</CardTitle>
+                  <CardDescription>View all submitted samples</CardDescription>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Users className="w-4 h-4 text-purple-600" />
+                    <span className="font-medium">Filter by Tech:</span>
+                  </div>
+                  <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
+                    <SelectTrigger className="w-56 h-10">
+                      <SelectValue placeholder="All Technicians" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Technicians</SelectItem>
+                      {branchTechnicians.map((tech) => (
+                        <SelectItem key={tech.id} value={tech.id}>
+                          {tech.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice ID</TableHead>
+                      <TableHead>Farmer Name</TableHead>
+                      <TableHead>Phone Number</TableHead>
+                      <TableHead>Submitted By</TableHead>
+                      <TableHead>Bill Amount</TableHead>
+                      <TableHead>Pending Amount</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loadingInvoices ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="h-32 text-center">
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-primary"></div>
+                            <p className="text-muted-foreground">Loading samples...</p>
                           </div>
                         </TableCell>
                       </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                    ) : sortedInvoices.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          No samples found for selected technician
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      sortedInvoices.map((sample) => {
+                        const fullyCompleted = isReportFullyCompleted(sample);
+                        const invoiceId = sample.invoiceId ?? sample.id;
 
-        {/* New Submission Dialog - unchanged */}
-        <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) resetForm(); }}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {step === 1 ? "Select Farmer" : "Sample Details"}
-              </DialogTitle>
-            </DialogHeader>
+                        return (
+                          <TableRow key={sample.id}>
+                            <TableCell className="font-medium">{invoiceId}</TableCell>
+                            <TableCell>{sample.farmerName}</TableCell>
+                            <TableCell>{sample.farmerPhone ?? "N/A"}</TableCell>
+                            <TableCell>{sample.technicianName}</TableCell>
+                            <TableCell>₹{sample.total ?? 0}</TableCell>
+                            <TableCell
+                              className={
+                                (sample.pendingAmount ?? 0) > 0
+                                  ? "text-red-600"
+                                  : "text-green-600"
+                              }
+                            >
+                              ₹{sample.pendingAmount ?? 0}
+                            </TableCell>
 
-            {step === 1 && (
-              <div className="space-y-4">
-                <div>
-                  <Popover open={openFarmerPopover} onOpenChange={setOpenFarmerPopover}>
-                    <PopoverTrigger asChild>
-                      <div>
-                        <Label>Select Farmer</Label>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between mt-1"
-                          onClick={() => setOpenFarmerPopover(true)}
-                        >
-                          {selectedFarmer
-                            ? `${selectedFarmer.name} - ${selectedFarmer.id}`
-                            : "Choose a farmer"}
-                        </Button>
-                      </div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search by name or phone..." />
-                        <CommandList>
-                          <CommandEmpty>No farmer found.</CommandEmpty>
-                          <CommandGroup>
-                            {farmers.map((farmer) => (
-                              <CommandItem
-                                key={farmer.id}
-                                value={`${farmer.name} ${farmer.phone}`.toLowerCase()}
-                                onSelect={() => {
-                                  setSelectedFarmer(farmer);
-                                  setOpenFarmerPopover(false);
-                                }}
-                              >
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{farmer.name}</span>
-                                  <span className="text-sm text-muted-foreground">
-                                    {farmer.phone}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {selectedFarmer && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Phone:</span>
-                          <span className="ml-2">{selectedFarmer.phone}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Species:</span>
-                          <span className="ml-2">{selectedFarmer.species}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Location:</span>
-                          <span className="ml-2">{selectedFarmer.city}, {selectedFarmer.state}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Culture Areas:</span>
-                          <span className="ml-2">{selectedFarmer.cultureAreas}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <DialogFooter>
-                  <Button onClick={resetForm} variant="outline">Cancel</Button>
-                  <Button onClick={() => setStep(2)} disabled={!selectedFarmer}>
-                    Next
-                  </Button>
-                </DialogFooter>
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Sample Type</Label>
-                    <Popover open={openTypePopover} onOpenChange={setOpenTypePopover}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between mt-1"
-                          onClick={() => setOpenTypePopover(true)}
-                        >
-                          {selectedTypes.length > 0
-                            ? selectedTypes
-                                .map(t => t === "pl_pcr" ? "PL/PCR" : t.charAt(0).toUpperCase() + t.slice(1))
-                                .join(", ")
-                            : "Select sample types"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0">
-                        <Command>
-                          <CommandInput placeholder="Search sample types..." />
-                          <CommandList>
-                            <CommandEmpty>No options found.</CommandEmpty>
-                            <CommandGroup>
-                              {sampleTypeOptions.map((type) => (
-                                <CommandItem
-                                  key={type}
-                                  value={type}
-                                  onSelect={() => {
-                                    const willAdd = !selectedTypes.includes(type);
-                                    setSelectedTypes(prev =>
-                                      willAdd ? [...prev, type] : prev.filter(t => t !== type)
-                                    );
-                                    if (willAdd) {
-                                      setQuantities(q => ({ ...q, [type]: 1 }));
-                                    } else {
-                                      setQuantities(prev => {
-                                        const newQ = { ...prev };
-                                        delete newQ[type];
-                                        return newQ;
-                                      });
-                                    }
-                                  }}
+                            <TableCell>
+                              <div className="flex items-center gap-3 flex-nowrap whitespace-nowrap">
+                                <Button
+                                  className="bg-transparent text-black border hover:bg-cyan-700 hover:text-white"
+                                  size="sm"
+                                  onClick={() =>
+                                    navigate(`/lab-results/${sample.id}${fullyCompleted ? "?mode=view" : ""}`)
+                                  }
                                 >
-                                  <div className="flex items-center justify-between w-full">
-                                    <span>{type === "pl_pcr" ? "PL / PCR" : type.charAt(0).toUpperCase() + type.slice(1)}</span>
-                                    {selectedTypes.includes(type) && <Check className="w-4 h-4" />}
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                                  {fullyCompleted ? "View Report" : "Generate Report"}
+                                </Button>
 
-                  <div>
-                    <Label>Date of Culture</Label>
-                    <Input
-                      type="date"
-                      value={dateOfCulture}
-                      onChange={(e) => setDateOfCulture(e.target.value)}
-                    />
-                  </div>
+                                <Button
+                                  className="bg-transparent text-black border hover:bg-green-600 hover:text-white"
+                                  size="sm"
+                                  onClick={() => navigate(`/invoice/${invoiceId}/${session.locationId}`)}
+                                >
+                                  View Invoice
+                                </Button>
+
+                                <Button
+                                  className="bg-transparent text-black border hover:bg-red-600 hover:text-white"
+                                  size="sm"
+                                  disabled={!fullyCompleted}
+                                  onClick={() => navigate(`/lab-results/${sample.id}?mode=edit`)}
+                                  title={!fullyCompleted ? "Edit available only after report is fully generated" : "Edit report data"}
+                                >
+                                  Edit
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) resetForm(); }}>
+              <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-6 pb-2">
+                  <DialogTitle className="text-xl">
+                    {step === 1 ? " Select Farmer" : " Sample Details"}
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto px-6 py-2">
+                  {step === 1 && (
+                    <div className="space-y-4">
+                      {/* FIXED CUSTOM UI: BETTER FARMER SELECTION */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Search and Select Farmer</Label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                          <Input 
+                            placeholder="Type name, phone or ID to search..." 
+                            className="pl-10 h-11"
+                            value={farmerSearchQuery}
+                            onChange={(e) => setFarmerSearchQuery(e.target.value)}
+                          />
+                          {farmerSearchQuery && (
+                            <button 
+                              onClick={() => setFarmerSearchQuery("")}
+                              className="absolute right-3 top-3"
+                            >
+                              <X className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* INTERNAL SCROLLABLE LIST - NO POPOVER Conflict */}
+                        <div className="border rounded-lg mt-2 overflow-hidden bg-white">
+                          <div className="max-h-[220px] overflow-y-auto divide-y">
+                            {filteredFarmerSelection.length > 0 ? (
+                              filteredFarmerSelection.map((farmer) => (
+                                <div
+                                  key={farmer.id}
+                                  onClick={() => {
+                                    setSelectedFarmer(farmer);
+                                    setFarmerSearchQuery(""); 
+                                  }}
+                                  className={`p-3 cursor-pointer transition-colors flex items-center justify-between hover:bg-cyan-50 ${selectedFarmer?.id === farmer.id ? 'bg-cyan-50 border-l-4 border-cyan-500' : ''}`}
+                                >
+                                  <div>
+                                    <p className="font-semibold text-gray-800">{farmer.name}</p>
+                                    <p className="text-xs text-muted-foreground"> Ph: {farmer.phone}</p>
+                                  </div>
+                                  {selectedFarmer?.id === farmer.id && (
+                                    <Check className="w-5 h-5 text-cyan-600" />
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-8 text-center text-muted-foreground">
+                                No farmers found matching your search.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {selectedFarmer && (
+                        <Card className="bg-muted/30 border-none shadow-none">
+                          <CardContent className="pt-6">
+                            <div className="grid grid-cols-2 gap-y-3 text-sm">
+                              <div>
+                                <span className="text-muted-foreground font-medium">Selected Farmer:</span>
+                                <p className="text-lg font-bold text-cyan-700">{selectedFarmer.name}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">Phone:</span>
+                                <p className="font-semibold">{selectedFarmer.phone}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">Species:</span>
+                                <p className="font-semibold">{selectedFarmer.species}</p>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-medium">Location:</span>
+                                <p className="font-semibold">{selectedFarmer.city}, {selectedFarmer.state}</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
+
+                  {step === 2 && (
+                    <div className="space-y-6 pb-6">
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <Label className="font-semibold">Sample Type(s)</Label>
+                          <div className="grid grid-cols-1 gap-2">
+                            {sampleTypeOptions.map((type) => (
+                              <button
+                                key={type}
+                                onClick={() => {
+                                  const willAdd = !selectedTypes.includes(type);
+                                  setSelectedTypes(prev =>
+                                    willAdd ? [...prev, type] : prev.filter(t => t !== type)
+                                  );
+                                  if (willAdd) {
+                                    setQuantities(q => ({ ...q, [type]: 1 }));
+                                  } else {
+                                    setQuantities(prev => {
+                                      const newQ = { ...prev };
+                                      delete newQ[type];
+                                      return newQ;
+                                    });
+                                  }
+                                }}
+                                className={`flex items-center justify-between p-3 rounded-md border text-sm font-medium transition-all ${
+                                  selectedTypes.includes(type) 
+                                    ? "bg-cyan-600 text-white border-cyan-700" 
+                                    : "bg-white hover:bg-gray-50 text-gray-700"
+                                }`}
+                              >
+                                {type === "pl_pcr" ? "PL / PCR" : type.charAt(0).toUpperCase() + type.slice(1)}
+                                {selectedTypes.includes(type) && <Check className="w-4 h-4" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label className="font-semibold">Date of Culture</Label>
+                          <Input
+                            type="date"
+                            className="h-11"
+                            value={dateOfCulture}
+                            onChange={(e) => setDateOfCulture(e.target.value)}
+                          />
+                          <div className="bg-blue-50 p-4 rounded-lg mt-4">
+                             <p className="text-xs text-blue-700 font-medium uppercase mb-1">Target Farmer</p>
+                             <p className="font-bold text-gray-800">{selectedFarmer?.name}</p>
+                             <p className="text-xs text-gray-600">{selectedFarmer?.phone}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {selectedTypes.length > 0 && (
+                        <div className="space-y-4 pt-4 border-t">
+                          <Label className="font-bold text-gray-800 uppercase tracking-wider text-xs">Quantity for each type</Label>
+                          <div className="grid grid-cols-2 gap-4">
+                            {selectedTypes.map((type) => (
+                              <div key={type} className="space-y-2 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <Label className="text-xs font-bold text-gray-600 uppercase">
+                                  {type === "pl_pcr" ? "PL / PCR Samples" : `${type} Samples`}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  max="10"
+                                  className="bg-white"
+                                  value={quantities[type] ?? 1}
+                                  onChange={(e) => {
+                                    const val = Math.max(1, Math.min(10, parseInt(e.target.value) || 1));
+                                    setQuantities(prev => ({ ...prev, [type]: val }));
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {selectedTypes.map((type) => (
-                  <div key={type} className="space-y-2 border p-4 rounded-md">
-                    <Label>
-                      {type === "pl_pcr" ? "PL / PCR Samples" : `${type.charAt(0).toUpperCase() + type.slice(1)} Samples`} (Max 10)
-                    </Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={quantities[type] ?? 1}
-                      onChange={(e) => {
-                        const val = Math.max(1, Math.min(10, parseInt(e.target.value) || 1));
-                        setQuantities(prev => ({ ...prev, [type]: val }));
-                      }}
-                      placeholder="Number of samples"
-                    />
-                  </div>
-                ))}
+                <DialogFooter className="p-6 pt-2 border-t bg-gray-50/50">
+                  {step === 1 ? (
+                    <>
+                      <Button onClick={resetForm} variant="outline" className="h-11 px-8">Cancel</Button>
+                      <Button 
+                        onClick={() => setStep(2)} 
+                        disabled={!selectedFarmer} 
+                        className="h-11 px-10 bg-cyan-600 hover:bg-cyan-700"
+                      >
+                        Next: Sample Details
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button onClick={() => setStep(1)} variant="outline" className="h-11 px-8">Back</Button>
+                      <Button
+                        onClick={() => {
+                          if (!selectedFarmer || !dateOfCulture || selectedTypes.length === 0) return;
 
-                <DialogFooter>
-                  <Button onClick={() => setStep(1)} variant="outline">Back</Button>
-                  <Button
-                    onClick={() => {
-                      if (!selectedFarmer || !dateOfCulture || selectedTypes.length === 0) return;
+                          const sampleSummary = selectedTypes.flatMap((type) => {
+                            const count = quantities[type] ?? 1;
+                            if (type === "pl_pcr") {
+                              return [{ type: "pl", count }, { type: "pcr", count }];
+                            }
+                            return [{ type, count }];
+                          });
 
-                      const sampleSummary = selectedTypes.flatMap((type) => {
-                        const count = quantities[type] ?? 1;
-                        if (type === "pl_pcr") {
-                          return [{ type: "pl", count }, { type: "pcr", count }];
-                        }
-                        return [{ type, count }];
-                      });
-
-                      navigate("/invoice", {
-                        state: { sampleSummary, dateOfCulture, farmer: selectedFarmer },
-                      });
-                    }}
-                    disabled={!dateOfCulture || selectedTypes.length === 0}
-                  >
-                    Submit & Generate Invoice
-                  </Button>
+                          navigate("/invoice", {
+                            state: { sampleSummary, dateOfCulture, farmer: selectedFarmer },
+                          });
+                        }}
+                        disabled={!dateOfCulture || selectedTypes.length === 0}
+                        className="h-11 px-10 bg-cyan-600 hover:bg-cyan-700"
+                      >
+                        Submit & Generate Invoice
+                      </Button>
+                    </>
+                  )}
                 </DialogFooter>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
-      </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
