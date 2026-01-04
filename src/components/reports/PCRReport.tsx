@@ -31,6 +31,15 @@ export default function PCRReport({
   const [reports, setReports] = useState<any[]>([]);
   const [technicianName, setTechnicianName] = useState<string>(""); // ← Added
   const [loading, setLoading] = useState(true);
+  const [locationDetails, setLocationDetails] = useState<{
+  address: string;
+  email: string;
+  contactNumber: string;
+}>({
+  address: "",
+  email: "",
+  contactNumber: "",
+});
 
   useEffect(() => {
     const fetchPCRReport = async () => {
@@ -155,6 +164,29 @@ export default function PCRReport({
 
     fetchPCRReport();
   }, [invoiceId, locationId, sampleNumber, showAllSamples, allSampleCount, compact, session]);
+
+  useEffect(() => {
+    const fetchLocationDetails = async () => {
+      if (!locationId) return;
+  
+      try {
+        const locDoc = await getDoc(doc(db, "locations", locationId));
+        if (locDoc.exists()) {
+          const data = locDoc.data();
+          setLocationDetails({
+            address: data.address || "Not available",
+            email: data.email || "Not available",
+            contactNumber: data.contactNumber || "Not available",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching location details:", error);
+        
+      }
+    };
+  
+    fetchLocationDetails();
+  }, [locationId]);
 
   if (loading) {
     return (
@@ -358,8 +390,9 @@ export default function PCRReport({
             <h1 className="text-4xl font-bold text-blue-800">
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
-            <p className="text-xs text-black font-semibold">3-6-10, Ravi House,Town Railway Station Road,Bhimavaram-534202,West Godavari,India</p>
-            <p className="text-sm text-black">Contact No- 7286898936, Mail Id:- adc5@waterbaseindia.com</p>
+            <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
+            <p className="text-sm text-black">Contact No: {locationDetails.contactNumber || "Loading..."} | 
+  Mail Id: {locationDetails.email || "Loading..."}</p>
             <h2 className="text-2xl font-bold text-red-700 mt-4">
               RT-q PCR Analysis Test Report
             </h2>

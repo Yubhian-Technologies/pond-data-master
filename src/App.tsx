@@ -18,6 +18,7 @@ import Reports from "./pages/Reports";
 import CMIS from "./pages/CMIS";
 import NotFound from "./pages/NotFound";
 import InvoiceTemplate from "../src/data/template";
+import InvoicePreview from "./pages/InvoicePreview";
 import { UserSessionProvider } from "./contexts/UserSessionContext";
 import InvoiceView from "./pages/InvoiceViewer";
 import SoilReport from "./components/reports/SoilReport";
@@ -70,7 +71,7 @@ const App = () => (
             <Route path="/lab-results/:invoiceId" element={<Protected><LabResults /></Protected>} />
             <Route path="/soil-report/:invoiceId/:locationId" element={<Protected><SoilReport /></Protected>} />
             <Route path="/water-report/:invoiceId/:locationId" element={<Protected><WaterReport /></Protected>} />
-            <Route path="/invoice-template" element={<Protected><InvoiceTemplate /></Protected>} />
+             <Route path="/invoice-template" element={<Protected><InvoicePreview /></Protected>} />
             <Route path="/reports" element={<Protected><Reports /></Protected>} />
             <Route path="/cmis" element={<Protected><CMIS /></Protected>} />
             <Route path="/invoice/:invoiceId/:locationId" element={<Protected><InvoiceView /></Protected>} />
