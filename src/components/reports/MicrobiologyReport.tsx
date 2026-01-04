@@ -285,7 +285,7 @@ export default function MicrobiologyReport({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 0 !important;
+            margin: 0.4cm;
           }
 
           html, body {

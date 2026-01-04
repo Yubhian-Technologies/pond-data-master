@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 
 import SoilForm from "../components/forms/SoilForm";
 import WaterForm from "../components/forms/WaterForm";
@@ -23,12 +23,12 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { useUserSession } from "../contexts/UserSessionContext";
-import { useSearchParams } from "react-router-dom";
 
 export default function LabResults() {
   const [invoice, setInvoice] = useState<any>(null);
   const { session } = useUserSession();
   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const navigate = useNavigate();
 
   const [currentType, setCurrentType] = useState<string | null>(null);
   const [step, setStep] = useState("loading");
@@ -195,11 +195,9 @@ export default function LabResults() {
       page-break-inside: avoid !important;
     }
 
-    /* REMOVE BROWSER HEADER/FOOTER (TITLE, URL, DATE, PAGE NO) */
     @page {
       size: A4 portrait;
       margin: 1cm;
-      /* These rules remove the default header/footer */
       @top-left { content: none; }
       @top-center { content: none; }
       @top-right { content: none; }
@@ -212,7 +210,6 @@ export default function LabResults() {
       page-break-inside: avoid !important; 
     }
 
-    /* Hide any accidental headers */
     .print\\:hidden { display: none !important; }
   }
 `;
@@ -240,19 +237,18 @@ export default function LabResults() {
   const renderPathologyReport = () => (
     <>
       <style>{combinedPrintStyles}</style>
-{hasPL && (
-  <div className={hasPL && hasPCR ? "pl-page" : ""}>
-    <div className={hasPL && hasPCR ? "pl-tight-bottom" : ""}>
-      {/* Hide signature in PLReport when combined with PCR */}
-      <PLReport 
-        invoiceId={invoiceId!} 
-        locationId={session.locationId} 
-        allSampleCount={plCount}
-        showSignature={!hasPCR}
-      />
-    </div>
-  </div>
-)}
+      {hasPL && (
+        <div className={hasPL && hasPCR ? "pl-page" : ""}>
+          <div className={hasPL && hasPCR ? "pl-tight-bottom" : ""}>
+            <PLReport 
+              invoiceId={invoiceId!} 
+              locationId={session.locationId} 
+              allSampleCount={plCount}
+              showSignature={!hasPCR}
+            />
+          </div>
+        </div>
+      )}
 
       {hasPCR && (
         <div className={hasPL && hasPCR ? "pcr-page" : ""}>
@@ -262,8 +258,6 @@ export default function LabResults() {
             allSampleCount={pcrCount}
             compact={hasPL && hasPCR}
           />
-
-          {/* Single signature — always shown after PCR */}
           {renderSignatureAndNote()}
         </div>
       )}
@@ -272,10 +266,21 @@ export default function LabResults() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto relative pb-24">
+      {/* Styles for printing */}
+      <style>{combinedPrintStyles}</style>
+
       {showTopButtons && (
         <>
-          <div className="overflow-x-auto pb-4 mb-8">
+          <div className="overflow-x-auto pb-4 mb-8 print:hidden">
             <div className="flex gap-4 justify-center min-w-max px-4">
+              {/* Back Button for Entry/Edit Mode */}
+              <button
+                onClick={() => navigate("/samples")}
+                className="px-3 py-2 rounded-xl  font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                BACK TO SAMPLES
+              </button>
+
               {invoice.sampleType?.map((s: any) => {
                 const type = s.type.toLowerCase();
                 const completed = invoice?.reportsProgress?.[type] === "completed";
@@ -301,7 +306,7 @@ export default function LabResults() {
             </div>
           </div>
 
-          <p className="text-center text-gray-600 mb-8 text-lg">
+          <p className="text-center text-gray-600 mb-8 text-lg print:hidden">
             Click a button to enter results for <strong>all samples</strong> of that type on one page.
           </p>
         </>
@@ -325,8 +330,16 @@ export default function LabResults() {
       {/* Final Reports View */}
       {isViewingReports && (
         <div>
-          <div className="overflow-x-auto pb-4 mb-10">
+          <div className="overflow-x-auto pb-4 mb-10 print:hidden">
             <div className="flex gap-4 justify-center min-w-max px-4">
+              {/* Back Button for Viewing Mode */}
+              <button
+                onClick={() => navigate("/samples")}
+                className="px-5 py-1.5 rounded-xl  font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                BACK
+              </button>
+
               {hasSoil && <button onClick={() => setActiveEnvReport("soil")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "soil" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>SOIL REPORT</button>}
               {hasWater && <button onClick={() => setActiveEnvReport("water")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "water" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>WATER REPORT</button>}
               {hasMicro && <button onClick={() => setActiveEnvReport("microbiology")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "microbiology" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>MICROBIOLOGY REPORT</button>}

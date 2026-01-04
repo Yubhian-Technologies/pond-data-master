@@ -23,13 +23,13 @@ interface InvoiceState {
   paymentMode: "cash" | "qr" | "neft";
 }
 
-// Allow state to be null/undefined for safety
 interface InvoiceTemplateProps {
   state: InvoiceState | null;
 }
 
 const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
-  // Safety check — prevent any crash if state is missing
+  const Navigate = useNavigate();
+
   if (!state) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
@@ -45,23 +45,21 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
     );
   }
 
-  // Dynamic Financial Year (Indian FY: April to March)
   const getFinancialYear = (): string => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = today.getMonth() + 1; // January = 1
+    const month = today.getMonth() + 1;
     return month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
   };
 
-  const financialYear = getFinancialYear(); // e.g., "2025-26"
+  const financialYear = getFinancialYear();
 
-  // GST Calculation
-  const GST_RATE = 18; // 9% CGST + 9% SGST
+  // GST Calculation Logic
+  const GST_RATE = 18; 
   const baseTotal = state.total;
   const gstAmount = Math.round(baseTotal * (GST_RATE / 100));
   const halfGst = gstAmount / 2;
   const grandTotal = baseTotal + gstAmount;
-  const Navigate=useNavigate();
 
   const numberToWords = (num: number): string => {
     const a = [
@@ -113,7 +111,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
 
   return (
     <>
-      {/* Screen-only buttons */}
       <div className="mb-6 print:hidden flex justify-end gap-4 px-4">
         <button
           onClick={() => Navigate('/samples')}
@@ -129,7 +126,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
         </button>
       </div>
 
-      {/* Printable A4 Invoice */}
       <div
         id="printable-invoice"
         className="bg-white mx-auto"
@@ -148,7 +144,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
           <img src={ADC} alt="ADC Logo" style={{ width: "100px" }} />
           <div className="text-center">
             <h2 style={{ fontSize: "18px", fontWeight: "bold" }}>
-              వాటర్‌బేస్ ఆక్వా డయాగ్నస్టిక్ సెంటర్
+              వాటర్బేస్ ఆక్వా డయాగ్నస్టిక్ సెంటర్
             </h2>
             <h3 style={{ fontSize: "16px", fontWeight: "600" }}>
               WATERBASE AQUA DIAGNOSTIC CENTER
@@ -321,7 +317,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
         </section>
       </div>
 
-      {/* Print Styles */}
       <style>{`
         @media print {
           body * { visibility: hidden; }

@@ -252,7 +252,7 @@ const Dashboard = () => {
           "Technician": techName,
           "Sample Types": typeDisplay || "-",
           "Sample Count": sampleCount,
-          "Revenue (₹)": Number(data.total || 0),
+          "Revenue (₹)": Number(data.total || 0) + Math.round(Number(data.total || 0) * (18 / 100)),
           "Status": isReport ? "Report Completed" : "Sample Submitted",
           "Date": format(createdAt, "dd-MM-yyyy"),
         });
@@ -292,10 +292,16 @@ const Dashboard = () => {
       let revenue = 0;
 
       filteredInvoices.forEach((inv) => {
-        samplesProcessed += inv.sampleCount;
-        revenue += inv.total;
-        if (inv.isReport) reportsGenerated += 1;
-      });
+  samplesProcessed += inv.sampleCount;
+
+ 
+  const baseAmount = inv.total;
+  const gstAmount = Math.round(baseAmount * (18 / 100));
+  const grandTotal = baseAmount + gstAmount;
+  revenue += grandTotal;
+
+  if (inv.isReport) reportsGenerated += 1;
+});
 
       // Recent activities
       const activities = filteredInvoices

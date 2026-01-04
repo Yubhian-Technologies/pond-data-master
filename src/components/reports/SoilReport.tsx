@@ -382,7 +382,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 0 !important;
+            margin: 0.3cm;
           }
 
           html, body {

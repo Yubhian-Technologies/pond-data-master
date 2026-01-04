@@ -243,6 +243,16 @@ const Samples = () => {
                       sortedInvoices.map((sample) => {
                         const fullyCompleted = isReportFullyCompleted(sample);
                         const invoiceId = sample.invoiceId ?? sample.id;
+                        
+                        // LOGIC UPDATE: Calculate Total with GST for the Dashboard
+                        const GST_RATE = 18;
+                        const baseTotal = Number(sample.total || 0);
+                        const gstAmount = Math.round(baseTotal * (GST_RATE / 100));
+                        const grandTotal = baseTotal + gstAmount;
+                        
+                        // Calculate Pending with GST (Assuming base pending needs GST as well)
+                        const basePending = Number(sample.pendingAmount || 0);
+                        const pendingWithGst = basePending > 0 ? basePending + Math.round(basePending * (GST_RATE / 100)) : 0;
 
                         return (
                           <TableRow key={sample.id}>
@@ -250,15 +260,15 @@ const Samples = () => {
                             <TableCell>{sample.farmerName}</TableCell>
                             <TableCell>{sample.farmerPhone ?? "N/A"}</TableCell>
                             <TableCell>{sample.technicianName}</TableCell>
-                            <TableCell>₹{sample.total ?? 0}</TableCell>
+                            <TableCell>₹{grandTotal}</TableCell>
                             <TableCell
                               className={
-                                (sample.pendingAmount ?? 0) > 0
+                                pendingWithGst > 0
                                   ? "text-red-600"
                                   : "text-green-600"
                               }
                             >
-                              ₹{sample.pendingAmount ?? 0}
+                              ₹{pendingWithGst}
                             </TableCell>
 
                             <TableCell>
@@ -312,7 +322,6 @@ const Samples = () => {
                 <div className="flex-1 overflow-y-auto px-6 py-2">
                   {step === 1 && (
                     <div className="space-y-4">
-                      {/* FIXED CUSTOM UI: BETTER FARMER SELECTION */}
                       <div className="space-y-2">
                         <Label className="text-sm font-semibold">Search and Select Farmer</Label>
                         <div className="relative">
@@ -333,7 +342,6 @@ const Samples = () => {
                           )}
                         </div>
 
-                        {/* INTERNAL SCROLLABLE LIST - NO POPOVER Conflict */}
                         <div className="border rounded-lg mt-2 overflow-hidden bg-white">
                           <div className="max-h-[220px] overflow-y-auto divide-y">
                             {filteredFarmerSelection.length > 0 ? (
@@ -430,9 +438,9 @@ const Samples = () => {
 
                         <div className="space-y-3">
                           <Label className="font-semibold">Date of Culture</Label>
-                          <Input
+                          <input
                             type="date"
-                            className="h-11"
+                            className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             value={dateOfCulture}
                             onChange={(e) => setDateOfCulture(e.target.value)}
                           />
