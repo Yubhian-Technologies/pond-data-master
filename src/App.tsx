@@ -21,8 +21,9 @@ import InvoiceTemplate from "../src/data/template";
 import InvoicePreview from "./pages/InvoicePreview";
 import { UserSessionProvider } from "./contexts/UserSessionContext";
 import InvoiceView from "./pages/InvoiceViewer";
-import SoilReport from "../../pond-data-master/src/components/reports/SoilReport";
-import WaterReport from "../../pond-data-master/src/components/reports/WaterReport";
+import SoilReport from "./components/reports/SoilReport";
+import WaterReport from "./components/reports/WaterReport";
+
 
 const queryClient = new QueryClient();
 
