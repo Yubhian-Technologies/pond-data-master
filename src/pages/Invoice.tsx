@@ -9,6 +9,7 @@ import { availableTests } from "@/data/tests";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
@@ -33,6 +34,8 @@ const PCR_PATHOGEN_MAP: Record<string, string> = {
   pl_ihhnv: "IHHNV",
 };
 
+const GST_RATE = 18;
+
 const InvoicePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -40,7 +43,11 @@ const InvoicePage = () => {
 
   const location = useLocation();
   const state = location.state as LocationState | undefined;
-  const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft">("");
+
+  const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft" | "rtgs">("");
+  const [transactionRef, setTransactionRef] = useState<string>("");
+  const [isPartialPayment, setIsPartialPayment] = useState<boolean>(false);
+  const [partialAmount, setPartialAmount] = useState<string>("");
 
   const locationId = session.locationId;
   const technicianId = session.technicianId;
@@ -48,11 +55,9 @@ const InvoicePage = () => {
 
   const [locationName, setLocationName] = useState<string>("");
 
-  // Fetch location name for prefix
   useEffect(() => {
     const fetchLocationName = async () => {
       if (!locationId) return;
-
       try {
         const locDoc = await getDoc(doc(db, "locations", locationId));
         if (locDoc.exists()) {
@@ -68,7 +73,6 @@ const InvoicePage = () => {
         setLocationName("");
       }
     };
-
     fetchLocationName();
   }, [locationId]);
 
@@ -101,12 +105,10 @@ const InvoicePage = () => {
     [other: string]: Set<string>[];
   }>(() => {
     const init: any = { pl: [], pcr: [] };
-
     for (let i = 0; i < plPcrSampleCount; i++) {
       init.pl.push(new Set<string>());
       init.pcr.push(new Set<string>());
     }
-
     sampleSummary.forEach((s) => {
       if (s.type !== "pl" && s.type !== "pcr") {
         init[s.type] = [];
@@ -115,7 +117,6 @@ const InvoicePage = () => {
         }
       }
     });
-
     return init;
   });
 
@@ -150,10 +151,8 @@ const InvoicePage = () => {
     return result;
   }, [perSampleTests.pcr]);
 
-  // Improved invoice ID generation with better fallback
   const generateInvoiceId = (): string => {
     let prefix = "XXX";
-
     if (locationName) {
       const lowerName = locationName.toLowerCase();
       if (lowerName.includes("nellore")) prefix = "NCR";
@@ -162,13 +161,11 @@ const InvoicePage = () => {
       else if (lowerName.includes("ganapavaram")) prefix = "GVRM";
       else if (lowerName.includes("juvvalapalem")) prefix = "JP";
     }
-
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let randomPart = "";
     for (let i = 0; i < 4; i++) {
       randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
     return `ADC ${prefix}${randomPart}`;
   };
 
@@ -200,13 +197,12 @@ const InvoicePage = () => {
     return perSampleTests[sampleType].every((set) => set.has(testId));
   };
 
-  const calculateTotal = () => {
+  const calculateTotals = () => {
     const groupedItems: {
       [type: string]: { name: string; quantity: number; total: number; price: number }[];
     } = {};
-    let total = 0;
+    let subtotal = 0;
 
-    // PCR Tests
     if (actualPcrCount > 0) {
       const pcrTestCount: { [testId: string]: number } = {};
       perSampleTests.pcr.forEach((set) => {
@@ -216,19 +212,17 @@ const InvoicePage = () => {
           });
         }
       });
-
       groupedItems["pcr"] = Object.entries(pcrTestCount)
         .map(([testId, qty]) => {
           const test = availableTests.find((t) => t.id === testId && t.sampleType === "pcr");
           if (!test) return null;
           const itemTotal = qty * test.price;
-          total += itemTotal;
+          subtotal += itemTotal;
           return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
         })
         .filter(Boolean) as any;
     }
 
-    // PL Tests
     if (actualPlCount > 0) {
       const plTestCount: { [testId: string]: number } = {};
       perSampleTests.pl.forEach((set) => {
@@ -238,19 +232,17 @@ const InvoicePage = () => {
           });
         }
       });
-
       groupedItems["pl"] = Object.entries(plTestCount)
         .map(([testId, qty]) => {
           const test = availableTests.find((t) => t.id === testId && t.sampleType === "pl");
           if (!test) return null;
           const itemTotal = qty * test.price;
-          total += itemTotal;
+          subtotal += itemTotal;
           return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
         })
         .filter(Boolean) as any;
     }
 
-    // Other sample types (soil, water, etc.)
     sampleSummary.forEach((s) => {
       if (s.type === "pl" || s.type === "pcr") return;
       const testCount: { [testId: string]: number } = {};
@@ -264,19 +256,22 @@ const InvoicePage = () => {
           const test = availableTests.find((t) => t.id === testId);
           if (!test) return null;
           const itemTotal = qty * test.price;
-          total += itemTotal;
+          subtotal += itemTotal;
           return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
         })
         .filter(Boolean) as any;
     });
 
-    return { total, groupedItems };
+    const gstAmount = Math.round(subtotal * (GST_RATE / 100));
+    const grandTotal = subtotal + gstAmount;
+
+    return { subtotal, gstAmount, grandTotal, groupedItems };
   };
 
-  const { total, groupedItems } = calculateTotal();
+  const { subtotal, gstAmount, grandTotal, groupedItems } = calculateTotals();
 
   const handleGenerateInvoice = async () => {
-    if (total === 0) {
+    if (grandTotal === 0) {
       toast({
         title: "Error",
         description: "Please select at least one test",
@@ -294,28 +289,42 @@ const InvoicePage = () => {
       return;
     }
 
-    // Generate formatted date (current date: Jan 03, 2026)
+    if ((paymentMode === "qr" || paymentMode === "neft") && !transactionRef.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter transaction/reference number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isPartialPayment) {
+      const amount = parseFloat(partialAmount);
+      if (!partialAmount || isNaN(amount) || amount <= 0 || amount > grandTotal) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid partial amount",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const today = new Date();
     const formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(
       today.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}-${today.getFullYear()}`; // e.g., 03-01-2026
+    ).toString().padStart(2, "0")}-${today.getFullYear()}`;
 
-    const invoiceId = generateInvoiceId(); // e.g., ADC NCRAB12
+    const invoiceId = generateInvoiceId();
 
     const sampleType = sampleSummary.map((s) => ({
       type: s.type.toLowerCase(),
-      count:
-        s.type === "pl" ? actualPlCount :
-        s.type === "pcr" ? actualPcrCount :
-        s.count,
+      count: s.type === "pl" ? actualPlCount : s.type === "pcr" ? actualPcrCount : s.count,
     }));
 
     const reportsProgress: { [key: string]: string } = {};
     if (actualPlCount > 0) reportsProgress["pl"] = "pending";
     if (actualPcrCount > 0) reportsProgress["pcr"] = "pending";
-
     sampleSummary.forEach((s) => {
       if (s.type !== "pl" && s.type !== "pcr") {
         const hasTests = perSampleTests[s.type]?.some((set) => set.size > 0);
@@ -325,10 +334,12 @@ const InvoicePage = () => {
       }
     });
 
-    // Final data to save and pass
+    const paidAmount = isPartialPayment ? parseFloat(partialAmount) : grandTotal;
+    const balanceAmount = isPartialPayment ? grandTotal - paidAmount : 0;
+
     const invoiceData = {
-      id: invoiceId,
-      invoiceId,                    // Critical: for querying later
+      // REMOVED: id: invoiceId,  ← This was causing the Firestore update error!
+      invoiceId, // Keep this for human-readable invoice number
       farmerName,
       farmerId,
       farmerPhone: mobile,
@@ -337,27 +348,33 @@ const InvoicePage = () => {
       technicianId,
       dateOfCulture,
       tests: groupedItems,
-      total,
+      subtotal,
+      gstAmount,
+      total: grandTotal,
       village,
       mobile,
       paymentMode,
+      transactionRef: paymentMode !== "cash" ? transactionRef.trim() : null,
+      isPartialPayment,
+      partialAmount: isPartialPayment ? paidAmount : null,
+      paidAmount,
+      balanceAmount,
       sampleType,
       reportsProgress,
       samplePathogens,
-      formattedDate,                // Critical: for display
+      formattedDate,
       createdAt: serverTimestamp(),
     };
 
     try {
-      // Save to Firestore
       await addDoc(collection(db, "locations", locationId, "invoices"), invoiceData);
 
-      // Navigate to template with full data including invoiceId
       navigate("/invoice-template", {
         state: {
           ...invoiceData,
-          invoiceId,                 // Ensure it's in state
+          invoiceId,
           formattedDate,
+          total: grandTotal,
         },
       });
 
@@ -523,7 +540,6 @@ const InvoicePage = () => {
                 </Card>
               </div>
 
-              {/* Summary & Payment */}
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
@@ -539,18 +555,27 @@ const InvoicePage = () => {
                             </h5>
                             {items.map((item: any, idx: number) => (
                               <div key={idx} className="flex justify-between text-sm">
-                                <span>
-                                  {item.name} × {item.quantity}
-                                </span>
+                                <span>{item.name} × {item.quantity}</span>
                                 <span>₹{item.total}</span>
                               </div>
                             ))}
                             <Separator className="my-3" />
                           </div>
                         ))}
-                        <div className="flex justify-between font-bold text-lg pt-2">
-                          <span>Total Amount</span>
-                          <span>₹{total}</span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-base">
+                            <span>Subtotal</span>
+                            <span>₹{subtotal}</span>
+                          </div>
+                          <div className="flex justify-between text-base">
+                            <span>GST (18%)</span>
+                            <span>₹{gstAmount}</span>
+                          </div>
+                          <Separator className="my-3" />
+                          <div className="flex justify-between font-bold text-lg">
+                            <span>Total Amount</span>
+                            <span>₹{grandTotal}</span>
+                          </div>
                         </div>
                       </>
                     ) : (
@@ -570,9 +595,10 @@ const InvoicePage = () => {
                       <Label>Payment Mode</Label>
                       <Select
                         value={paymentMode}
-                        onValueChange={(value: "cash" | "qr" | "neft" | "") =>
-                          setPaymentMode(value)
-                        }
+                        onValueChange={(value: "cash" | "qr" | "neft" | "") => {
+                          setPaymentMode(value);
+                          if (value === "cash") setTransactionRef("");
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select payment mode" />
@@ -585,11 +611,66 @@ const InvoicePage = () => {
                       </Select>
                     </div>
 
+                    {(paymentMode === "qr" || paymentMode === "neft") && (
+                      <div>
+                        <Label htmlFor="transactionRef">Transaction ID / Reference No.</Label>
+                        <Input
+                          id="transactionRef"
+                          type="text"
+                          value={transactionRef}
+                          onChange={(e) => setTransactionRef(e.target.value)}
+                          placeholder="Enter transaction reference"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="partialPayment"
+                          checked={isPartialPayment}
+                          onCheckedChange={(checked) => {
+                            setIsPartialPayment(checked as boolean);
+                            if (!checked) setPartialAmount("");
+                          }}
+                        />
+                        <Label htmlFor="partialPayment" className="cursor-pointer font-medium">
+                          Partial Payment
+                        </Label>
+                      </div>
+
+                      {isPartialPayment && (
+                        <div>
+                          <Label htmlFor="partialAmount">Amount Received (₹)</Label>
+                          <Input
+                            id="partialAmount"
+                            type="number"
+                            value={partialAmount}
+                            onChange={(e) => setPartialAmount(e.target.value)}
+                            placeholder={`Maximum: ${grandTotal}`}
+                            min="1"
+                            max={grandTotal}
+                          />
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Balance Due: ₹{(grandTotal - (parseFloat(partialAmount) || 0))}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     <Button
                       onClick={handleGenerateInvoice}
                       className="w-full"
                       size="lg"
-                      disabled={total === 0 || !paymentMode}
+                      disabled={
+                        grandTotal === 0 ||
+                        !paymentMode ||
+                        (["qr", "neft"].includes(paymentMode) && !transactionRef.trim()) ||
+                        (isPartialPayment &&
+                          (!partialAmount ||
+                            parseFloat(partialAmount) <= 0 ||
+                            parseFloat(partialAmount) > grandTotal))
+                      }
                     >
                       Generate Invoice & Proceed
                     </Button>

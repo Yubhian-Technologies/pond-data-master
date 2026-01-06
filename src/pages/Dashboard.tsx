@@ -42,6 +42,7 @@ import { db } from "./firebase";
 import { formatDistanceToNow, startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 import * as XLSX from "xlsx";
 import { auth } from "@/pages/firebase";
+import { Toast } from "@/components/ui/toast";
 
 interface Location {
   id: string;
@@ -240,22 +241,26 @@ const Dashboard = () => {
           isReport,
           sampleCount,
           total: Number(data.total || 0),
+          paidAmount: Number(data.paidAmount || 0), // ← Store paidAmount for calculation
           technicianName: techName,
         };
 
         allInvoices.push(invoiceItem);
 
+        // Export uses actual paid amount
         tempExportRows.push({
-          "Invoice ID": invoiceId,
-          "Farmer Name": farmerName,
-          "Location": locationName,
-          "Technician": techName,
-          "Sample Types": typeDisplay || "-",
-          "Sample Count": sampleCount,
-          "Revenue (₹)": Number(data.total || 0) + Math.round(Number(data.total || 0) * (18 / 100)),
-          "Status": isReport ? "Report Completed" : "Sample Submitted",
-          "Date": format(createdAt, "dd-MM-yyyy"),
-        });
+  "Invoice ID": invoiceId,
+  "Farmer Name": farmerName,
+  "Location": locationName,
+  "Technician": techName,
+  "Sample Types": typeDisplay || "-",
+  "Sample Count": sampleCount,
+  "Bill Amount (₹)": Number(data.total || 0),
+  "Amount Paid (₹)": data.paidAmount !== undefined ? Number(data.paidAmount || 0) : Number(data.total || 0),
+  "Pending Amount (₹)": data.paidAmount !== undefined ? Number(data.total || 0) - Number(data.paidAmount || 0) : 0,
+  "Status": isReport ? "Report Completed" : "Sample Submitted",
+  "Date": format(createdAt, "dd-MM-yyyy"),
+});
       });
 
       // Apply search filter
@@ -270,7 +275,6 @@ const Dashboard = () => {
           )
         : allInvoices;
 
-      // Filter export rows based on same search logic
       const filteredExportRows = searchTerm
         ? tempExportRows.filter((row, index) => {
             const inv = allInvoices[index];
@@ -292,16 +296,14 @@ const Dashboard = () => {
       let revenue = 0;
 
       filteredInvoices.forEach((inv) => {
-  samplesProcessed += inv.sampleCount;
+        samplesProcessed += inv.sampleCount;
 
- 
-  const baseAmount = inv.total;
-  const gstAmount = Math.round(baseAmount * (18 / 100));
-  const grandTotal = baseAmount + gstAmount;
-  revenue += grandTotal;
+        // Revenue = actual amount paid (paidAmount if exists, else full total)
+        const actualPaid = inv.paidAmount > 0 ? inv.paidAmount : inv.total;
+        revenue += actualPaid;
 
-  if (inv.isReport) reportsGenerated += 1;
-});
+        if (inv.isReport) reportsGenerated += 1;
+      });
 
       // Recent activities
       const activities = filteredInvoices
@@ -319,7 +321,7 @@ const Dashboard = () => {
 
       setRecentActivities(activities);
 
-      // Revenue change
+      // Revenue change (also using actual paid)
       let revenueChange = "";
       if (!isDateFiltered && !searchTerm && selectedTechnicianId === "all") {
         const lastMonthStart = Timestamp.fromDate(startOfMonth(subMonths(new Date(), 1)));
@@ -331,7 +333,11 @@ const Dashboard = () => {
         );
         const lastSnap = await getDocs(lastQuery);
         let lastRevenue = 0;
-        lastSnap.forEach((d) => (lastRevenue += Number(d.data().total) || 0));
+        lastSnap.forEach((d) => {
+          const invData = d.data();
+          const actualPaid = invData.paidAmount !== undefined ? Number(invData.paidAmount || 0) : Number(invData.total || 0);
+          lastRevenue += actualPaid;
+        });
 
         if (lastRevenue > 0) {
           const change = ((revenue - lastRevenue) / lastRevenue) * 100;
@@ -368,47 +374,64 @@ const Dashboard = () => {
 
   // Excel Export
   const handleExportToExcel = () => {
-    if (exportData.length === 0) {
-      alert("No data to export with current filters.");
-      return;
-    }
+  if (exportData.length === 0) {
+    Toast({ title: "No data", variant: "destructive" });
+    return;
+  }
 
-    const totals = exportData.reduce(
-      (acc, row) => ({
-        invoices: acc.invoices + 1,
-        samples: acc.samples + row["Sample Count"],
-        reports: acc.reports + (row["Status"] === "Report Completed" ? 1 : 0),
-        revenue: acc.revenue + row["Revenue (₹)"],
-      }),
-      { invoices: 0, samples: 0, reports: 0, revenue: 0 }
-    );
+  const totals = exportData.reduce(
+    (acc, row) => ({
+      invoices: acc.invoices + 1,
+      samples: acc.samples + row["Sample Count"],
+      reports: acc.reports + (row["Status"] === "Report Completed" ? 1 : 0),
+      billAmount: acc.billAmount + row["Bill Amount (₹)"],
+      amountPaid: acc.amountPaid + row["Amount Paid (₹)"],
+      pending: acc.pending + row["Pending Amount (₹)"],
+    }),
+    { invoices: 0, samples: 0, reports: 0, billAmount: 0, amountPaid: 0, pending: 0 }
+  );
 
-    const summaryRow = {
-      "Invoice ID": "TOTALS",
-      "Farmer Name": "",
-      "Location": "",
-      "Technician": "",
-      "Sample Types": "",
-      "Sample Count": totals.samples,
-      "Revenue (₹)": totals.revenue,
-      "Status": `${totals.reports} Reports`,
-      "Date": `${totals.invoices} Invoices`,
-    };
-
-    const worksheetData = [{}, ...exportData, summaryRow];
-
-    const ws = XLSX.utils.json_to_sheet(worksheetData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Lab Report");
-
-    ws["!cols"] = [
-      { wch: 18 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 14 }, { wch: 15 }, { wch: 22 }, { wch: 15 },
-    ];
-
-    const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
-    const fileName = `Lab_Dashboard_${currentLocationName.replace(/[^a-zA-Z0-9]/g, "_")}_${format(new Date(), "dd-MM-yyyy")}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+  const summaryRow = {
+    "Invoice ID": "TOTALS",
+    "Farmer Name": "",
+    "Location": "",
+    "Technician": "",
+    "Sample Types": "",
+    "Sample Count": totals.samples,
+    "Bill Amount (₹)": totals.billAmount,
+    "Amount Paid (₹)": totals.amountPaid,
+    "Pending Amount (₹)": totals.pending,
+    "Status": `${totals.reports} Reports Completed`,
+    "Date": `${totals.invoices} Invoices`,
   };
+
+  const worksheetData = [{}, ...exportData, {}, summaryRow]; // extra empty row for spacing
+
+  const ws = XLSX.utils.json_to_sheet(worksheetData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Lab Report");
+
+  // Column widths
+  ws["!cols"] = [
+    { wch: 18 }, // Invoice ID
+    { wch: 25 }, // Farmer Name
+    { wch: 20 }, // Location
+    { wch: 20 }, // Technician
+    { wch: 16 }, // Sample Types
+    { wch: 14 }, // Sample Count
+    { wch: 18 }, // Bill Amount
+    { wch: 18 }, // Amount Paid
+    { wch: 18 }, // Pending Amount
+    { wch: 22 }, // Status
+    { wch: 15 }, // Date
+  ];
+
+  const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
+  const fileName = `Lab_Dashboard_${currentLocationName.replace(/[^a-zA-Z0-9]/g, "_")}_${format(new Date(), "dd-MM-yyyy")}.xlsx`;
+
+  // This triggers immediate download — no browser questions
+  XLSX.writeFile(wb, fileName);
+};
 
   const hasAnyFilter = !!startDate || !!endDate || !!searchTerm || selectedTechnicianId !== "all";
   const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Loading...";

@@ -3,15 +3,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Check, Users, Search, X } from "lucide-react";
+import { Plus, Check, Users, Search, X, IndianRupee } from "lucide-react";
 import { Farmer } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
 import {
@@ -42,9 +49,14 @@ const Samples = () => {
   const [quantities, setQuantities] = useState<Record<SampleGroup, number>>(() => ({} as Record<SampleGroup, number>));
 
   const [loadingInvoices, setLoadingInvoices] = useState(true);
-  
-  // Custom Farmer Search State
   const [farmerSearchQuery, setFarmerSearchQuery] = useState("");
+
+  // Add Payment Dialog State
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [currentInvoice, setCurrentInvoice] = useState<any>(null);
+  const [paymentMode, setPaymentMode] = useState<"cash" | "qr" | "neft" | "">("");
+  const [transactionRef, setTransactionRef] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   useEffect(() => {
     const fetchFarmers = async () => {
@@ -91,10 +103,16 @@ const Samples = () => {
         const locationId = session.locationId;
         if (!locationId) return;
         const snap = await getDocs(collection(db, "locations", locationId, "invoices"));
-        const data = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const data = snap.docs.map((doc) => {
+          const docData = doc.data();
+          if ('id' in docData) {
+            delete (docData as any).id;
+          }
+          return {
+            id: doc.id,
+            ...docData,
+          };
+        });
         setInvoices(data);
       } catch (err) {
         console.error("Error fetching invoices:", err);
@@ -159,7 +177,6 @@ const Samples = () => {
     return timeB - timeA;
   });
 
-  // Filtered Farmer List for Selection
   const filteredFarmerSelection = useMemo(() => {
     return farmers.filter(f => 
       f.name.toLowerCase().includes(farmerSearchQuery.toLowerCase()) || 
@@ -167,6 +184,89 @@ const Samples = () => {
       f.id.toLowerCase().includes(farmerSearchQuery.toLowerCase())
     );
   }, [farmers, farmerSearchQuery]);
+
+  const handleAddPayment = async () => {
+    if (!currentInvoice || !paymentMode || !paymentAmount) {
+      toast({
+        title: "Error",
+        description: "Please fill all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if ((paymentMode === "qr" || paymentMode === "neft") && !transactionRef.trim()) {
+      toast({
+        title: "Error",
+        description: "Transaction reference is required for QR/NEFT",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const newPaid = (currentInvoice.paidAmount || 0) + amount;
+      const newBalance = currentInvoice.total - newPaid;
+
+      const invoiceRef = doc(db, "locations", session.locationId!, "invoices", currentInvoice.id);
+
+      await updateDoc(invoiceRef, {
+        paidAmount: newPaid,
+        balanceAmount: newBalance > 0 ? newBalance : 0,
+        isPartialPayment: newBalance > 0,
+        paymentMode: paymentMode,
+        transactionRef: paymentMode !== "cash" ? transactionRef.trim() : null,
+        lastPaymentDate: new Date(),
+      });
+
+      setInvoices(prev => prev.map(inv => 
+        inv.id === currentInvoice.id 
+          ? { ...inv, paidAmount: newPaid, balanceAmount: newBalance > 0 ? newBalance : 0 }
+          : inv
+      ));
+
+      toast({
+        title: "Success",
+        description: `₹${amount} payment recorded successfully!`,
+      });
+
+      setPaymentDialogOpen(false);
+      resetPaymentForm();
+    } catch (error) {
+      console.error("Error updating payment:", error);
+      toast({
+        title: "Error",
+        description: "Failed to record payment. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openPaymentDialog = (invoice: any) => {
+    setCurrentInvoice(invoice);
+    const pending = invoice.total - (invoice.paidAmount || 0);
+    setPaymentAmount(pending.toString());
+    setPaymentMode("");
+    setTransactionRef("");
+    setPaymentDialogOpen(true);
+  };
+
+  const resetPaymentForm = () => {
+    setPaymentAmount("");
+    setPaymentMode("");
+    setTransactionRef("");
+    setCurrentInvoice(null);
+  };
 
   return (
     <DashboardLayout>
@@ -219,6 +319,7 @@ const Samples = () => {
                       <TableHead>Phone Number</TableHead>
                       <TableHead>Submitted By</TableHead>
                       <TableHead>Bill Amount</TableHead>
+                      <TableHead>Amount Paid</TableHead>   {/* ← NEW COLUMN */}
                       <TableHead>Pending Amount</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -226,7 +327,7 @@ const Samples = () => {
                   <TableBody>
                     {loadingInvoices ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="h-32 text-center">
+                        <TableCell colSpan={8} className="h-32 text-center">  {/* ← Updated colSpan to 8 */}
                           <div className="flex flex-col items-center justify-center gap-3">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-primary"></div>
                             <p className="text-muted-foreground">Loading samples...</p>
@@ -235,7 +336,7 @@ const Samples = () => {
                       </TableRow>
                     ) : sortedInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center text-muted-foreground">  {/* ← Updated colSpan */}
                           No samples found for selected technician
                         </TableCell>
                       </TableRow>
@@ -243,16 +344,10 @@ const Samples = () => {
                       sortedInvoices.map((sample) => {
                         const fullyCompleted = isReportFullyCompleted(sample);
                         const invoiceId = sample.invoiceId ?? sample.id;
-                        
-                        // LOGIC UPDATE: Calculate Total with GST for the Dashboard
-                        const GST_RATE = 18;
-                        const baseTotal = Number(sample.total || 0);
-                        const gstAmount = Math.round(baseTotal * (GST_RATE / 100));
-                        const grandTotal = baseTotal + gstAmount;
-                        
-                        // Calculate Pending with GST (Assuming base pending needs GST as well)
-                        const basePending = Number(sample.pendingAmount || 0);
-                        const pendingWithGst = basePending > 0 ? basePending + Math.round(basePending * (GST_RATE / 100)) : 0;
+
+                        const grandTotal = Number(sample.total || 0);
+                        const paidSoFar = Number(sample.paidAmount || 0);
+                        const pendingAmount = grandTotal - paidSoFar;
 
                         return (
                           <TableRow key={sample.id}>
@@ -261,14 +356,15 @@ const Samples = () => {
                             <TableCell>{sample.farmerPhone ?? "N/A"}</TableCell>
                             <TableCell>{sample.technicianName}</TableCell>
                             <TableCell>₹{grandTotal}</TableCell>
+                            <TableCell className="font-medium text-green-600">₹{paidSoFar}</TableCell>  {/* ← NEW: Amount Paid */}
                             <TableCell
                               className={
-                                pendingWithGst > 0
-                                  ? "text-red-600"
-                                  : "text-green-600"
+                                pendingAmount > 0
+                                  ? "text-red-600 font-medium"
+                                  : "text-green-600 font-medium"
                               }
                             >
-                              ₹{pendingWithGst}
+                              ₹{pendingAmount}
                             </TableCell>
 
                             <TableCell>
@@ -277,7 +373,7 @@ const Samples = () => {
                                   className="bg-transparent text-black border hover:bg-cyan-700 hover:text-white"
                                   size="sm"
                                   onClick={() =>
-                                    navigate(`/lab-results/${sample.id}${fullyCompleted ? "?mode=view" : ""}`)
+                                    navigate(`/lab-results/${sample.invoiceId}${fullyCompleted ? "?mode=view" : ""}`)
                                   }
                                 >
                                   {fullyCompleted ? "View Report" : "Generate Report"}
@@ -291,11 +387,22 @@ const Samples = () => {
                                   View Invoice
                                 </Button>
 
+                                {pendingAmount > 0 && (
+                                  <Button
+                                    className="bg-transparent text-black border hover:bg-blue-600 hover:text-white flex items-center gap-1"
+                                    size="sm"
+                                    onClick={() => openPaymentDialog(sample)}
+                                  >
+                                    <IndianRupee className="w-4 h-4" />
+                                    Add Payment
+                                  </Button>
+                                )}
+
                                 <Button
                                   className="bg-transparent text-black border hover:bg-red-600 hover:text-white"
                                   size="sm"
                                   disabled={!fullyCompleted}
-                                  onClick={() => navigate(`/lab-results/${sample.id}?mode=edit`)}
+                                  onClick={() => navigate(`/lab-results/${sample.invoiceId}?mode=edit`)}
                                   title={!fullyCompleted ? "Edit available only after report is fully generated" : "Edit report data"}
                                 >
                                   Edit
@@ -311,6 +418,7 @@ const Samples = () => {
               </CardContent>
             </Card>
 
+            {/* FULLY RESTORED: New Sample Submission Dialog */}
             <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) resetForm(); }}>
               <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-2">
@@ -519,6 +627,80 @@ const Samples = () => {
                       </Button>
                     </>
                   )}
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Add Payment Dialog */}
+            <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Record Payment</DialogTitle>
+                  <DialogDescription>
+                    Invoice: <span className="font-semibold">{currentInvoice?.invoiceId}</span> | 
+                    Farmer: <span className="font-semibold">{currentInvoice?.farmerName}</span>
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total Bill</p>
+                      <p className="font-bold text-lg">₹{currentInvoice?.total || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Pending Amount</p>
+                      <p className="font-bold text-lg text-red-600">
+                        ₹{currentInvoice ? currentInvoice.total - (currentInvoice.paidAmount || 0) : 0}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Amount to Pay</Label>
+                    <Input
+                      type="number"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="Enter amount"
+                      min="1"
+                      max={currentInvoice ? currentInvoice.total - (currentInvoice.paidAmount || 0) : undefined}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Payment Mode</Label>
+                    <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as any)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="qr">QR Code / UPI</SelectItem>
+                        <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(paymentMode === "qr" || paymentMode === "neft") && (
+                    <div className="space-y-2">
+                      <Label>Transaction Reference</Label>
+                      <Input
+                        value={transactionRef}
+                        onChange={(e) => setTransactionRef(e.target.value)}
+                        placeholder="Enter UPI ID / Reference No."
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setPaymentDialogOpen(false); resetPaymentForm(); }}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddPayment} className="bg-blue-600 hover:bg-blue-700">
+                    Record Payment
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

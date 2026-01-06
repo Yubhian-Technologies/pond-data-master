@@ -19,8 +19,14 @@ interface InvoiceState {
   tests: {
     [type: string]: TestItem[];
   };
-  total: number;
+  subtotal: number;
+  gstAmount: number;
+  total: number;          // grand total
   paymentMode: "cash" | "qr" | "neft";
+  transactionRef?: string | null;  // ← added for reference number
+  isPartialPayment?: boolean;
+  paidAmount?: number | null;
+  balanceAmount?: number;
 }
 
 interface InvoiceTemplateProps {
@@ -28,7 +34,7 @@ interface InvoiceTemplateProps {
 }
 
 const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
-  const Navigate = useNavigate();
+  const navigate = useNavigate();
 
   if (!state) {
     return (
@@ -54,12 +60,10 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
 
   const financialYear = getFinancialYear();
 
-  // GST Calculation Logic
-  const GST_RATE = 18; 
-  const baseTotal = state.total;
-  const gstAmount = Math.round(baseTotal * (GST_RATE / 100));
+  const subtotal = state.subtotal;
+  const gstAmount = state.gstAmount;
+  const grandTotal = state.total;
   const halfGst = gstAmount / 2;
-  const grandTotal = baseTotal + gstAmount;
 
   const numberToWords = (num: number): string => {
     const a = [
@@ -102,8 +106,13 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
     return result + " Only";
   };
 
-  const tick = (mode: "cash" | "qr" | "neft") =>
-    state.paymentMode === mode ? "Checked" : "Unchecked";
+  const getPaymentModeLabel = (mode: "cash" | "qr" | "neft") => {
+    switch (mode) {
+      case "cash": return "CASH";
+      case "qr": return "QR SCAN / UPI";
+      case "neft": return "NEFT / RTGS";
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -113,7 +122,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
     <>
       <div className="mb-6 print:hidden flex justify-end gap-4 px-4">
         <button
-          onClick={() => Navigate('/samples')}
+          onClick={() => navigate('/samples')}
           className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium"
         >
           ← Back
@@ -247,7 +256,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                   Subtotal (₹)
                 </td>
                 <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                  ₹{baseTotal}
+                  ₹{subtotal}
                 </td>
               </tr>
               <tr>
@@ -285,6 +294,26 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                   ₹{grandTotal}
                 </td>
               </tr>
+              {state.isPartialPayment && (
+                <>
+                  <tr>
+                    <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                      Amount Paid (₹)
+                    </td>
+                    <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                      ₹{state.paidAmount || 0}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                      Balance Due (₹)
+                    </td>
+                    <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                      ₹{state.balanceAmount || 0}
+                    </td>
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
 
@@ -301,12 +330,12 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
             }}
           >
             <div>
-              <p><strong>Mode of Payment:</strong></p>
-              <p>
-                CASH {tick("cash")} &nbsp;&nbsp;|&nbsp;&nbsp;
-                QR SCAN {tick("qr")} &nbsp;&nbsp;|&nbsp;&nbsp;
-                NEFT/RTGS {tick("neft")}
-              </p>
+              <p><strong>Mode of Payment:</strong> {getPaymentModeLabel(state.paymentMode)}</p>
+              {(state.paymentMode === "qr" || state.paymentMode === "neft") && state.transactionRef && (
+                <p>
+                  <strong>Transaction Ref:</strong> {state.transactionRef}
+                </p>
+              )}
             </div>
             <div style={{ textAlign: "right" }}>
               <p>For Waterbase Aqua Diagnostic Center</p>

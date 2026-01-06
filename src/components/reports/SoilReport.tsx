@@ -1,5 +1,3 @@
-// src/components/reports/SoilReport.tsx
-
 import React, { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { useParams } from "react-router-dom";
@@ -13,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import AV from "@/assets/AV.jpg";
-import ADC from "@/assets/ADC.jpg"
+import ADC from "@/assets/ADC.jpg";
 
 interface FormData {
   farmerName: string;
@@ -29,8 +27,7 @@ interface FormData {
   sampleTime: string;
   reportTime: string;
   reportedBy: string;
-  checkedBy: string;        // We keep this but always leave it blank
-  // Remove cmisBy completely
+  checkedBy: string;
 }
 
 interface FarmerData {
@@ -38,7 +35,7 @@ interface FarmerData {
   soilType?: string;
   sourceOfSoil?: string;
   phone?: string;
-  city?: string;     
+  city?: string;
   state?: string;
 }
 
@@ -56,15 +53,16 @@ const SoilReport: React.FC<SoilReportProps> = ({
   const routeParams = useParams<{ invoiceId?: string; locationId?: string }>();
   const invoiceId = propInvoiceId || routeParams.invoiceId;
   const locationId = propLocationId || routeParams.locationId;
+
   const [locationDetails, setLocationDetails] = useState<{
-  address: string;
-  email: string;
-  contactNumber: string;
-}>({
-  address: "",
-  email: "",
-  contactNumber: "",
-});
+    address: string;
+    email: string;
+    contactNumber: string;
+  }>({
+    address: "",
+    email: "",
+    contactNumber: "",
+  });
 
   const [formData, setFormData] = useState<FormData>({
     farmerName: "",
@@ -81,7 +79,6 @@ const SoilReport: React.FC<SoilReportProps> = ({
     reportTime: new Date().toTimeString().slice(0, 5),
     reportedBy: "",
     checkedBy: "",
-   
   });
 
   const [samples, setSamples] = useState<any[]>([]);
@@ -94,6 +91,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
       try {
         if (!invoiceId || !locationId) return;
 
+        // Fetch report data (soil-specific fields)
         const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
         const reportSnap = await getDoc(reportRef);
 
@@ -114,12 +112,20 @@ const SoilReport: React.FC<SoilReportProps> = ({
           reportTime = data?.reportTime || reportTime;
         }
 
+        // Fetch invoice data — now supports both new and old invoices
         const invoicesRef = collection(db, "locations", locationId, "invoices");
-        const q = query(invoicesRef, where("id", "==", invoiceId));
-        const snapshot = await getDocs(q);
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let snapshot = await getDocs(q);
+
+        // Fallback for old invoices that used 'id' field
+        if (snapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          snapshot = await getDocs(q);
+        }
 
         if (snapshot.empty) {
           console.log("Invoice not found for invoiceId:", invoiceId);
+          setLoading(false);
           return;
         }
 
@@ -128,22 +134,25 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
         const calculatedSoilCount =
           data.sampleType
-            ?.filter((s: any) => s.type === "soil")
-            .reduce((sum: number, item: any) => sum + Number(item.count), 0) || 0;
+            ?.filter((s: any) => s.type?.toLowerCase() === "soil")
+            .reduce((sum: number, item: any) => sum + Number(item.count || 0), 0) || 0;
 
         const displaySampleCount = allSampleCount > 0 ? allSampleCount : calculatedSoilCount;
 
-        const sampleDate = data.sampleDate || data.createdAt?.toDate?.()?.toISOString().split("T")[0] || "-";
+        const sampleDate =
+          data.sampleDate ||
+          data.formattedDate ||
+          data.createdAt?.toDate?.()?.toISOString().split("T")[0] ||
+          new Date().toISOString().split("T")[0];
 
         setFormData((prev) => ({
           ...prev,
-          
           reportedBy: technicianName || "",
-          checkedBy:"",
+          checkedBy: "",
           farmerName: data.farmerName || "",
           farmerUID: data.farmerUID || data.farmerId || "",
-          farmerAddress: data.farmerAddress || "",
-          mobile: data.farmerPhone || "",
+          farmerAddress: data.village || data.farmerAddress || "",
+          mobile: data.farmerPhone || data.mobile || "",
           noOfSamples: displaySampleCount.toString(),
           sampleDate,
           reportDate: new Date().toISOString().split("T")[0],
@@ -154,6 +163,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
           reportTime,
         }));
 
+        // Fetch farmer details if farmerId exists
         if (data.farmerId) {
           const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
           const farmerSnap = await getDoc(farmerRef);
@@ -170,6 +180,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
           }
         }
 
+        // Fetch soil samples
         const samplesRef = collection(
           db,
           "locations",
@@ -188,11 +199,10 @@ const SoilReport: React.FC<SoilReportProps> = ({
         const formattedSamples = list.map((s: any, i: number) => ({
           id: s.id,
           ...s,
-          pondNo: (s as any).pondNo || `Sample ${i + 1}`, 
+          pondNo: s.pondNo || `Sample ${i + 1}`,
         }));
 
         setSamples(formattedSamples);
-
       } catch (error) {
         console.error("Error loading soil report:", error);
       } finally {
@@ -202,10 +212,11 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
     fetchData();
   }, [invoiceId, locationId, allSampleCount]);
+
   useEffect(() => {
     const fetchLocationDetails = async () => {
       if (!locationId) return;
-  
+
       try {
         const locDoc = await getDoc(doc(db, "locations", locationId));
         if (locDoc.exists()) {
@@ -218,14 +229,16 @@ const SoilReport: React.FC<SoilReportProps> = ({
         }
       } catch (error) {
         console.error("Error fetching location details:", error);
-        
       }
     };
-  
+
     fetchLocationDetails();
   }, [locationId]);
 
   if (loading) return <p className="text-center py-12 text-xl">Loading Soil Report...</p>;
+  if (samples.length === 0 && formData.farmerName === "") {
+    return <p className="text-center py-12 text-red-600 text-xl">No soil report data found for this invoice.</p>;
+  }
 
   return (
     <>
@@ -239,47 +252,25 @@ const SoilReport: React.FC<SoilReportProps> = ({
       </div>
 
       <div className="bg-white" id="report">
-        {/* <div className="text-center py-2 mb-4" style={{ backgroundColor: '#1e3a8a', color: '#ffffff' }}>
-          <h1 className="text-xl font-bold">SOIL ANALYSIS REPORT</h1>
-        </div> */}
-
-        {/* <div className="flex justify-between items-start mb-4 pb-4" style={{ borderBottom: '2px solid #374151' }}>
-          <div className="flex items-start gap-4">
-            <div className="px-4 py-3 rounded font-bold text-2xl" style={{ backgroundColor: '#dc2626', color: '#ffffff' }}>
-              <div>KC</div>
-              <div className="text-xs">T</div>
-            </div>
-            <div>
-              <div className="font-bold text-lg">KCT Group Trust</div>
-              <div className="text-xs" style={{ color: '#4b5563' }}>Karam Chand Thapar Group</div>
-            </div>
+        <div className="flex justify-between items-start mb-8 border-b-2 border-black">
+          <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
+          <div className="text-center flex-1">
+            <h1 className="text-3xl font-bold text-blue-700">
+              WATERBASE AQUA DIAGNOSTIC CENTER
+            </h1>
+            <p className="text-xs text-black font-semibold">
+              {locationDetails.address || "Loading lab address..."}
+            </p>
+            <p className="text-sm text-black">
+              Contact No: {locationDetails.contactNumber || "Loading..."} | Mail Id: {locationDetails.email || "Loading..."}
+            </p>
+            <h2 className="text-2xl font-bold text-red-600 mt-3">
+              Soil Analysis Report
+            </h2>
           </div>
-          <div className="text-right text-sm">
-            <div className="font-bold">Community Development Center</div>
-            <div>(Learning, Livelihood & Research)</div>
-            <div># 3-6-10, Ravi House,</div>
-            <div>Town Railway Station Road,</div>
-            <div>Bhimavaram-534202, (WG Dt.)</div>
-            <div>Andhra pradesh, India.</div>
-            <div className="mt-2">Ph : 08816-297707</div>
-            <div>Email:bhimavaram@kctgroup.com</div>
-          </div>
-        </div> */}
- <div className="flex justify-between items-start mb-8  border-b-2 border-black ">
-        <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
-        <div className="text-center flex-1">
-          <h1 className="text-3xl font-bold text-blue-700">
-            WATERBASE AQUA DIAGNOSTIC CENTER
-          </h1>
-          <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
-            <p className="text-sm text-black">Contact No: {locationDetails.contactNumber || "Loading..."} | 
-  Mail Id: {locationDetails.email || "Loading..."}</p>
-          <h2 className="text-2xl font-bold text-red-600 mt-3">
-            Soil Analysis Report
-          </h2>
+          <img src={AV} alt="AV Logo" className="w-40 object-contain" />
         </div>
-        <img src={AV} alt="AV Logo" className="w-40 object-contain" />
-      </div>
+
         <div className="text-right mb-4">
           <span className="font-bold">Report Id:- {invoiceId || "-"}</span>
         </div>
@@ -367,8 +358,8 @@ const SoilReport: React.FC<SoilReportProps> = ({
               <span className="font-semibold">Reported by :</span> {formData.reportedBy}
             </div>
             <div className="px-2 py-2 text-xs font-medium" style={{ width: '50%' }}>
-      Checked by: ______________________
-    </div>
+              Checked by: ______________________
+            </div>
           </div>
         </div>
 
@@ -377,7 +368,6 @@ const SoilReport: React.FC<SoilReportProps> = ({
         </div>
       </div>
 
-      {/* FINAL PRINT CSS - ZERO WHITE SPACE ON SIDES/TOP/BOTTOM */}
       <style>{`
         @media print {
           @page {
@@ -410,7 +400,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
             top: 0 !important;
             width: 210mm !important;
             height: 297mm !important;
-            padding: 0 !important; /* ZERO padding - content to the edge */
+            padding: 0 !important;
             box-sizing: border-box !important;
             margin: 0 !important;
             background: white !important;
@@ -419,7 +409,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
           #report > div, table, .grid {
             width: 100% !important;
             max-width: none !important;
-            margin: 0 0 8px 0 !important; /* Minimal vertical spacing only */
+            margin: 0 0 8px 0 !important;
             padding: 0 !important;
           }
 

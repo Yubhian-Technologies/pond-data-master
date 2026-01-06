@@ -140,7 +140,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
       try {
         setLoading(true);
         const invoicesRef = collection(db, "locations", locationId, "invoices");
-        const q = query(invoicesRef, where("id", "==", invoiceId));
+        const q = query(invoicesRef, where("invoiceId", "==", invoiceId));
         const invoiceSnap = await getDocs(q);
 
         if (invoiceSnap.empty) {

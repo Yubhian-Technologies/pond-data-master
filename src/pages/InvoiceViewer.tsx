@@ -10,23 +10,28 @@ import {
 import { db } from "./firebase";
 import InvoiceTemplate from "../data/template";
 
-// Reuse the same interfaces as in InvoiceTemplate for consistency
-interface TestItem {
-  name: string;
-  quantity: number;
-  price: number;
-  total: number;
-}
-
+// Full interface matching what InvoiceTemplate expects (from the second file)
 interface InvoiceState {
-  invoiceId: string;         // Critical: added for display in template
+  invoiceId: string;
   farmerName: string;
   formattedDate: string;
   village: string;
   mobile: string;
-  tests: { [type: string]: TestItem[] };
+  tests: {
+    [type: string]: {
+      name: string;
+      quantity: number;
+      price: number;
+      total: number;
+    }[];
+  };
+  subtotal: number;
+  gstAmount: number;
   total: number;
   paymentMode: "cash" | "qr" | "neft";
+  isPartialPayment?: boolean;
+  paidAmount?: number | null;
+  balanceAmount?: number;
 }
 
 const InvoiceViewer: React.FC = () => {
@@ -51,7 +56,6 @@ const InvoiceViewer: React.FC = () => {
         setError(null);
         const invoicesRef = collection(db, "locations", locationId, "invoices");
 
-        // Query using the reliable 'invoiceId' field (recommended)
         const q = query(invoicesRef, where("invoiceId", "==", invoiceId));
 
         const querySnapshot = await getDocs(q);
@@ -70,25 +74,28 @@ const InvoiceViewer: React.FC = () => {
         if (data.formattedDate) {
           formattedDate = data.formattedDate;
         } else if (data.createdAt) {
-          // Fallback: if you have a timestamp
           const date = data.createdAt.toDate();
-          formattedDate = date.toLocaleDateString("en-GB").split("/").reverse().join("-");
-        } else {
-          const today = new Date();
-          formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(today.getMonth() + 1)
+          formattedDate = `${date.getDate().toString().padStart(2, "0")}-${(
+            date.getMonth() + 1
+          )
             .toString()
-            .padStart(2, "0")}-${today.getFullYear()}`;
+            .padStart(2, "0")}-${date.getFullYear()}`;
         }
 
         const invoiceState: InvoiceState = {
-          invoiceId: data.invoiceId || data.id || invoiceId, // Ensure invoiceId is always present
+          invoiceId: data.invoiceId || invoiceId,
           farmerName: data.farmerName || "Unknown Farmer",
           formattedDate,
           village: data.village || "Not specified",
           mobile: data.farmerPhone || data.mobile || "Not provided",
           tests: data.tests || {},
+          subtotal: data.subtotal || 0,
+          gstAmount: data.gstAmount || 0,
           total: data.total || 0,
           paymentMode: data.paymentMode || "cash",
+          isPartialPayment: data.isPartialPayment || false,
+          paidAmount: data.paidAmount ?? null,
+          balanceAmount: data.balanceAmount ?? null,
         };
 
         setInvoiceData(invoiceState);
@@ -133,7 +140,7 @@ const InvoiceViewer: React.FC = () => {
     );
   }
 
-  // No Data (shouldn't happen after error check, but safe)
+  // No Data
   if (!invoiceData) {
     return (
       <div className="flex items-center justify-center min-h-screen">

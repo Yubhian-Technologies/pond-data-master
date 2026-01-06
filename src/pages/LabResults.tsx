@@ -43,23 +43,36 @@ export default function LabResults() {
   }, [session, invoiceId]);
 
   const fetchInvoice = async () => {
-    const ref = collection(db, "locations", session.locationId, "invoices");
-    const q = query(ref, where("id", "==", invoiceId));
-    const snap = await getDocs(q);
+  const ref = collection(db, "locations", session.locationId, "invoices");
 
-    if (!snap.empty) {
-      const docSnap = snap.docs[0];
-      const docData = docSnap.data();
-      const docId = docSnap.id;
+  // Try querying by 'invoiceId' first (new invoices)
+  let q = query(ref, where("invoiceId", "==", invoiceId));
+  let snap = await getDocs(q);
 
-      const fullData = { ...docData, docId };
-      setInvoice(fullData);
-      startFlow(fullData);
-    } else {
-      console.error("Invoice not found");
-      setStep("error");
+  // If not found, fall back to old 'id' field (for old invoices)
+  if (snap.empty) {
+    q = query(ref, where("id", "==", invoiceId));
+    snap = await getDocs(q);
+  }
+
+  if (!snap.empty) {
+    const docSnap = snap.docs[0];
+    const docData = docSnap.data();
+    const docId = docSnap.id;
+
+    // Clean up any conflicting 'id' field
+    if ('id' in docData) {
+      delete (docData as any).id;
     }
-  };
+
+    const fullData = { ...docData, docId };
+    setInvoice(fullData);
+    startFlow(fullData);
+  } else {
+    console.error("Invoice not found even in fallback query");
+    setStep("error");
+  }
+};
 
   const startFlow = (data: any) => {
     const types = data.sampleType || [];
