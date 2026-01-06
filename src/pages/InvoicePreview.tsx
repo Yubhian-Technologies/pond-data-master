@@ -1,9 +1,9 @@
-// src/pages/InvoicePreview.tsx
+
 import React from "react";
 import { useLocation } from "react-router-dom";
 import InvoiceTemplate from "@/data/template";
 
-// Exact interface matching InvoiceTemplate expectations (including subtotal, gstAmount, and partial payments)
+
 interface InvoiceState {
   invoiceId: string;
   farmerName: string;
@@ -21,7 +21,7 @@ interface InvoiceState {
   subtotal: number;
   gstAmount: number;
   total: number;
-  paymentMode: "cash" | "qr" | "neft";
+  paymentMode: "cash" | "qr" | "neft" | "rtgs";
   isPartialPayment?: boolean;
   paidAmount?: number | null;
   balanceAmount?: number;

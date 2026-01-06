@@ -22,7 +22,7 @@ interface InvoiceState {
   subtotal: number;
   gstAmount: number;
   total: number;          // grand total
-  paymentMode: "cash" | "qr" | "neft";
+  paymentMode: "cash" | "qr" | "neft" | "rtgs";
   transactionRef?: string | null;  // ← added for reference number
   isPartialPayment?: boolean;
   paidAmount?: number | null;
@@ -106,11 +106,12 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
     return result + " Only";
   };
 
-  const getPaymentModeLabel = (mode: "cash" | "qr" | "neft") => {
+  const getPaymentModeLabel = (mode: "cash" | "qr" | "neft" | "rtgs") => {
     switch (mode) {
       case "cash": return "CASH";
       case "qr": return "QR SCAN / UPI";
-      case "neft": return "NEFT / RTGS";
+      case "neft": return "NEFT ";
+      case "rtgs": return "RTGS"
     }
   };
 
@@ -331,7 +332,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
           >
             <div>
               <p><strong>Mode of Payment:</strong> {getPaymentModeLabel(state.paymentMode)}</p>
-              {(state.paymentMode === "qr" || state.paymentMode === "neft") && state.transactionRef && (
+              {(state.paymentMode === "qr" || state.paymentMode === "neft" || state.paymentMode ==="rtgs") && state.transactionRef && (
                 <p>
                   <strong>Transaction Ref:</strong> {state.transactionRef}
                 </p>

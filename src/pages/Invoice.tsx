@@ -289,7 +289,7 @@ const InvoicePage = () => {
       return;
     }
 
-    if ((paymentMode === "qr" || paymentMode === "neft") && !transactionRef.trim()) {
+    if ((paymentMode === "qr" || paymentMode === "neft" || paymentMode === "rtgs") && !transactionRef.trim()) {
       toast({
         title: "Error",
         description: "Please enter transaction/reference number",
@@ -338,8 +338,8 @@ const InvoicePage = () => {
     const balanceAmount = isPartialPayment ? grandTotal - paidAmount : 0;
 
     const invoiceData = {
-      // REMOVED: id: invoiceId,  ← This was causing the Firestore update error!
-      invoiceId, // Keep this for human-readable invoice number
+      
+      invoiceId, 
       farmerName,
       farmerId,
       farmerPhone: mobile,
@@ -595,7 +595,7 @@ const InvoicePage = () => {
                       <Label>Payment Mode</Label>
                       <Select
                         value={paymentMode}
-                        onValueChange={(value: "cash" | "qr" | "neft" | "") => {
+                        onValueChange={(value: "cash" | "qr" | "neft" | "rtgs" | "") => {
                           setPaymentMode(value);
                           if (value === "cash") setTransactionRef("");
                         }}
@@ -607,11 +607,12 @@ const InvoicePage = () => {
                           <SelectItem value="cash">Cash</SelectItem>
                           <SelectItem value="qr">QR Code / UPI</SelectItem>
                           <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
+                          <SelectItem value="rtgs">RTGS / Bank Transfer</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {(paymentMode === "qr" || paymentMode === "neft") && (
+                    {(paymentMode === "qr" || paymentMode === "neft" || paymentMode === "rtgs") && (
                       <div>
                         <Label htmlFor="transactionRef">Transaction ID / Reference No.</Label>
                         <Input

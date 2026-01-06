@@ -28,7 +28,7 @@ interface InvoiceState {
   subtotal: number;
   gstAmount: number;
   total: number;
-  paymentMode: "cash" | "qr" | "neft";
+  paymentMode: "cash" | "qr" | "neft" | "rtgs";
   isPartialPayment?: boolean;
   paidAmount?: number | null;
   balanceAmount?: number;
