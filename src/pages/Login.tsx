@@ -9,6 +9,7 @@ import { Beaker } from "lucide-react";
 import { toast } from "sonner";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "./firebase";
+import ADC from "@/assets/ADC.jpg"
 
 const Login = () => {
   const navigate = useNavigate();
@@ -67,9 +68,10 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
       <Card className="w-full max-w-md shadow-[var(--shadow-elevated)]">
         <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+          {/* <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Beaker className="w-8 h-8 text-primary-foreground" />
-          </div>
+          </div> */}
+          <img src={ADC} className="w-36 h-24 justify-center items-center m-auto"  alt="" />
           <div>
             <CardTitle className="text-2xl font-bold">Aqua Lab Management</CardTitle>
             <CardDescription className="text-base mt-2">

@@ -1,6 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileCheck2, Calendar, FileText, Users, UserCircle } from "lucide-react";
+import { FileCheck2, Calendar, FileText, Users, UserCircle, IndianRupee } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs, Timestamp } from "firebase/firestore";
@@ -26,7 +26,11 @@ interface ReportEntry {
   createdAt: Timestamp | null;
   displayDate: string;
   technicianId?: string;
-  technicianName: string; // Added field
+  technicianName: string;
+  total: number;
+  paidAmount: number;
+  isFullyPaid: boolean;
+  pendingAmount: number; // ← ADDED THIS LINE
 }
 
 const Reports = () => {
@@ -73,7 +77,12 @@ const Reports = () => {
           const farmerName = data.farmerName || "Unknown Farmer";
           const createdAt = data.createdAt as Timestamp | null;
           const techId = data.technicianId || "";
-          const techName = data.technicianName || "Unknown"; // Extract technician name
+          const techName = data.technicianName || "Unknown";
+
+          const total = Number(data.total || 0);
+          const paidAmount = Number(data.paidAmount || 0);
+          const pendingAmount = Math.max(0, total - paidAmount);
+          const isFullyPaid = paidAmount >= total && total > 0;
 
           const progress = data.reportsProgress || {};
           const types: ReportType[] = [];
@@ -99,7 +108,11 @@ const Reports = () => {
               types,
               createdAt,
               technicianId: techId,
-              technicianName: techName, // Store in entry
+              technicianName: techName,
+              total,
+              paidAmount,
+              isFullyPaid,
+              pendingAmount, // Now valid
               displayDate: createdAt
                 ? createdAt.toDate().toLocaleDateString("en-IN", {
                     day: "2-digit",
@@ -241,10 +254,28 @@ const Reports = () => {
                             </div>
                           </div>
                           
-                          {/* Technician Name Display */}
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <UserCircle className="w-4 h-4 text-purple-500" />
-                            <span>Submitted by: <span className="font-medium text-gray-700">{report.technicianName}</span></span>
+                          <div className="space-y-2">
+                            {/* Technician Name */}
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <UserCircle className="w-4 h-4 text-purple-500" />
+                              <span>Submitted by: <span className="font-medium text-gray-700">{report.technicianName}</span></span>
+                            </div>
+
+                            {/* Payment Status with Amounts */}
+                            <div className="flex items-center gap-2 text-sm">
+                              {/* <IndianRupee className="w-4 h-4" /> */}
+                              <span className={report.isFullyPaid ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                Payment {report.isFullyPaid ? "Completed" : "Pending"}
+                              </span>
+                              <span className="text-gray-600">|</span>
+                              <span className="font-medium">
+                                Paid: ₹{report.paidAmount}
+                              </span>
+                              <span className="text-gray-600">|</span>
+                              <span className="font-medium">
+                                Pending: ₹{report.pendingAmount}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
