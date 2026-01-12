@@ -58,7 +58,7 @@ import {
   DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { formatDistanceToNow, startOfMonth, endOfMonth, subMonths, format } from "date-fns";
+import { formatDistanceToNow, startOfMonth, endOfMonth, format } from "date-fns";
 import * as XLSX from "xlsx";
 
 interface Location {
@@ -117,7 +117,7 @@ const Dashboard = () => {
     samplesProcessed: 0,
     reportsGenerated: 0,
     revenue: 0,
-    revenueChange: "",
+    // removed revenueChange
   });
 
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
@@ -242,7 +242,7 @@ const Dashboard = () => {
         const monthStart = startOfMonth(now);
         const monthEnd = endOfMonth(now);
         const monthStartT = Timestamp.fromDate(monthStart);
-        const monthEndT = Timestamp.fromDate(new Date(monthEnd.getTime() + 86399999)); // end of day
+        const monthEndT = Timestamp.fromDate(new Date(monthEnd.getTime() + 86399999));
         newFarmersQuery = query(
           farmersColl,
           where("createdAt", ">=", monthStartT),
@@ -398,7 +398,7 @@ const Dashboard = () => {
 
       filteredInvoices.forEach((inv) => {
         samplesProcessed += inv.sampleCount;
-        revenue += inv.paidAmount;
+        revenue += inv.paidAmount;           // ← Revenue = sum of paidAmount
         if (inv.isReport) reportsGenerated += 1;
       });
 
@@ -417,38 +417,12 @@ const Dashboard = () => {
 
       setRecentActivities(activities);
 
-      // Revenue change (only when no custom filters)
-      let revenueChange = "";
-      if (!isDateFiltered && !searchTerm && selectedTechnicianId === "all") {
-        const lastMonthStart = Timestamp.fromDate(startOfMonth(subMonths(new Date(), 1)));
-        const lastMonthEnd = Timestamp.fromDate(endOfMonth(subMonths(new Date(), 1)));
-        const lastQuery = query(
-          invoicesColl,
-          where("createdAt", ">=", lastMonthStart),
-          where("createdAt", "<=", lastMonthEnd)
-        );
-        const lastSnap = await getDocs(lastQuery);
-        let lastRevenue = 0;
-        lastSnap.forEach((d) => {
-          const invData = d.data();
-          lastRevenue += Number(invData.paidAmount || 0);
-        });
-
-        if (lastRevenue > 0) {
-          const change = ((revenue - lastRevenue) / lastRevenue) * 100;
-          revenueChange = change > 0 ? `+${change.toFixed(0)}%` : `${change.toFixed(0)}%`;
-        } else if (revenue > 0) {
-          revenueChange = "+New";
-        }
-      }
-
       setStats({
         totalFarmers,
         newFarmers,
         samplesProcessed,
         reportsGenerated,
         revenue,
-        revenueChange,
       });
     } catch (error) {
       console.error("Dashboard error:", error);
@@ -467,7 +441,6 @@ const Dashboard = () => {
     fetchDashboardData();
   };
 
-  // ── Fetch real farmers data for modal ─────────────────────────────────────
   const fetchRealFarmers = async () => {
     if (!selectedLocationId) return [];
 
@@ -521,7 +494,7 @@ const Dashboard = () => {
           types: inv.typeDisplay || "Unknown",
         }));
     } else if (type === "revenue") {
-      title = "Revenue Details";
+      title = "Revenue by Payment Mode";
 
       const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
       const pendingAmount = invoices.reduce((sum, inv) => sum + Number(inv.balanceAmount || 0), 0);
@@ -543,7 +516,7 @@ const Dashboard = () => {
         .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
 
       content = [
-        { label: "Total Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}` },
+        { label: "Total Revenue (Paid Amount)", value: `₹${totalRevenue.toLocaleString("en-IN")}` },
         { label: "Paid via Cash", value: `₹${cash.toLocaleString("en-IN")}` },
         { label: "Paid via QR / UPI", value: `₹${qr.toLocaleString("en-IN")}` },
         { label: "Paid via NEFT", value: `₹${neft.toLocaleString("en-IN")}` },
@@ -822,7 +795,7 @@ const Dashboard = () => {
                     {loading ? "-" : `₹${stats.revenue.toLocaleString("en-IN")}`}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    {stats.revenueChange ? `${stats.revenueChange} vs last month` : "Selected period"}
+                    Total amount paid • Selected period
                   </p>
                 </CardContent>
               </Card>

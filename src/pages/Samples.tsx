@@ -37,7 +37,10 @@ const Samples = () => {
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [branchTechnicians, setBranchTechnicians] = useState<{ id: string; name: string }[]>([]);
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
+  const [allOtherTechnicians, setAllOtherTechnicians] = useState<{ id: string; name: string; branchId: string }[]>([]);
+
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");           // filter for table only
+  const [selectedOtherTechId, setSelectedOtherTechId] = useState<string>("none");           // only for NEW submissions
 
   // Date filter states
   const [startDate, setStartDate] = useState<string>("");
@@ -56,12 +59,68 @@ const Samples = () => {
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [farmerSearchQuery, setFarmerSearchQuery] = useState("");
 
-  // Payment Dialog State
+  // Payment Dialog State 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState<any>(null);
   const [paymentModeLocal, setPaymentModeLocal] = useState<"cash" | "qr" | "neft" | "">("");
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
+
+  // Fetch current branch technicians (for filter dropdown)
+  useEffect(() => {
+    const fetchTechnicians = async () => {
+      const locationId = session.locationId;
+      if (!locationId) return;
+      try {
+        const techRef = collection(db, "locations", locationId, "technicians");
+        const snap = await getDocs(techRef);
+        const techs = snap.docs.map(d => ({
+          id: d.id,
+          name: d.data().name || "Unknown Technician"
+        }));
+        setBranchTechnicians(techs);
+      } catch (err) {
+        console.error("Error fetching branch technicians:", err);
+      }
+    };
+    fetchTechnicians();
+  }, [session.locationId]);
+
+  // Fetch technicians from ALL OTHER branches (for new submission choice)
+  useEffect(() => {
+    const fetchAllOtherTechnicians = async () => {
+      if (!session.locationId) return;
+
+      try {
+        const locationsSnap = await getDocs(collection(db, "locations"));
+        const otherTechs: { id: string; name: string; branchId: string }[] = [];
+
+        for (const locDoc of locationsSnap.docs) {
+          const locId = locDoc.id;
+          if (locId === session.locationId) continue;
+
+          const techRef = collection(db, "locations", locId, "technicians");
+          const techSnap = await getDocs(techRef);
+
+          techSnap.docs.forEach(techDoc => {
+            const name = techDoc.data().name || "Unknown Technician";
+            otherTechs.push({
+              id: techDoc.id,
+              name,
+              branchId: locId
+            });
+          });
+        }
+
+        otherTechs.sort((a, b) => a.name.localeCompare(b.name));
+        setAllOtherTechnicians(otherTechs);
+      } catch (err) {
+        console.error("Error fetching other branches technicians:", err);
+      }
+    };
+
+    fetchAllOtherTechnicians();
+  }, [session.locationId]);
 
   useEffect(() => {
     const fetchFarmers = async () => {
@@ -80,25 +139,6 @@ const Samples = () => {
       }
     };
     fetchFarmers();
-  }, [session.locationId]);
-
-  useEffect(() => {
-    const fetchTechnicians = async () => {
-      const locationId = session.locationId;
-      if (!locationId) return;
-      try {
-        const techRef = collection(db, "locations", locationId, "technicians");
-        const snap = await getDocs(techRef);
-        const techs = snap.docs.map(d => ({
-          id: d.id,
-          name: d.data().name || "Unknown Technician"
-        }));
-        setBranchTechnicians(techs);
-      } catch (err) {
-        console.error("Error fetching technicians:", err);
-      }
-    };
-    fetchTechnicians();
   }, [session.locationId]);
 
   useEffect(() => {
@@ -156,6 +196,7 @@ const Samples = () => {
     setQuantities({} as Record<SampleGroup, number>);
     setFarmerSearchQuery("");
     setOpen(false);
+    setSelectedOtherTechId("none"); // reset for next time
   };
 
   const isReportFullyCompleted = (sample: any) => {
@@ -289,6 +330,43 @@ const Samples = () => {
     setCurrentInvoice(null);
   };
 
+  const handleSubmitAndGenerate = () => {
+    if (!selectedFarmer || !dateOfCulture || selectedTypes.length === 0) return;
+
+    const sampleSummary = selectedTypes.flatMap((type) => {
+      const count = quantities[type] ?? 1;
+      if (type === "pl_pcr") {
+        return [{ type: "pl", count }, { type: "pcr", count }];
+      }
+      return [{ type, count }];
+    });
+
+    // Decide which technician to use for this NEW invoice
+    let technicianForThisInvoice = {
+      technicianId: session.technicianId || "unknown",
+      technicianName: session.technicianName || "Current Technician"
+    };
+
+    if (selectedOtherTechId && selectedOtherTechId !== "none") {
+      const chosen = allOtherTechnicians.find(t => t.id === selectedOtherTechId);
+      if (chosen) {
+        technicianForThisInvoice = {
+          technicianId: chosen.id,
+          technicianName: chosen.name
+        };
+      }
+    }
+
+    navigate("/invoice", {
+      state: { 
+        sampleSummary, 
+        dateOfCulture, 
+        farmer: selectedFarmer,
+        technician: technicianForThisInvoice  // ← this is passed correctly
+      },
+    });
+  };
+
   return (
     <DashboardLayout>
       <div className="h-screen flex flex-col">
@@ -340,31 +418,57 @@ const Samples = () => {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 flex-wrap gap-4">
                 <div>
                   <CardTitle>Recent Samples</CardTitle>
                   <CardDescription>View all submitted samples</CardDescription>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Users className="w-4 h-4 text-purple-600" />
-                    <span className="font-medium">Filter by Tech:</span>
+                <div className="flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Users className="w-4 h-4 text-purple-600" />
+                      <span className="font-medium">Filter by Tech:</span>
+                    </div>
+                    <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
+                      <SelectTrigger className="w-56 h-10">
+                        <SelectValue placeholder="All Technicians" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Technicians</SelectItem>
+                        {branchTechnicians.map((tech) => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
-                    <SelectTrigger className="w-56 h-10">
-                      <SelectValue placeholder="All Technicians" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Technicians</SelectItem>
-                      {branchTechnicians.map((tech) => (
-                        <SelectItem key={tech.id} value={tech.id}>
-                          {tech.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Users className="w-4 h-4 text-amber-600" />
+                      <span className="font-medium">Submit as Tech:</span>
+                    </div>
+                    <Select 
+                      value={selectedOtherTechId} 
+                      onValueChange={setSelectedOtherTechId}
+                    >
+                      <SelectTrigger className="w-64 h-10">
+                        <SelectValue placeholder="Current technician" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Current technician (me)</SelectItem>
+                        {allOtherTechnicians.map((tech) => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.name} (other branch)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardHeader>
+
               <CardContent>
                 <Table>
                   <TableHeader>
@@ -405,13 +509,10 @@ const Samples = () => {
                         const paidSoFar = Number(sample.paidAmount || 0);
                         const pendingAmount = grandTotal - paidSoFar;
 
-                        // ────────────────────────────────────────────────
-                        // FIXED LOGIC: If payment was done at invoice time → treat as fully paid
                         const isPaidAtGeneration = sample.paymentMode && sample.paymentMode !== "pending";
                         const displayPaid = isPaidAtGeneration ? grandTotal : paidSoFar;
                         const displayPending = isPaidAtGeneration ? 0 : pendingAmount;
                         const showAddPaymentButton = sample.paymentMode === "pending" && displayPending > 0;
-                        // ────────────────────────────────────────────────
 
                         const sampleDate = sample.createdAt
                           ? format(
@@ -419,6 +520,9 @@ const Samples = () => {
                               "dd MMM yyyy"
                             )
                           : "N/A";
+
+                        // Always use the real stored name from Firestore
+                        const displayTechnicianName = sample.technicianName || "Unknown";
 
                         return (
                           <TableRow key={sample.id}>
@@ -430,7 +534,7 @@ const Samples = () => {
                             <TableCell className="font-medium">{invoiceId}</TableCell>
                             <TableCell>{sample.farmerName}</TableCell>
                             <TableCell>{sample.farmerPhone ?? "N/A"}</TableCell>
-                            <TableCell>{sample.technicianName}</TableCell>
+                            <TableCell>{displayTechnicianName}</TableCell>
                             <TableCell>₹{grandTotal}</TableCell>
                             <TableCell className="font-medium text-green-600">₹{displayPaid}</TableCell>
                             <TableCell
@@ -681,21 +785,7 @@ const Samples = () => {
                     <>
                       <Button onClick={() => setStep(1)} variant="outline" className="h-11 px-8">Back</Button>
                       <Button
-                        onClick={() => {
-                          if (!selectedFarmer || !dateOfCulture || selectedTypes.length === 0) return;
-
-                          const sampleSummary = selectedTypes.flatMap((type) => {
-                            const count = quantities[type] ?? 1;
-                            if (type === "pl_pcr") {
-                              return [{ type: "pl", count }, { type: "pcr", count }];
-                            }
-                            return [{ type, count }];
-                          });
-
-                          navigate("/invoice", {
-                            state: { sampleSummary, dateOfCulture, farmer: selectedFarmer },
-                          });
-                        }}
+                        onClick={handleSubmitAndGenerate}
                         disabled={!dateOfCulture || selectedTypes.length === 0}
                         className="h-11 px-10 bg-cyan-600 hover:bg-cyan-700"
                       >

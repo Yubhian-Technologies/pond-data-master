@@ -23,6 +23,7 @@ interface LocationState {
   sampleSummary: SampleSummaryItem[];
   dateOfCulture: string;
   farmer: { name: string; address: string; phone: string; id: string };
+  technician?: { technicianId: string; technicianName: string }; // ← Added optional type
 }
 
 const PCR_PATHOGEN_MAP: Record<string, string> = {
@@ -44,14 +45,15 @@ const InvoicePage = () => {
   const location = useLocation();
   const state = location.state as LocationState | undefined;
 
+  // Get technician from Samples page (passed via navigate state)
+  const passedTechnician = state?.technician || null;
+
   const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft" | "rtgs" | "pending">("");
   const [transactionRef, setTransactionRef] = useState<string>("");
 
   const [isZeroInvoice, setIsZeroInvoice] = useState(false);
 
   const locationId = session.locationId;
-  const technicianId = session.technicianId;
-  const technicianName = session.technicianName;
 
   const [locationName, setLocationName] = useState<string>("");
 
@@ -314,13 +316,9 @@ const InvoicePage = () => {
 
     const invoiceId = generateInvoiceId();
 
-    // ──────────────────────────────────────────────────────────────
-    // CHANGED: Save per-sample selected tests instead of global list
-    // Structure: { "water": { 1: ["pH","salinity"], 2: ["tpc","do"], ... } }
-    // ──────────────────────────────────────────────────────────────
+    // ── per-sample selected tests logic remains the same ──
     const perSampleSelectedTests: Record<string, Record<number, string[]>> = {};
 
-    // For other sample types (water, soil, etc.)
     sampleSummary.forEach((s) => {
       const type = s.type.toLowerCase();
       if (type === "pl" || type === "pcr") return;
@@ -334,9 +332,6 @@ const InvoicePage = () => {
         });
       }
     });
-
-    // Optional: you can still keep global selectedTests if needed somewhere else
-    // But for per-sample display in forms → perSampleSelectedTests is what matters
 
     const sampleType = sampleSummary.map((s) => ({
       type: s.type.toLowerCase(),
@@ -355,14 +350,36 @@ const InvoicePage = () => {
       }
     });
 
+    // ── FIXED PAYMENT LOGIC ───────────────────────────────────────────────
+    let paidAmount = 0;
+    let balanceAmount = grandTotal;
+    let isPartialPayment = false;
+
+    if (isZeroInvoice) {
+      paidAmount = 0;
+      balanceAmount = 0;
+    } else if (paymentMode !== "pending") {
+      paidAmount = grandTotal;
+      balanceAmount = 0;
+      isPartialPayment = false;
+    } else {
+      paidAmount = 0;
+      balanceAmount = grandTotal;
+      isPartialPayment = true;
+    }
+
+    // ── Use passed technician from Samples (if any), else current session ──
+    const technicianId = passedTechnician?.technicianId || session.technicianId || "unknown";
+    const technicianName = passedTechnician?.technicianName || session.technicianName || "Unknown Technician";
+
     const invoiceData = {
       invoiceId,
       farmerName,
       farmerId,
       farmerPhone: mobile,
       locationId,
-      technicianName,
-      technicianId,
+      technicianName,                      // ← Now correctly uses passed or session
+      technicianId,                        // ← Now correctly uses passed or session
       dateOfCulture,
       tests: groupedItems,
       subtotal: isZeroInvoice ? 0 : subtotal,
@@ -372,9 +389,9 @@ const InvoicePage = () => {
       mobile,
       paymentMode: isZeroInvoice ? "pending" : paymentMode,
       transactionRef: paymentMode !== "cash" && paymentMode !== "pending" ? transactionRef.trim() : null,
-      isPartialPayment: false,
-      paidAmount: 0,
-      balanceAmount: isZeroInvoice ? 0 : grandTotal,
+      isPartialPayment,
+      paidAmount,
+      balanceAmount,
       sampleType,
       reportsProgress,
       samplePathogens,
@@ -382,12 +399,7 @@ const InvoicePage = () => {
       createdAt: serverTimestamp(),
       isZeroInvoice: isZeroInvoice,
       note: isZeroInvoice ? "Lab Equipment Testing - Zero Charge" : null,
-
-      // ─── NEW / REPLACED FIELD ──────────────────────────────────────
-      perSampleSelectedTests,   // ← This is the important one for per-sample display
-      // You can keep selectedTests too if needed, but it's optional now
-      // selectedTests: { ... } // ← remove or keep, up to you
-      // ──────────────────────────────────────────────────────────────
+      perSampleSelectedTests,
     };
 
     try {
