@@ -13,6 +13,7 @@ interface FarmerInfo {
   village: string;
   mobile: string;
   date: string;
+  farmerId?: string;          // ← Added (optional for backward compatibility)
 }
 
 interface MicrobiologyData {
@@ -183,40 +184,44 @@ export default function MicrobiologyReport({
               Contact No: {locationDetails.contactNumber || "Loading..."} | 
               Mail Id: {locationDetails.email || "Loading..."}
             </p>
-            <h2 className="text-2xl font-bold text-red-600 mt-3">
-              Microbiology Analysis Report
-            </h2>
           </div>
           <img src={AV} alt="AV Logo" className="w-32" />
         </div>
 
-        {/* Report ID */}
-        <div className="text-right mb-6">
-          <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
-        </div>
+       <div className="flex justify-center mb-10">
+  <table className="border-2 border-gray-800 text-sm w-full max-w-5xl">
+    <tbody>
+      {/* Row 1 - 8 columns */}
+      <tr>
+        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer Name</td>
+        <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerName || "-"}</td>
+        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Village</td>
+        <td className="border px-4 py-2 w-1/8">{farmerInfo?.village || "-"}</td>
+        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Report ID</td>
+        <td className="border px-4 py-2 w-1/8">{invoiceId || "-"}</td>
+        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">No. of Samples</td>
+        <td className="border px-4 py-2 w-1/8">{allSampleCount}</td>
+      </tr>
 
-        {/* Farmer Info */}
-        <div className="flex justify-center mb-10">
-          <table className="border-2 border-gray-800 text-sm">
-            <tbody>
-              <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer Name</td>
-                <td className="border px-4 py-2">{farmerInfo?.farmerName || "-"}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Village</td>
-                <td className="border px-4 py-2">{farmerInfo?.village || "-"}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Date</td>
-                <td className="border px-4 py-2">{farmerInfo?.date || "-"}</td>
-              </tr>
-              <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Mobile</td>
-                <td className="border px-4 py-2">{farmerInfo?.mobile || "-"}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">No. of Samples</td>
-                <td className="border px-4 py-2">{allSampleCount}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Type</td>
-                <td className="border px-4 py-2">Microbiology</td>
-              </tr>
-            </tbody>
-          </table>
+      {/* Row 2 - 8 columns */}
+      <tr>
+        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Mobile</td>
+        <td className="border px-4 py-2 w-1/8">{farmerInfo?.mobile || "-"}</td>
+        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer ID</td>
+        <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerId || "-"}</td>
+        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Sample Type</td>
+        <td className="border px-4 py-2 w-1/8" colSpan={1}>Microbiology</td>
+        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Date</td>
+        <td className="border px-4 py-2 w-1/8">{farmerInfo?.date || "-"}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+        <div className="text-center m-4">
+          <h2 className="text-2xl font-bold text-red-600 mt-3">
+            Microbiology Analysis Report
+          </h2>
         </div>
 
         {/* Vibrio Table */}
@@ -271,12 +276,12 @@ export default function MicrobiologyReport({
         </div>
 
         {/* Note */}
-        <div className="text-center text-xs text-gray-700 mt-10 mb-4">
-          <p><strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.</p>
+        <div className="text-center text-sm text-gray-700 mt-10 mb-4">
+          <p><strong className="text-red-600">Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.</p>
         </div>
 
-        <div className="mt-12 text-center text-sm text-gray-600 print:hidden">
-          Report generated on {new Date().toLocaleDateString()}
+        <div className="mt-20 font-bold text-center text-sm text-red-600 ">
+          TWL ADC Committed to Complete farming Solutions
         </div>
       </div>
 

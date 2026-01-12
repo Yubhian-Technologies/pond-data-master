@@ -145,40 +145,47 @@ const SoilReport: React.FC<SoilReportProps> = ({
           data.createdAt?.toDate?.()?.toISOString().split("T")[0] ||
           new Date().toISOString().split("T")[0];
 
-        setFormData((prev) => ({
-          ...prev,
-          reportedBy: technicianName || "",
-          checkedBy: "",
-          farmerName: data.farmerName || "",
-          farmerUID: data.farmerUID || data.farmerId || "",
-          farmerAddress: data.village || data.farmerAddress || "",
-          mobile: data.farmerPhone || data.mobile || "",
-          noOfSamples: displaySampleCount.toString(),
-          sampleDate,
-          reportDate: new Date().toISOString().split("T")[0],
-          soilType,
-          sourceOfSoil,
-          sampleCollectionTime,
-          sampleTime,
-          reportTime,
-        }));
+        // ──────────────────────────────────────────────────────────────
+// Set initial form data from invoice
+// ──────────────────────────────────────────────────────────────
+setFormData((prev) => ({
+  ...prev,
+  reportedBy: technicianName || "",
+  checkedBy: "",
+  farmerName: data.farmerName || "",
+  farmerUID: data.farmerId || "",           // temporary - will be overwritten with real ID
+  farmerAddress: data.village || data.farmerAddress || "",
+  mobile: data.farmerPhone || data.mobile || "",
+  noOfSamples: displaySampleCount.toString(),
+  sampleDate,
+  reportDate: new Date().toISOString().split("T")[0],
+  soilType,
+  sourceOfSoil,
+  sampleCollectionTime,
+  sampleTime,
+  reportTime,
+}));
 
-        // Fetch farmer details if farmerId exists
-        if (data.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
-          const farmerSnap = await getDoc(farmerRef);
+// ──────────────────────────────────────────────────────────────
+// IMPORTANT: Fetch REAL formatted farmerId from farmer document
+// ──────────────────────────────────────────────────────────────
+if (data.farmerId) {
+  const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
+  const farmerSnap = await getDoc(farmerRef);
 
-          if (farmerSnap.exists()) {
-            const farmerData = farmerSnap.data() as FarmerData;
-            setFormData((prev) => ({
-              ...prev,
-              farmerAddress: [farmerData.address, farmerData.city, farmerData.state]
-                .filter(Boolean)
-                .join(", ") || prev.farmerAddress,
-              mobile: farmerData.phone || prev.mobile,
-            }));
-          }
-        }
+  if (farmerSnap.exists()) {
+    const farmerData = farmerSnap.data();
+
+    setFormData((prev) => ({
+      ...prev,
+      farmerUID: farmerData.farmerId || prev.farmerUID,  // ← This is the correct formatted ID!
+      farmerAddress: [farmerData.address, farmerData.city, farmerData.state]
+        .filter(Boolean)
+        .join(", ") || prev.farmerAddress,
+      mobile: farmerData.phone || prev.mobile,
+    }));
+  }
+}
 
         // Fetch soil samples
         const samplesRef = collection(
@@ -264,16 +271,17 @@ const SoilReport: React.FC<SoilReportProps> = ({
             <p className="text-sm text-black">
               Contact No: {locationDetails.contactNumber || "Loading..."} | Mail Id: {locationDetails.email || "Loading..."}
             </p>
-            <h2 className="text-2xl font-bold text-red-600 mt-3">
-              Soil Analysis Report
-            </h2>
+            
           </div>
           <img src={AV} alt="AV Logo" className="w-40 object-contain" />
         </div>
 
-        <div className="text-right mb-4">
-          <span className="font-bold">Report Id:- {invoiceId || "-"}</span>
-        </div>
+       
+       <div className="text-center m-5">
+        <h2 className="text-2xl font-bold text-red-600 mt-3">
+              Soil Analysis Report
+            </h2>
+       </div>
 
         <div className="grid grid-cols-10 gap-0 text-sm mb-6 border border-black">
           <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Name</div>
@@ -287,15 +295,15 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
           <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Farmer UID</div>
           <div className="col-span-2 border-r border-t border-black p-0.5">{formData.farmerUID || "-"}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Source of Soil</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sourceOfSoil || "-"}</div>
+          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Address </div>
+          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.farmerAddress || "-"}</div>
           <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Sample Date</div>
           <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sampleDate || "-"}</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Sample Time</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sampleTime || "-"}</div>
+          <div className="col-span-2 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Source of Soil</div>
+          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sourceOfSoil|| "-"}</div>
 
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Address</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5">{formData.farmerAddress || "-"}</div>
+          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Report Id</div>
+          <div className="col-span-2 border-r border-t border-black p-0.5">{invoiceId || "-"}</div>
           <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">No.of Samples</div>
           <div className="col-span-1 border-r border-t border-black p-0.5">{formData.noOfSamples}</div>
           <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Report Date</div>
@@ -364,7 +372,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
         </div>
 
         <div className="text-center font-bold text-sm" style={{ color: '#dc2626' }}>
-          KCT Group Trust committed for Complete Farming Solutions
+          ADC AQUA DIAGNOSTIC CENTER committed for Complete Farming Solutions
         </div>
       </div>
 

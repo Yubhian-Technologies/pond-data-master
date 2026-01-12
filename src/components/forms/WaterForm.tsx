@@ -83,7 +83,6 @@ export default function WaterForm({
     mobile: "",
     sdDoc: "",
     sampleCollectionTime: "",
-    sampleTime: "",
     reportTime: "",
     farmerUID: "",
     sourceOfWater: "",
@@ -93,7 +92,6 @@ export default function WaterForm({
     reportDate: "",
   });
 
-  // NEW: Shared remarks & recommendations for all samples
   const [remarksAndRecommendations, setRemarksAndRecommendations] = useState("");
 
   const emptyPond: Pond = {
@@ -195,7 +193,7 @@ export default function WaterForm({
               ...prev,
               farmerName: farmer.name || "",
               mobile: farmer.phone || "",
-              farmerUID: invoice.farmerId || "",
+              farmerUID: farmer.farmerId || "",           // ← Correct field: the formatted ID
               farmerAddress: [farmer.address, farmer.city].filter(Boolean).join(", "),
               sdDoc: invoice.dateOfCulture || "",
               sourceOfWater: farmer.waterSource || "",
@@ -203,7 +201,6 @@ export default function WaterForm({
               reportDate: todayDate,
               reportTime: currentTime,
               sampleCollectionTime: prev.sampleCollectionTime || "",
-              sampleTime: prev.sampleCollectionTime || "",
               noOfSamples: String(totalSamples),
             }));
           }
@@ -278,7 +275,6 @@ export default function WaterForm({
               favella: data.favella || "",
             });
 
-            // Load shared remarks if exists (from any sample or separate field)
             if (data.remarksAndRecommendations) {
               setRemarksAndRecommendations(data.remarksAndRecommendations);
             }
@@ -298,15 +294,6 @@ export default function WaterForm({
     loadData();
   }, [invoice, invoiceId, locationId, totalSamples]);
 
-  useEffect(() => {
-    if (formData.sampleCollectionTime && !formData.sampleTime) {
-      setFormData(prev => ({
-        ...prev,
-        sampleTime: formData.sampleCollectionTime,
-      }));
-    }
-  }, [formData.sampleCollectionTime]);
-
   const handlePondChange = (id: number, field: keyof Pond, value: string) => {
     setPonds((prev) =>
       prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
@@ -323,7 +310,6 @@ export default function WaterForm({
         ...pond,
         sampleNumber: index + 1,
         savedAt: new Date(),
-        // Save shared remarks in EVERY sample document (simple way)
         remarksAndRecommendations,
       }, { merge: true });
     });
@@ -347,12 +333,11 @@ export default function WaterForm({
         sdDoc: formData.sdDoc,
         sampleDate: formData.sampleDate,
         sampleCollectionTime: formData.sampleCollectionTime,
-        sampleTime: formData.sampleTime,
         reportDate: formData.reportDate,
         reportTime: formData.reportTime,
       });
 
-      onSubmit(); 
+      onSubmit();
     } catch (err) {
       console.error("Error saving water reports:", err);
       alert("Failed to save. Please try again.");
@@ -379,7 +364,6 @@ export default function WaterForm({
           { label: "Farmer Address", name: "farmerAddress" },
           { label: "Sample Date", name: "sampleDate", type: "date" },
           { label: "Sample Collection Time", name: "sampleCollectionTime", type: "time" },
-          { label: "Sample Time", name: "sampleTime", type: "time" },
           { label: "Report Date", name: "reportDate", type: "date" },
           { label: "Report Time", name: "reportTime", type: "time" },
           { label: "No. of Samples", value: totalSamples, disabled: true },
@@ -547,7 +531,6 @@ export default function WaterForm({
         );
       })}
 
-      {/* NEW: Shared Remarks & Recommendations textarea at the bottom */}
       <div className="mb-12">
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Remarks & Recommendations

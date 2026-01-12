@@ -294,17 +294,18 @@ const WaterReport: React.FC<WaterReportProps> = ({
             <h1 className="text-2xl font-bold text-blue-700">WATERBASE AQUA DIAGNOSTIC CENTER</h1>
             <p className="text-[10px] text-black font-semibold">{locationDetails.address}</p>
             <p className="text-xs text-black">Contact No: {locationDetails.contactNumber} | Mail Id: {locationDetails.email}</p>
-            <h2 className="text-xl font-bold mt-1 text-red-600 uppercase">Water Quality Report</h2>
+            
           </div>
           <div className="w-32 h-24 flex items-center justify-center">
             <img src={AV} alt="AV" className="max-w-full max-h-full object-contain" />
           </div>
         </div>
 
-        <div className="text-right mb-1">
-          <span className="font-bold text-xs text-black">Report Id:- {invoiceId || "-"}</span>
-        </div>
+       
 
+        <div className="text-center flex-1 m-5">
+          <h2 className="text-xl font-bold mt-1 text-red-600 uppercase">Water Quality Report</h2>
+        </div>
         {/* Farmer Info Grid */}
         <div className="grid grid-cols-10 text-[11px] mb-3 border border-black border-collapse">
           <div className="col-span-1 border-r border-black p-1 font-bold bg-gray-100">Farmer Name</div>
@@ -318,15 +319,15 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
           <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Farmer UID</div>
           <div className="col-span-2 border-t border-r border-black p-1">{formData.farmerUID}</div>
-          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Source</div>
-          <div className="col-span-1 border-t border-r border-black p-1">{formData.sourceOfWater}</div>
+          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Address</div>
+          <div className="col-span-1 border-t border-r border-black p-1">{formData.farmerAddress}</div>
           <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Sample Date</div>
           <div className="col-span-1 border-t border-r border-black p-1">{formData.sampleDate}</div>
-          <div className="col-span-2 border-t border-r border-black p-1 font-bold bg-gray-100">Sample Time</div>
-          <div className="col-span-1 border-t border-black p-1">{formData.sampleTime}</div>
+          <div className="col-span-2 border-t border-r border-black p-1 font-bold bg-gray-100">Source</div>
+          <div className="col-span-1 border-t border-black p-1">{formData.sourceOfWater}</div>
 
-          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Address</div>
-          <div className="col-span-2 border-t border-r border-black p-1">{formData.farmerAddress}</div>
+          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Report Id</div>
+          <div className="col-span-2 border-t border-r border-black p-1">{invoiceId || "-"}</div>
           <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">No. of Samples</div>
           <div className="col-span-1 border-t border-r border-black p-1">{formData.noOfSamples}</div>
           <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Report Date</div>
@@ -511,9 +512,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
           <p className="font-bold text-xs">Checked by: ________________</p>
         </div>
 
-        {/* <div className="mt-2 text-[9px] italic text-gray-600 leading-tight">
+        <div className="mt-2 text-[9px] italic text-gray-600 leading-tight">
           <p>Note: The Samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose, Not for any Litigation.</p>
-        </div> */}
+        </div>
       </div>
 
       <style>{`

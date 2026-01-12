@@ -7,6 +7,7 @@ interface FarmerInfo {
   village: string;
   mobile: string;
   date: string;
+  farmerId: string;          // ← Added
 }
 
 interface MicrobiologyFormProps {
@@ -47,23 +48,29 @@ export default function MicrobiologyForm({
     village: invoice?.village ?? "",
     mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
     date: today,
+    farmerId: "",                    // ← Added
   });
 
   const [microbiologyData, setMicrobiologyData] = useState<any>(emptyMicrobiologyData);
   const [loading, setLoading] = useState(true);
+
+  // NEW: Farmer UID (display + save)
+  const [farmerUID, setFarmerUID] = useState<string>("");
+
+  // Sample Type field
+  const [sampleType, setSampleType] = useState<string>("Microbiology");
 
   // ──────────────────────────────────────────────────────────────
   // NEW: Per-sample selected microbiology tests from invoice
   // ──────────────────────────────────────────────────────────────
   const perSampleSelectedTests = invoice.perSampleSelectedTests?.microbiology || {};
 
-  // Mapping from test ID → display name (adjust keys to match your actual test IDs)
+  // Mapping from test ID → display name
   const testNameMap: Record<string, string> = {
     yellowColonies: "Yellow Colonies",
     greenColonies: "Green Colonies",
     tpc: "Total Plate Count (TPC)",
-    testCode: "Test Code", // if you have it as selectable test
-    // Add any other microbiology test IDs you use in availableTests
+    testCode: "Test Code",
   };
   // ──────────────────────────────────────────────────────────────
 
@@ -76,6 +83,18 @@ export default function MicrobiologyForm({
 
       try {
         setLoading(true);
+
+        // Load formatted Farmer ID
+        let loadedFarmerId = "";
+        if (invoice?.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+          const farmerSnap = await getDoc(farmerRef);
+          if (farmerSnap.exists()) {
+            const farmerData = farmerSnap.data();
+            loadedFarmerId = farmerData.farmerId || "";
+            setFarmerUID(loadedFarmerId);
+          }
+        }
 
         const reportRef = doc(
           db,
@@ -98,7 +117,13 @@ export default function MicrobiologyForm({
               village: data.farmerInfo.village || invoice?.village || "",
               mobile: data.farmerInfo.mobile || invoice?.farmerPhone || invoice?.mobile || "",
               date: data.farmerInfo.date || today,
+              farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",
             });
+          }
+
+          // Load saved sample type if exists
+          if (data.sampleType) {
+            setSampleType(data.sampleType);
           }
 
           const savedData = data.microbiologyData || {};
@@ -110,12 +135,11 @@ export default function MicrobiologyForm({
 
           setMicrobiologyData(normalized);
         } else {
-          setFarmerInfo({
-            farmerName: invoice?.farmerName ?? "",
-            village: invoice?.village ?? "",
-            mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
-            date: today,
-          });
+          // First time - set farmerId from loaded value
+          setFarmerInfo((prev) => ({
+            ...prev,
+            farmerId: loadedFarmerId,
+          }));
           setMicrobiologyData(emptyMicrobiologyData);
         }
       } catch (error) {
@@ -153,9 +177,10 @@ export default function MicrobiologyForm({
       await setDoc(
         reportRef,
         {
-          farmerInfo,
+          farmerInfo,           // now includes farmerId
           microbiologyData,
           totalSamples,
+          sampleType,           // ← saving sample type too
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -226,12 +251,40 @@ export default function MicrobiologyForm({
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Farmer ID</label>
+            <input
+              className="w-full border border-gray-300 p-3 rounded-lg bg-gray-100 focus:ring-2 focus:ring-blue-500"
+              value={farmerUID}
+              readOnly
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
             <input
               type="date"
               className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500"
               value={farmerInfo.date}
               onChange={(e) => setFarmerInfo({ ...farmerInfo, date: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">No. of Samples</label>
+            <input
+              className="w-full border border-gray-300 p-3 rounded-lg bg-gray-100 focus:ring-2 focus:ring-blue-500"
+              value={totalSamples}
+              readOnly
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sample Type</label>
+            <input
+              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500"
+              value={sampleType}
+              onChange={(e) => setSampleType(e.target.value)}
+              placeholder="e.g. Microbiology"
             />
           </div>
         </div>
@@ -250,7 +303,6 @@ export default function MicrobiologyForm({
                 <th className="border border-blue-400 px-4 py-3 text-left font-bold text-md">Parameter</th>
                 {Array.from({ length: totalSamples }, (_, i) => {
                   const sampleNumber = i + 1;
-                  // Get selected tests only for THIS sample
                   const sampleSelectedIds = perSampleSelectedTests[sampleNumber] || [];
                   const sampleSelectedNames = sampleSelectedIds
                     .map((id: string) => testNameMap[id] || id)

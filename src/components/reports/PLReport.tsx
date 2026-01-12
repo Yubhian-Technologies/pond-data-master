@@ -15,7 +15,7 @@ interface FarmerInfo {
   sampleDate: string;
   sampleTime: string;
   reportDate: string;
-  reportTime: string;
+  farmerId:string;
 }
 
 interface PLData {
@@ -44,28 +44,29 @@ interface PLReportProps {
   invoiceId: string;
   locationId: string;
   allSampleCount: number;
-  showSignature?: boolean; // NEW: Control whether to show signature (default: true)
+  showSignature?: boolean; // Control whether to show signature (default: true)
 }
 
 export default function PLReport({
   invoiceId,
   locationId,
   allSampleCount,
-  showSignature = true, // Show by default when used alone
+  showSignature = true,
 }: PLReportProps) {
   const { session } = useUserSession(); // Get technician name
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo | null>(null);
   const [plData, setPlData] = useState<PLData | null>(null);
+  const [sampleType, setSampleType] = useState<string>("PL (Post Larvae)");
   const [loading, setLoading] = useState(true);
   const [locationDetails, setLocationDetails] = useState<{
-  address: string;
-  email: string;
-  contactNumber: string;
-}>({
-  address: "",
-  email: "",
-  contactNumber: "",
-});
+    address: string;
+    email: string;
+    contactNumber: string;
+  }>({
+    address: "",
+    email: "",
+    contactNumber: "",
+  });
 
   useEffect(() => {
     const fetchPLReport = async () => {
@@ -87,6 +88,9 @@ export default function PLReport({
         if (snap.exists()) {
           const data = snap.data();
 
+          const loadedSampleType = data.sampleType || "PL (Post Larvae)";
+          setSampleType(loadedSampleType);
+
           const savedFarmerInfo = data.farmerInfo || {};
           setFarmerInfo({
             farmerName: savedFarmerInfo.farmerName || "-",
@@ -95,7 +99,7 @@ export default function PLReport({
             sampleDate: savedFarmerInfo.sampleDate || "-",
             sampleTime: savedFarmerInfo.sampleTime || "-",
             reportDate: savedFarmerInfo.reportDate || new Date().toISOString().split("T")[0],
-            reportTime: savedFarmerInfo.reportTime || new Date().toTimeString().slice(0, 5),
+            farmerId: savedFarmerInfo.farmerId || "-",
           });
 
           const savedPlData = data.plData || {};
@@ -154,7 +158,7 @@ export default function PLReport({
             sampleDate: "-",
             sampleTime: "-",
             reportDate: new Date().toISOString().split("T")[0],
-            reportTime: new Date().toTimeString().slice(0, 5),
+            farmerId:"-",
           });
         }
       } catch (err) {
@@ -170,7 +174,7 @@ export default function PLReport({
   useEffect(() => {
     const fetchLocationDetails = async () => {
       if (!locationId) return;
-  
+
       try {
         const locDoc = await getDoc(doc(db, "locations", locationId));
         if (locDoc.exists()) {
@@ -183,10 +187,9 @@ export default function PLReport({
         }
       } catch (error) {
         console.error("Error fetching location details:", error);
-        
       }
     };
-  
+
     fetchLocationDetails();
   }, [locationId]);
 
@@ -219,29 +222,36 @@ export default function PLReport({
   return (
     <>
       <style>{`
-        @media print {
-          #pl-report {
-            padding: 8px !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            border-radius: 0 !important;
-          }
-          h1 { font-size: 1.6rem !important; }
-          h2 { font-size: 1.3rem !important; }
-          p, td, th, span { font-size: 0.7rem !important; line-height: 1.2 !important; }
-          .px-4 { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
-          .py-2 { padding-top: 0.3rem !important; padding-bottom: 0.3rem !important; }
-          .mb-4, .mb-8, .mb-12 { margin-bottom: 0.5rem !important; }
-          img.w-40 { width: 100px !important; }
-          table td, table th { padding: 0.2rem 0.3rem !important; }
-          .text-xs { font-size: 0.6rem !important; }
-          table, div, section { page-break-inside: avoid !important; }
-          @page { size: A4 portrait; margin: 1cm; }
-          .print\\:hidden { display: none !important; }
-        }
-      `}</style>
+  @media print {
+    #pl-report, #notes-section {
+      padding: 8px !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
+    h1 { font-size: 1.6rem !important; }
+    h2 { font-size: 1.3rem !important; }
+    p, td, th, span { font-size: 0.7rem !important; line-height: 1.2 !important; }
+    .px-4 { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
+    .py-2 { padding-top: 0.3rem !important; padding-bottom: 0.3rem !important; }
+    .mb-4, .mb-8, .mb-12 { margin-bottom: 0.5rem !important; }
+    img.w-40 { width: 100px !important; }
+    table td, table th { padding: 0.2rem 0.3rem !important; }
+    .text-xs { font-size: 0.6rem !important; }
+    table, div, section { page-break-inside: avoid !important; }
+    @page { size: A4 portrait; margin: 0.8cm 1cm; }
 
-      <div className="bg-white rounded-lg shadow-md p-8" id="pl-report">
+    .print\\:hidden { display: none !important; }
+    .screen-only { display: none !important; }
+    // .print-only { display: block !important; }
+
+    /* Force page break BEFORE the notes section */
+    #notes-section { page-break-before: always; margin-top: 0 !important; padding-top: 0 !important; }
+  }
+  .print-only { display: none; } /* Hidden on screen */
+`}</style>
+
+      <div className=" rounded-lg  p-8" id="pl-report">
         <div className="mb-5 print:hidden">
           <button
             onClick={handlePrint}
@@ -258,21 +268,16 @@ export default function PLReport({
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
             <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
-            <p className="text-sm text-black">Contact No: {locationDetails.contactNumber || "Loading..."} | 
-  Mail Id: {locationDetails.email || "Loading..."}</p>
-            <h2 className="text-2xl font-bold text-red-600 mt-3">
-              Post Larvae General Observation Report
-            </h2>
+            <p className="text-sm text-black">
+              Contact No: {locationDetails.contactNumber || "Loading..."} | 
+              Mail Id: {locationDetails.email || "Loading..."}
+            </p>
           </div>
           <img src={AV} alt="AV Logo" className="w-40 object-contain" />
         </div>
 
-        <div className="text-right mb-4">
-          <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
-        </div>
-
-        <div className="flex justify-center mb-12">
-          <table className="border-2 border-gray-800 text-sm">
+        <div className="w-full mb-12">
+          <table className="w-full border-2 border-gray-800 text-sm table-fixed">
             <tbody>
               <tr>
                 <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer Name</td>
@@ -283,23 +288,31 @@ export default function PLReport({
                 <td className="border px-4 py-2">{farmerInfo.sampleDate}</td>
               </tr>
               <tr>
+                
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Report Id</td>
+                <td className="border px-4 py-2">{invoiceId || '-'}</td>
                 <td className="font-semibold bg-blue-100 border px-4 py-2">Mobile</td>
                 <td className="border px-4 py-2">{farmerInfo.mobile}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Time</td>
-                <td className="border px-4 py-2">{farmerInfo.sampleTime}</td>
                 <td className="font-semibold bg-blue-100 border px-4 py-2">Report Date</td>
                 <td className="border px-4 py-2">{farmerInfo.reportDate}</td>
               </tr>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">No. of Samples</td>
+                
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer ID</td>
+  <td className="border px-4 py-2">{farmerInfo.farmerId || '-'}</td>
+  <td className="font-semibold bg-blue-100 border px-4 py-2">No. of Samples</td>
                 <td className="border px-4 py-2">{allSampleCount}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Report Time</td>
-                <td className="border px-4 py-2">{farmerInfo.reportTime}</td>
                 <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Type</td>
-                <td className="border px-4 py-2">PL</td>
+                <td className="border px-4 py-2">{sampleType}</td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div className="text-center m-5">
+          <h2 className="text-2xl font-bold text-red-600 mt-3">
+            Post Larvae General Observation Report
+          </h2>
         </div>
 
         <div className="flex justify-center overflow-x-auto">
@@ -354,8 +367,9 @@ export default function PLReport({
           </table>
         </div>
 
-        {/* Signature & Note — only if showSignature is true */}
+       
         {showSignature && (
+          <>
           <div className="mt-20 border-t-2 border-black pt-8">
             <div className="flex justify-between text-sm px-10 mb-10">
               <div>
@@ -373,8 +387,34 @@ export default function PLReport({
               </p>
             </div>
           </div>
+          <div className="text-sm text-gray-800 mt-8">
+          <p className="font-bold mb-2 text-red-600">Note:</p>
+          <p className="mb-4">
+            PL: Post Larve, MGR: Muscle Gut Ratio, SHG: Swollen Hind Gut, HP: Hepatopancreas, F: Full, S: Shrunken,
+            FBI: Filamentous Bacterial Infection, PZ: Protozoal Infection, Infection Level: Light: &lt;10%, Moderate: 10 to 30%, Heavy:40%
+          </p>
+
+          <p className="font-bold mb-2 text-red-600">PL Quality Selection - Scoring</p>
+          <p className="mb-4">
+            <span className="text-red-600 font-bold">Rostral Spines:</span> 15 Points (&gt;4 Spines), Average Length: 10 points(&gt;11mm), Size Variation: 10 points (&lt;10%), Muscle Gut Ratio: 15 points (&gt;4:1
+            Spine), Hepatopancreas: 15 points (Full), Necrosis: 10 points (Absent) Fouling: 10 points (Absent), Swollen Hind Gut: 15 points (Absent)
+          </p>
+
+          <p className="mt-6">
+            <span className="text-red-600 font-bold">Note:</span> The samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose. Not
+          </p>
+        </div>
+
+        <div className="text-center mt-20">
+          <p className="text-red-600 font-bold">TWL ADC committed for Complete farming Solutions</p>
+        </div>
+        </>
+          
         )}
       </div>
+
+      
+      
     </>
   );
 }

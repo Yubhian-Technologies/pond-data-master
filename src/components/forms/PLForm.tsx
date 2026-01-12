@@ -10,6 +10,7 @@ interface FarmerInfo {
   sampleTime: string;
   reportDate: string;
   reportTime: string;
+  farmerId: string;          // ← Added
 }
 
 interface PLFormProps {
@@ -72,10 +73,16 @@ export default function PLForm({
     sampleTime: "",
     reportDate: today,
     reportTime: currentTime,
+    farmerId: "",                      // ← Added
   });
 
   const [plData, setPlData] = useState<any>(emptyPLData);
   const [loading, setLoading] = useState(true);
+
+  const [sampleType, setSampleType] = useState<string>("PL (Post Larvae)");
+
+  // We still keep this for the read-only display field
+  const [farmerUID, setFarmerUID] = useState<string>("");
 
   /* ---------- Load existing data on mount ---------- */
   useEffect(() => {
@@ -87,6 +94,18 @@ export default function PLForm({
 
       try {
         setLoading(true);
+
+        // Load formatted Farmer UID
+        let loadedFarmerId = "";
+        if (invoice?.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+          const farmerSnap = await getDoc(farmerRef);
+          if (farmerSnap.exists()) {
+            const farmerData = farmerSnap.data();
+            loadedFarmerId = farmerData.farmerId || "";
+            setFarmerUID(loadedFarmerId);
+          }
+        }
 
         const plReportRef = doc(
           db,
@@ -103,7 +122,7 @@ export default function PLForm({
         if (snap.exists()) {
           const data = snap.data();
 
-          // Load saved farmer info
+          // Load saved farmer info (including farmerId if exists)
           if (data.farmerInfo) {
             setFarmerInfo({
               farmerName: data.farmerInfo.farmerName || invoice?.farmerName || "",
@@ -113,6 +132,7 @@ export default function PLForm({
               sampleTime: data.farmerInfo.sampleTime || "",
               reportDate: data.farmerInfo.reportDate || today,
               reportTime: data.farmerInfo.reportTime || currentTime,
+              farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",  // ← Use saved or freshly loaded
             });
           }
 
@@ -126,16 +146,11 @@ export default function PLForm({
 
           setPlData(normalized);
         } else {
-          // First time
-          setFarmerInfo({
-            farmerName: invoice?.farmerName ?? "",
-            village: invoice?.village ?? "",
-            mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
-            sampleDate: invoice?.sampleDate || today,
-            sampleTime: "",
-            reportDate: today,
-            reportTime: currentTime,
-          });
+          // First time — use freshly loaded farmerId
+          setFarmerInfo((prev) => ({
+            ...prev,
+            farmerId: loadedFarmerId,
+          }));
           setPlData(emptyPLData);
         }
       } catch (error) {
@@ -176,15 +191,16 @@ export default function PLForm({
       await setDoc(
         plReportRef,
         {
-          farmerInfo,
+          farmerInfo,           // Now includes farmerId
           plData,
           totalSamples,
+          sampleType,           // Optional: also save sampleType if you want
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
       );
 
-      onSubmit(); // Notify LabResults to mark PL as completed and proceed
+      onSubmit(); // Notify parent
     } catch (error) {
       console.error("Error saving PL report:", error);
       alert("Failed to save. Please try again.");
@@ -227,7 +243,7 @@ export default function PLForm({
         PL Health Check Report – All Samples ({totalSamples})
       </h1>
 
-      {/* Farmer Information - With Date/Time Fields */}
+      {/* Farmer Information - With Date/Time Fields + No. of Samples & Farmer UID */}
       <section className="mb-10 bg-gray-50 p-5 rounded-lg">
         <h2 className="text-lg font-semibold mb-4 text-gray-800">Farmer Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -255,24 +271,23 @@ export default function PLForm({
               onChange={(e) => setFarmerInfo({ ...farmerInfo, mobile: e.target.value })}
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Farmer UID</label>
+            <input
+              className="w-full border border-gray-300 p-2 rounded bg-gray-100"
+              value={farmerUID}
+              readOnly
+            />
+          </div>
 
           {/* Sample Date & Time */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Sample Date</label>
             <input
               type="date"
-              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={farmerInfo.sampleDate}
               onChange={(e) => setFarmerInfo({ ...farmerInfo, sampleDate: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sample Time</label>
-            <input
-              type="time"
-              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
-              value={farmerInfo.sampleTime}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, sampleTime: e.target.value })}
             />
           </div>
 
@@ -281,7 +296,7 @@ export default function PLForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">Report Date</label>
             <input
               type="date"
-              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={farmerInfo.reportDate}
               onChange={(e) => setFarmerInfo({ ...farmerInfo, reportDate: e.target.value })}
             />
@@ -293,6 +308,26 @@ export default function PLForm({
               className="w-full border border-gray-300 p-2 rounded bg-gray-100"
               value={farmerInfo.reportTime}
               readOnly
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">No. of Samples</label>
+            <input
+              type="text"
+              className="w-full border border-gray-300 p-2 rounded bg-gray-100"
+              value={totalSamples}
+              readOnly
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sample Type</label>
+            <input
+              type="text"
+              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={sampleType}
+              onChange={(e) => setSampleType(e.target.value)}
+              placeholder="e.g. PL (Post Larvae)"
             />
           </div>
         </div>

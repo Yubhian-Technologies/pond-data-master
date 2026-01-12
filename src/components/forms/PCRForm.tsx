@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
 interface FarmerInfo {
   farmerName: string;
   village: string;
   mobile: string;
-  date: string;
+  farmerId: string;
+  sampleCollectionTime: string; // ← Sample Collection Time (was Date of Culture)
+  sampleType: string;
+  noOfSamples: number;
+  reportDate: string;
+  docDifference: string; // ← Auto-calculated days difference
 }
 
 interface PathogenResult {
@@ -46,7 +51,12 @@ export default function PCRForm({
     farmerName: invoice?.farmerName || "",
     village: invoice?.village || "",
     mobile: invoice?.farmerPhone || invoice?.mobile || "",
-    date: invoice?.formattedDate || today,
+    farmerId: invoice?.farmerId || "—",
+    sampleCollectionTime: invoice?.dateOfCulture || today, // Sample Collection Time
+    sampleType: invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.type || "PL PCR",
+    noOfSamples: totalSamples,
+    reportDate: today,
+    docDifference: "0 days",
   });
 
   const [samplesData, setSamplesData] = useState<SamplePCRData[]>([]);
@@ -63,14 +73,49 @@ export default function PCRForm({
     pl_ihhnv: "IHHNV",
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // NEW: Per-sample selected pathogens (from invoice.samplePathogens)
-  // invoice.samplePathogens = { 1: ["pl_wssv", "pl_ehp"], 2: ["pl_vibrio_pcr"], ... }
-  // ──────────────────────────────────────────────────────────────
   const samplePathogens = invoice?.samplePathogens || {};
-  // ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+  const loadFarmerFromMaster = async () => {
+    if (!invoice?.farmerId || !locationId) return;
 
-  // Load all PCR samples
+    try {
+      const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+      const snap = await getDoc(farmerRef);
+
+      if (snap.exists()) {
+        const farmer = snap.data();
+
+        setFarmerInfo(prev => ({
+          ...prev,
+          farmerId: farmer.farmerId || "",   // ← Correct UID
+          farmerName: farmer.name || prev.farmerName,
+          mobile: farmer.phone || prev.mobile,
+          village: farmer.city || prev.village
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to load farmer master data:", err);
+    }
+  };
+
+  loadFarmerFromMaster();
+}, [invoice?.farmerId, locationId]);
+
+
+  // Auto-calculate difference between sampleCollectionTime and reportDate
+  useEffect(() => {
+    if (farmerInfo.sampleCollectionTime && farmerInfo.reportDate) {
+      const collectionDate = new Date(farmerInfo.sampleCollectionTime);
+      const reportDateObj = new Date(farmerInfo.reportDate);
+      const diffTime = Math.abs(reportDateObj.getTime() - collectionDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      setFarmerInfo((prev) => ({
+        ...prev,
+        docDifference: diffDays === 0 ? "Same Day" : `${diffDays} days`,
+      }));
+    }
+  }, [farmerInfo.sampleCollectionTime, farmerInfo.reportDate]);
+
   useEffect(() => {
     const loadAllData = async () => {
       if (!invoice || !invoiceId || !locationId || totalSamples === 0) {
@@ -109,7 +154,6 @@ export default function PCRForm({
               setGelImages((prev) => ({ ...prev, [i]: data.gelImageUrl }));
             }
           } else {
-            // New sample — initialize pathogens from invoice.samplePathogens[i]
             const selectedForThisSample = samplePathogens[i] || [];
 
             const initialPathogens = selectedForThisSample.map((testId: string) => ({
@@ -219,13 +263,13 @@ export default function PCRForm({
 
         await setDoc(ref, {
           sampleNumber: sampleNum,
-          ...farmerInfo,
+          ...farmerInfo, // Now includes all new fields
           sampleCode: sample.sampleCode,
           sampleType: sample.sampleType,
           pathogens: sample.pathogens,
           gelImageUrl: gelImages[sampleNum] || "",
           updatedAt: new Date().toISOString(),
-        });
+        }, { merge: true });
       });
 
       await Promise.all(savePromises);
@@ -265,15 +309,50 @@ export default function PCRForm({
           {Object.entries(farmerInfo).map(([key, value]) => (
             <div key={key}>
               <label className="block text-sm font-medium text-gray-700 capitalize mb-1">
-                {key.replace(/([A-Z])/g, " $1").trim()}
+                {key === "sampleCollectionTime"
+                  ? "Sample Collection Time"
+                  : key === "dateOfCulture"
+                  ? "Sample Collection Time"
+                  : key === "docDifference"
+                  ? "Days Difference"
+                  : key === "noOfSamples"
+                  ? "No. of Samples"
+                  : key.replace(/([A-Z])/g, " $1").trim()}
               </label>
-              <input
-                value={value}
-                onChange={(e) =>
-                  setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
-                }
-                className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
-              />
+
+              {key === "sampleCollectionTime" || key === "reportDate" ? (
+                <input
+                  type="date"
+                  value={value}
+                  onChange={(e) =>
+                    setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                />
+              ) : key === "docDifference" ? (
+                <input
+                  type="text"
+                  value={value}
+                  readOnly
+                  className="w-full border bg-gray-100 rounded px-4 py-3 cursor-not-allowed"
+                />
+              ) : key === "noOfSamples" || key === "farmerId" ? (
+                <input
+                  type="text"
+                  value={value}
+                  readOnly
+                  className="w-full border bg-gray-100 rounded px-4 py-3 cursor-not-allowed"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) =>
+                    setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                />
+              )}
             </div>
           ))}
         </div>
@@ -285,7 +364,6 @@ export default function PCRForm({
       {samplesData.map((sample, sampleIndex) => {
         const sampleNum = sampleIndex + 1;
 
-        // Get selected pathogens only for THIS sample
         const selectedForThisSample = samplePathogens[sampleNum] || [];
         const selectedNames = selectedForThisSample.map(
           (id: string) => PATHOGEN_NAME_MAP[id] || id
@@ -297,7 +375,6 @@ export default function PCRForm({
               Sample {sampleNum}
             </h3>
 
-            {/* NEW: Show selected tests/pathogens for this specific sample */}
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm font-medium text-blue-800 mb-2">
                 Pathogens selected for Sample {sampleNum}:
@@ -320,7 +397,6 @@ export default function PCRForm({
               )}
             </div>
 
-            {/* Sample Details */}
             <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <label className="block text-sm font-medium mb-1">Sample Code</label>
@@ -342,7 +418,6 @@ export default function PCRForm({
               </div>
             </div>
 
-            {/* Pathogens */}
             <div className="mb-10">
               <h4 className="font-semibold text-lg mb-5">Pathogen Results</h4>
               {sample.pathogens.length === 0 ? (
@@ -391,7 +466,6 @@ export default function PCRForm({
               )}
             </div>
 
-            {/* Gel Image */}
             <div className="mb-12">
               <h4 className="font-semibold text-lg mb-4">Gel Electrophoresis Image</h4>
               <input
@@ -416,7 +490,6 @@ export default function PCRForm({
         );
       })}
 
-      {/* Final Submit */}
       <div className="text-center mt-12">
         <button
           onClick={saveAllData}

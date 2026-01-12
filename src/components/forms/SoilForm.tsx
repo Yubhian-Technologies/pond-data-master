@@ -131,22 +131,21 @@ export default function SoilForm({
       try {
         setLoading(true);
 
-        // Load farmer info
-        if (invoice.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
-          const farmerSnap = await getDoc(farmerRef);
-          if (farmerSnap.exists()) {
-            const farmer = farmerSnap.data();
-            setFormData(prev => ({
-              ...prev,
-              farmerName: farmer.name || "",
-              farmerUID: farmer.farmerUID || "",
-              farmerAddress: `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
-              mobile: farmer.phone || "",
-              noOfSamples: String(totalSamples),
-            }));
-          }
-        }
+       if (invoice.farmerId) {
+  const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+  const farmerSnap = await getDoc(farmerRef);
+  if (farmerSnap.exists()) {
+    const farmer = farmerSnap.data();
+    setFormData(prev => ({
+      ...prev,
+      farmerName: farmer.name || "",
+      farmerUID: farmer.farmerId || "",           // ← Changed to farmer.farmerId
+      farmerAddress: `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
+      mobile: farmer.phone || "",
+      noOfSamples: String(totalSamples),
+    }));
+  }
+}
 
         // Load existing report header
         const reportHeaderRef = doc(db, "locations", locationId, "reports", invoiceId);
@@ -310,11 +309,11 @@ export default function SoilForm({
             <input type="time" name="sampleCollectionTime" value={formData.sampleCollectionTime} onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           </div>
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium mb-1">Sample Time</label>
             <input type="time" name="sampleTime" value={formData.sampleTime} onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-          </div>
+          </div> */}
           <div>
             <label className="block text-sm font-medium mb-1">Report Time</label>
             <input type="time" value={formData.reportTime} readOnly

@@ -82,12 +82,18 @@ export default function PCRReport({
               sampleType: data.sampleType || "PL",
               pathogens: data.pathogens || [],
               gelImageUrl: data.gelImageUrl || null,
-              farmerInfo: {
-                farmerName: data.farmerName || "",
-                village: data.village || "",
-                mobile: data.mobile || "",
-                date: data.date || "",
-              },
+             farmerInfo: {
+  farmerName: data.farmerName || "",
+  village: data.village || "",
+  mobile: data.mobile || "",
+  farmerId: data.farmerId || "",
+  sampleCollectionTime: data.sampleCollectionTime || "",
+  sampleType: data.sampleType || "",
+  noOfSamples: data.noOfSamples || "",
+  reportDate: data.reportDate || "",
+  docDifference: data.docDifference || "",
+},
+
             };
           });
 
@@ -122,11 +128,17 @@ export default function PCRReport({
             techName = data.technicianName || data.reportedBy || "";
 
             setFarmerInfo({
-              farmerName: data.farmerName || "",
-              village: data.village || "",
-              mobile: data.mobile || "",
-              date: data.date || "",
-            });
+  farmerName: data.farmerName || "",
+  village: data.village || "",
+  mobile: data.mobile || "",
+  farmerId: data.farmerId || "",
+  sampleCollectionTime: data.sampleCollectionTime || "",
+  sampleType: data.sampleType || "",
+  noOfSamples: data.noOfSamples || "",
+  reportDate: data.reportDate || "",
+  docDifference: data.docDifference || "",
+});
+
 
             setReports([
               {
@@ -207,7 +219,12 @@ export default function PCRReport({
   const singlePathogen = allPathogens.length === 1;
 
   const ResultTable = () => (
-    <div className="overflow-x-auto mb-8">
+    <div className="overflow-x-auto mb-4">
+       <div className="text-center">
+        <h2 className="text-2xl font-bold text-red-700 m-4">
+              RT-q PCR Analysis
+            </h2>
+       </div>
       <table className="w-full border-2 border-gray-800 text-sm">
         <thead className="bg-blue-100">
           <tr>
@@ -373,7 +390,7 @@ export default function PCRReport({
         }
       `}</style>
 
-      <div className="bg-white p-8 shadow-lg rounded-lg" id="report">
+      <div className=" p-8  rounded-lg" id="report">
         <div className="print:hidden mb-8 text-right">
           <button
             onClick={() => window.print()}
@@ -384,7 +401,7 @@ export default function PCRReport({
           </button>
         </div>
 
-        <div className="flex justify-between items-center border-b-4 border-blue-700 pb-8 mb-10">
+        <div className="flex justify-between items-center border-b-4 border-blue-700 pb-8 mb-8">
           <img src={ADC} alt="ADC Logo" className="h-28" />
           <div className="text-center">
             <h1 className="text-4xl font-bold text-blue-800">
@@ -393,16 +410,12 @@ export default function PCRReport({
             <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
             <p className="text-sm text-black">Contact No: {locationDetails.contactNumber || "Loading..."} | 
   Mail Id: {locationDetails.email || "Loading..."}</p>
-            <h2 className="text-2xl font-bold text-red-700 mt-4">
-              RT-q PCR Analysis Test Report
-            </h2>
+           
           </div>
           <img src={AV} alt="AV Logo" className="h-28" />
         </div>
 
-        <div className="text-right mb-6">
-          <span className="font-bold text-lg">Report Id:- {invoiceId || "-"}</span>
-        </div>
+        
 
         {farmerInfo && (
           <table className="w-full mb-10 border-2 border-gray-800 text-sm">
@@ -412,20 +425,34 @@ export default function PCRReport({
                 <td className="border px-6 py-3">{farmerInfo.farmerName || "-"}</td>
                 <td className="border px-6 py-3 font-bold bg-gray-100">Village</td>
                 <td className="border px-6 py-3">{farmerInfo.village || "-"}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Date</td>
-                <td className="border px-6 py-3">{farmerInfo.date || "-"}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Sample Collected</td>
+<td className="border px-6 py-3">{farmerInfo.sampleCollectionTime || "-"}</td>
+
               </tr>
               <tr>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
-                <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">No. of Samples</td>
-                <td className="border px-6 py-3">{reports.length}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Test</td>
-                <td className="border px-6 py-3 font-medium">RT-qPCR</td>
-              </tr>
+  <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
+  <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
+
+  <td className="border px-6 py-3 font-bold bg-gray-100">Farmer ID</td>
+  <td className="border px-6 py-3">{farmerInfo.farmerId || "-"}</td>
+
+  <td className="border px-6 py-3 font-bold bg-gray-100">Report Date</td>
+  <td className="border px-6 py-3">{farmerInfo.reportDate || "-"}</td>
+</tr>
+
+<tr>
+  <td className="border px-6 py-3 font-bold bg-gray-100">Report Id</td>
+  <td className="border px-6 py-3">{invoiceId || '-'}</td>
+  <td className="border px-6 py-3 font-bold bg-gray-100">No of samples</td>
+  <td className="border px-6 py-3">{farmerInfo.noOfSamples || "-"}</td>
+  <td className="border px-6 py-3 font-bold bg-gray-100">DOC</td>
+  <td className="border px-6 py-3">{farmerInfo.docDifference || "-"}</td>
+</tr>
+
             </tbody>
           </table>
         )}
+        
 
         <ResultTable />
         <GelImagesSection />
