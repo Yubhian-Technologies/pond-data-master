@@ -6,11 +6,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { signOut } from "firebase/auth";
-import { toast } from "sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Search,
   Filter,
@@ -18,12 +37,12 @@ import {
   FlaskConical,
   FileText,
   TrendingUp,
-  User,
   Calendar,
-  CheckCircle2,
   MapPin,
   Download,
   UserCircle,
+  CheckCircle2,
+  User,
 } from "lucide-react";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { useEffect, useState } from "react";
@@ -34,15 +53,13 @@ import {
   where,
   orderBy,
   Timestamp,
+  Query,
   CollectionReference,
-  Query as FirestoreQuery,
   DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { formatDistanceToNow, startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 import * as XLSX from "xlsx";
-import { auth } from "@/pages/firebase";
-import { Toast } from "@/components/ui/toast";
 
 interface Location {
   id: string;
@@ -53,6 +70,42 @@ interface Location {
 interface Technician {
   id: string;
   name: string;
+}
+
+interface InvoiceItem {
+  id: string;
+  createdAt: Date;
+  farmerName: string;
+  invoiceId: string;
+  title: string;
+  typeDisplay: string;
+  isReport: boolean;
+  sampleCount: number;
+  total: number;
+  paidAmount: number;
+  balanceAmount: number;
+  paymentMode: string;
+  technicianName: string;
+  formattedDate: string;
+  farmerId: string;
+  farmerPhone: string;
+  village: string;
+  species: string;
+  cultureAreas: number;
+}
+
+interface ModalFarmer {
+  farmerId: string;
+  farmerName: string;
+  phone: string;
+  village: string;
+  species: string;
+  cultureAreas: number;
+}
+
+interface ModalData {
+  type: "farmers" | "samples" | "reports" | "revenue" | null;
+  title: string;
 }
 
 const Dashboard = () => {
@@ -80,6 +133,12 @@ const Dashboard = () => {
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
 
   const [exportData, setExportData] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
+
+  // Modal States
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<ModalData>({ type: null, title: "" });
+  const [modalContent, setModalContent] = useState<any[]>([]);
 
   const handleExit = () => {
     clearTechnician();
@@ -106,7 +165,7 @@ const Dashboard = () => {
     fetchLocations();
   }, []);
 
-  // Fetch Technicians for the selected branch
+  // Fetch Technicians for selected branch
   useEffect(() => {
     const fetchTechnicians = async () => {
       if (!selectedLocationId) return;
@@ -139,15 +198,29 @@ const Dashboard = () => {
     setLoading(true);
 
     try {
-      const farmersRef = collection(db, "locations", locationIdToUse, "farmers");
-      const invoicesRef = collection(db, "locations", locationIdToUse, "invoices");
+      // Farmers collection reference
+      const farmersColl: CollectionReference<DocumentData> = collection(
+        db,
+        "locations",
+        locationIdToUse,
+        "farmers"
+      );
 
-      // Total Farmers
-      const farmersSnap = await getDocs(farmersRef);
+      // Invoices collection reference
+      const invoicesColl: CollectionReference<DocumentData> = collection(
+        db,
+        "locations",
+        locationIdToUse,
+        "invoices"
+      );
+
+      // Total farmers (all time)
+      const farmersSnap = await getDocs(farmersColl);
       const totalFarmers = farmersSnap.size;
 
-      // Date filtering
+      // ── New farmers (this month or filtered period) ────────────────────────
       const isDateFiltered = !!startDate && !!endDate;
+
       let startT: Timestamp | null = null;
       let endT: Timestamp | null = null;
 
@@ -156,36 +229,48 @@ const Dashboard = () => {
         endT = Timestamp.fromDate(new Date(`${endDate}T23:59:59.999`));
       }
 
-      // New Farmers
-      let newFarmersQuery: CollectionReference<DocumentData> | FirestoreQuery<DocumentData> = farmersRef;
+      let newFarmersQuery: Query<DocumentData> = farmersColl;
+
       if (isDateFiltered && startT && endT) {
-        newFarmersQuery = query(farmersRef, where("createdAt", ">=", startT), where("createdAt", "<=", endT));
+        newFarmersQuery = query(
+          farmersColl,
+          where("createdAt", ">=", startT),
+          where("createdAt", "<=", endT)
+        );
       } else {
         const now = new Date();
         const monthStart = startOfMonth(now);
         const monthEnd = endOfMonth(now);
         const monthStartT = Timestamp.fromDate(monthStart);
-        const monthEndT = Timestamp.fromDate(new Date(monthEnd.getTime() + 86399999));
-        newFarmersQuery = query(farmersRef, where("createdAt", ">=", monthStartT), where("createdAt", "<=", monthEndT));
+        const monthEndT = Timestamp.fromDate(new Date(monthEnd.getTime() + 86399999)); // end of day
+        newFarmersQuery = query(
+          farmersColl,
+          where("createdAt", ">=", monthStartT),
+          where("createdAt", "<=", monthEndT)
+        );
       }
+
       const newFarmersSnap = await getDocs(newFarmersQuery);
       const newFarmers = newFarmersSnap.size;
 
-      // Invoices query
-      let invoicesQuery: CollectionReference<DocumentData> | FirestoreQuery<DocumentData> = invoicesRef;
+      // ── Invoices ────────────────────────────────────────────────────────────
+      let invoicesQuery: Query<DocumentData> = query(
+        invoicesColl,
+        orderBy("createdAt", "desc")
+      );
+
       if (isDateFiltered && startT && endT) {
         invoicesQuery = query(
-          invoicesRef,
+          invoicesColl,
           where("createdAt", ">=", startT),
           where("createdAt", "<=", endT),
           orderBy("createdAt", "desc")
         );
-      } else {
-        invoicesQuery = query(invoicesRef, orderBy("createdAt", "desc"));
       }
+
       const invoicesSnap = await getDocs(invoicesQuery);
 
-      const allInvoices: any[] = [];
+      const allInvoices: InvoiceItem[] = [];
       const tempExportRows: any[] = [];
 
       const locationName = allLocations.find((l) => l.id === locationIdToUse)?.name || "Unknown Lab";
@@ -193,7 +278,6 @@ const Dashboard = () => {
       invoicesSnap.forEach((doc) => {
         const data = doc.data();
 
-        // Technician Filter check
         if (selectedTechnicianId !== "all" && data.technicianId !== selectedTechnicianId) {
           return;
         }
@@ -231,7 +315,7 @@ const Dashboard = () => {
           ? `${typeDisplay || "Analysis"} Report Generated`
           : `${typeDisplay || "Sample"} Submitted`;
 
-        const invoiceItem = {
+        const invoiceItem: InvoiceItem = {
           id: doc.id,
           createdAt,
           farmerName,
@@ -241,29 +325,47 @@ const Dashboard = () => {
           isReport,
           sampleCount,
           total: Number(data.total || 0),
-          paidAmount: Number(data.paidAmount || 0), // ← Store paidAmount for calculation
+          paidAmount: Number(data.paidAmount || 0),
+          balanceAmount: Number(data.balanceAmount || 0),
+          paymentMode: data.paymentMode || "pending",
           technicianName: techName,
+          formattedDate: data.formattedDate || format(createdAt, "dd-MM-yyyy"),
+          farmerId: data.farmerId || "N/A",
+          farmerPhone: data.farmerPhone || data.phone || "N/A",
+          village: data.village || data.city || "N/A",
+          species: data.species || "N/A",
+          cultureAreas: Number(data.cultureAreas || 0),
         };
 
         allInvoices.push(invoiceItem);
 
-        // Export uses actual paid amount
+        // Prepare payment distribution for export
+        const cash = data.paymentMode === "cash" ? Number(data.paidAmount || 0) : 0;
+        const qr = data.paymentMode === "qr" ? Number(data.paidAmount || 0) : 0;
+        const neft = data.paymentMode === "neft" ? Number(data.paidAmount || 0) : 0;
+        const rtgs = data.paymentMode === "rtgs" ? Number(data.paidAmount || 0) : 0;
+
         tempExportRows.push({
-  "Invoice ID": invoiceId,
-  "Farmer Name": farmerName,
-  "Location": locationName,
-  "Technician": techName,
-  "Sample Types": typeDisplay || "-",
-  "Sample Count": sampleCount,
-  "Bill Amount (₹)": Number(data.total || 0),
-  "Amount Paid (₹)": data.paidAmount !== undefined ? Number(data.paidAmount || 0) : Number(data.total || 0),
-  "Pending Amount (₹)": data.paidAmount !== undefined ? Number(data.total || 0) - Number(data.paidAmount || 0) : 0,
-  "Status": isReport ? "Report Completed" : "Sample Submitted",
-  "Date": format(createdAt, "dd-MM-yyyy"),
-});
+          "Invoice ID": invoiceId,
+          "Farmer Name": farmerName,
+          "Location": locationName,
+          "Technician": techName,
+          "Sample Types": typeDisplay || "-",
+          "Sample Count": sampleCount,
+          "Bill Amount (₹)": Number(data.total || 0),
+          "Amount Paid (₹)": Number(data.paidAmount || 0),
+          "Cash (₹)": cash,
+          "QR/UPI (₹)": qr,
+          "NEFT (₹)": neft,
+          "RTGS (₹)": rtgs,
+          "Pending Amount (₹)": Number(data.balanceAmount || 0),
+          "Status": isReport ? "Report Completed" : "Sample Submitted",
+          "Date": data.formattedDate || format(createdAt, "dd-MM-yyyy"),
+        });
       });
 
-      // Apply search filter
+      setInvoices(allInvoices);
+
       const searchLower = searchTerm.toLowerCase();
       const filteredInvoices = searchTerm
         ? allInvoices.filter(
@@ -278,7 +380,7 @@ const Dashboard = () => {
       const filteredExportRows = searchTerm
         ? tempExportRows.filter((row, index) => {
             const inv = allInvoices[index];
-            if(!inv) return false;
+            if (!inv) return false;
             return (
               inv.farmerName.toLowerCase().includes(searchLower) ||
               inv.invoiceId.toLowerCase().includes(searchLower) ||
@@ -290,22 +392,16 @@ const Dashboard = () => {
 
       setExportData(filteredExportRows);
 
-      // Calculate stats from filtered invoices
       let samplesProcessed = 0;
       let reportsGenerated = 0;
       let revenue = 0;
 
       filteredInvoices.forEach((inv) => {
         samplesProcessed += inv.sampleCount;
-
-        // Revenue = actual amount paid (paidAmount if exists, else full total)
-        const actualPaid = inv.paidAmount > 0 ? inv.paidAmount : inv.total;
-        revenue += actualPaid;
-
+        revenue += inv.paidAmount;
         if (inv.isReport) reportsGenerated += 1;
       });
 
-      // Recent activities
       const activities = filteredInvoices
         .map((inv) => ({
           id: inv.id,
@@ -321,13 +417,13 @@ const Dashboard = () => {
 
       setRecentActivities(activities);
 
-      // Revenue change (also using actual paid)
+      // Revenue change (only when no custom filters)
       let revenueChange = "";
       if (!isDateFiltered && !searchTerm && selectedTechnicianId === "all") {
         const lastMonthStart = Timestamp.fromDate(startOfMonth(subMonths(new Date(), 1)));
         const lastMonthEnd = Timestamp.fromDate(endOfMonth(subMonths(new Date(), 1)));
         const lastQuery = query(
-          invoicesRef,
+          invoicesColl,
           where("createdAt", ">=", lastMonthStart),
           where("createdAt", "<=", lastMonthEnd)
         );
@@ -335,8 +431,7 @@ const Dashboard = () => {
         let lastRevenue = 0;
         lastSnap.forEach((d) => {
           const invData = d.data();
-          const actualPaid = invData.paidAmount !== undefined ? Number(invData.paidAmount || 0) : Number(invData.total || 0);
-          lastRevenue += actualPaid;
+          lastRevenue += Number(invData.paidAmount || 0);
         });
 
         if (lastRevenue > 0) {
@@ -372,66 +467,173 @@ const Dashboard = () => {
     fetchDashboardData();
   };
 
-  // Excel Export
-  const handleExportToExcel = () => {
-  if (exportData.length === 0) {
-    Toast({ title: "No data", variant: "destructive" });
-    return;
-  }
+  // ── Fetch real farmers data for modal ─────────────────────────────────────
+  const fetchRealFarmers = async () => {
+    if (!selectedLocationId) return [];
 
-  const totals = exportData.reduce(
-    (acc, row) => ({
-      invoices: acc.invoices + 1,
-      samples: acc.samples + row["Sample Count"],
-      reports: acc.reports + (row["Status"] === "Report Completed" ? 1 : 0),
-      billAmount: acc.billAmount + row["Bill Amount (₹)"],
-      amountPaid: acc.amountPaid + row["Amount Paid (₹)"],
-      pending: acc.pending + row["Pending Amount (₹)"],
-    }),
-    { invoices: 0, samples: 0, reports: 0, billAmount: 0, amountPaid: 0, pending: 0 }
-  );
+    try {
+      const farmersRef = collection(db, "locations", selectedLocationId, "farmers");
+      const q = query(farmersRef, orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
 
-  const summaryRow = {
-    "Invoice ID": "TOTALS",
-    "Farmer Name": "",
-    "Location": "",
-    "Technician": "",
-    "Sample Types": "",
-    "Sample Count": totals.samples,
-    "Bill Amount (₹)": totals.billAmount,
-    "Amount Paid (₹)": totals.amountPaid,
-    "Pending Amount (₹)": totals.pending,
-    "Status": `${totals.reports} Reports Completed`,
-    "Date": `${totals.invoices} Invoices`,
+      return snap.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          farmerId: data.farmerId || "N/A",
+          farmerName: data.name || "Unknown",
+          phone: data.phone || "N/A",
+          village: data.city || data.village || "N/A",
+          species: data.species || "Not specified",
+          cultureAreas: Number(data.cultureAreas || 0),
+        } as ModalFarmer;
+      });
+    } catch (err) {
+      console.error("Error fetching real farmers:", err);
+      return [];
+    }
   };
 
-  const worksheetData = [{}, ...exportData, {}, summaryRow]; // extra empty row for spacing
+  const openModal = async (type: ModalData["type"]) => {
+    let title = "";
+    let content: any[] = [];
 
-  const ws = XLSX.utils.json_to_sheet(worksheetData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Lab Report");
+    if (type === "farmers") {
+      title = "All Farmers";
+      content = await fetchRealFarmers();
+    } else if (type === "samples") {
+      title = "All Sample Submissions";
+      content = invoices.map((inv) => ({
+        invoiceId: inv.invoiceId || inv.id,
+        farmerName: inv.farmerName,
+        date: inv.formattedDate || "N/A",
+        types: inv.typeDisplay || "Unknown",
+        count: inv.sampleCount || 0,
+        status: inv.isReport ? "Report Completed" : "Sample Submitted",
+      }));
+    } else if (type === "reports") {
+      title = "Completed Reports";
+      content = invoices
+        .filter((inv) => inv.isReport)
+        .map((inv) => ({
+          invoiceId: inv.invoiceId || inv.id,
+          farmerName: inv.farmerName,
+          date: inv.formattedDate || "N/A",
+          types: inv.typeDisplay || "Unknown",
+        }));
+    } else if (type === "revenue") {
+      title = "Revenue Details";
 
-  // Column widths
-  ws["!cols"] = [
-    { wch: 18 }, // Invoice ID
-    { wch: 25 }, // Farmer Name
-    { wch: 20 }, // Location
-    { wch: 20 }, // Technician
-    { wch: 16 }, // Sample Types
-    { wch: 14 }, // Sample Count
-    { wch: 18 }, // Bill Amount
-    { wch: 18 }, // Amount Paid
-    { wch: 18 }, // Pending Amount
-    { wch: 22 }, // Status
-    { wch: 15 }, // Date
-  ];
+      const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+      const pendingAmount = invoices.reduce((sum, inv) => sum + Number(inv.balanceAmount || 0), 0);
 
-  const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
-  const fileName = `Lab_Dashboard_${currentLocationName.replace(/[^a-zA-Z0-9]/g, "_")}_${format(new Date(), "dd-MM-yyyy")}.xlsx`;
+      const cash = invoices
+        .filter(inv => inv.paymentMode === "cash")
+        .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
 
-  // This triggers immediate download — no browser questions
-  XLSX.writeFile(wb, fileName);
-};
+      const qr = invoices
+        .filter(inv => inv.paymentMode === "qr")
+        .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+
+      const neft = invoices
+        .filter(inv => inv.paymentMode === "neft")
+        .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+
+      const rtgs = invoices
+        .filter(inv => inv.paymentMode === "rtgs")
+        .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+
+      content = [
+        { label: "Total Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}` },
+        { label: "Paid via Cash", value: `₹${cash.toLocaleString("en-IN")}` },
+        { label: "Paid via QR / UPI", value: `₹${qr.toLocaleString("en-IN")}` },
+        { label: "Paid via NEFT", value: `₹${neft.toLocaleString("en-IN")}` },
+        { label: "Paid via RTGS", value: `₹${rtgs.toLocaleString("en-IN")}` },
+        { label: "Total Pending Amount", value: `₹${pendingAmount.toLocaleString("en-IN")}` },
+      ];
+    }
+
+    setModalData({ type, title });
+    setModalContent(content);
+    setModalOpen(true);
+  };
+
+  const handleExportToExcel = () => {
+    if (exportData.length === 0) return;
+
+    const totals = exportData.reduce(
+      (acc, row) => ({
+        invoices: acc.invoices + 1,
+        samples: acc.samples + row["Sample Count"],
+        reports: acc.reports + (row["Status"] === "Report Completed" ? 1 : 0),
+        billAmount: acc.billAmount + row["Bill Amount (₹)"],
+        amountPaid: acc.amountPaid + row["Amount Paid (₹)"],
+        cash: acc.cash + row["Cash (₹)"],
+        qr: acc.qr + row["QR/UPI (₹)"],
+        neft: acc.neft + row["NEFT (₹)"],
+        rtgs: acc.rtgs + row["RTGS (₹)"],
+        pending: acc.pending + row["Pending Amount (₹)"],
+      }),
+      { 
+        invoices: 0, 
+        samples: 0, 
+        reports: 0, 
+        billAmount: 0, 
+        amountPaid: 0, 
+        cash: 0,
+        qr: 0,
+        neft: 0,
+        rtgs: 0,
+        pending: 0 
+      }
+    );
+
+    const summaryRow = {
+      "Invoice ID": "TOTALS",
+      "Farmer Name": "",
+      "Location": "",
+      "Technician": "",
+      "Sample Types": "",
+      "Sample Count": totals.samples,
+      "Bill Amount (₹)": totals.billAmount,
+      "Amount Paid (₹)": totals.amountPaid,
+      "Cash (₹)": totals.cash,
+      "QR/UPI (₹)": totals.qr,
+      "NEFT (₹)": totals.neft,
+      "RTGS (₹)": totals.rtgs,
+      "Pending Amount (₹)": totals.pending,
+      "Status": `${totals.reports} Reports Completed`,
+      "Date": `${totals.invoices} Invoices`,
+    };
+
+    const worksheetData = [{}, ...exportData, {}, summaryRow];
+
+    const ws = XLSX.utils.json_to_sheet(worksheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Lab Report");
+
+    ws["!cols"] = [
+      { wch: 18 },  // Invoice ID
+      { wch: 25 },  // Farmer Name
+      { wch: 20 },  // Location
+      { wch: 20 },  // Technician
+      { wch: 16 },  // Sample Types
+      { wch: 14 },  // Sample Count
+      { wch: 18 },  // Bill Amount
+      { wch: 18 },  // Amount Paid
+      { wch: 14 },  // Cash
+      { wch: 14 },  // QR/UPI
+      { wch: 14 },  // NEFT
+      { wch: 14 },  // RTGS
+      { wch: 18 },  // Pending
+      { wch: 22 },  // Status
+      { wch: 15 },  // Date
+    ];
+
+    const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
+    const fileName = `Lab_Dashboard_${currentLocationName.replace(/[^a-zA-Z0-9]/g, "_")}_${format(new Date(), "dd-MM-yyyy")}.xlsx`;
+
+    XLSX.writeFile(wb, fileName);
+  };
 
   const hasAnyFilter = !!startDate || !!endDate || !!searchTerm || selectedTechnicianId !== "all";
   const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Loading...";
@@ -496,7 +698,7 @@ const Dashboard = () => {
 
                 {/* Lab Branch & Technician Selector */}
                 <div className="mt-5 pt-4 border-t border-gray-200 flex flex-wrap gap-6">
-                  {/* <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <MapPin className="w-4 h-4 text-blue-600" />
                       <span className="font-medium">Lab Branch:</span>
@@ -513,7 +715,7 @@ const Dashboard = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div> */}
+                  </div>
 
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -543,7 +745,10 @@ const Dashboard = () => {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-              <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-blue-50 to-white">
+              <Card 
+                className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-blue-50 to-white cursor-pointer"
+                onClick={() => openModal("farmers")}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Total Farmers</CardTitle>
@@ -560,7 +765,10 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-purple-50 to-white">
+              <Card 
+                className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-purple-50 to-white cursor-pointer"
+                onClick={() => openModal("samples")}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Samples Processed</CardTitle>
@@ -577,7 +785,10 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-green-50 to-white">
+              <Card 
+                className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-green-50 to-white cursor-pointer"
+                onClick={() => openModal("reports")}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Reports Finalized</CardTitle>
@@ -594,7 +805,10 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-emerald-50 to-white">
+              <Card 
+                className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-emerald-50 to-white cursor-pointer"
+                onClick={() => openModal("revenue")}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
@@ -675,6 +889,109 @@ const Dashboard = () => {
             </Card>
           </div>
         </div>
+
+        {/* Modal */}
+        <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">{modalData.title}</DialogTitle>
+            </DialogHeader>
+
+            <div className="mt-6">
+              {modalData.type === "farmers" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Farmers List</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Farmer ID</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Village</TableHead>
+                        <TableHead>Species</TableHead>
+                        <TableHead>Culture Areas (acres)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {modalContent.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            No farmers found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        (modalContent as ModalFarmer[]).map((f, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{f.farmerId}</TableCell>
+                            <TableCell>{f.farmerName}</TableCell>
+                            <TableCell>{f.phone}</TableCell>
+                            <TableCell>{f.village}</TableCell>
+                            <TableCell>{f.species}</TableCell>
+                            <TableCell>{f.cultureAreas}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {modalData.type === "samples" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Sample Submissions</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow><TableHead>Invoice ID</TableHead><TableHead>Farmer</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Count</TableHead><TableHead>Status</TableHead></TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {modalContent.map((s, i) => (
+                        <TableRow key={i}><TableCell>{s.invoiceId}</TableCell><TableCell>{s.farmerName}</TableCell><TableCell>{s.date}</TableCell><TableCell>{s.types}</TableCell><TableCell>{s.count}</TableCell><TableCell>{s.status}</TableCell></TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {modalData.type === "reports" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Completed Reports</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow><TableHead>Invoice ID</TableHead><TableHead>Farmer</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead></TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {modalContent.map((r, i) => (
+                        <TableRow key={i}><TableCell>{r.invoiceId}</TableCell><TableCell>{r.farmerName}</TableCell><TableCell>{r.date}</TableCell><TableCell>{r.types}</TableCell></TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {modalData.type === "revenue" && (
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold">Revenue Summary</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {modalContent.map((item, i) => (
+                      <Card 
+                        key={i} 
+                        className={item.label.includes("Pending") ? "bg-red-50 border-red-200" : ""}
+                      >
+                        <CardContent className="pt-6">
+                          <p className="text-sm text-muted-foreground">{item.label}</p>
+                          <p className="text-2xl font-bold mt-1">{item.value}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button onClick={() => setModalOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

@@ -369,60 +369,71 @@ const SoilReport: React.FC<SoilReportProps> = ({
       </div>
 
       <style>{`
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 0.3cm;
-          }
+  @media print {
+    @page {
+      size: A4 landscape;
+      margin: 0.4cm 0.5cm;
+    }
 
-          html, body {
-            width: 210mm !important;
-            height: 297mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: hidden;
-            background: white !important;
-            -webkit-print-color-adjust: exact;
-            color-adjust: exact;
-          }
+    html, body {
+      width: 297mm !important;
+      height: 210mm !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden;
+      background: white !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
 
-          body * {
-            visibility: hidden;
-          }
+    body * {
+      visibility: hidden;
+    }
 
-          #report, #report * {
-            visibility: visible !important;
-          }
+    #report, #report * {
+      visibility: visible !important;
+    }
 
-          #report {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 210mm !important;
-            height: 297mm !important;
-            padding: 0 !important;
-            box-sizing: border-box !important;
-            margin: 0 !important;
-            background: white !important;
-          }
+    #report {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 297mm !important;
+      height: 210mm !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-sizing: border-box !important;
+      background: white !important;
+    }
 
-          #report > div, table, .grid {
-            width: 100% !important;
-            max-width: none !important;
-            margin: 0 0 8px 0 !important;
-            padding: 0 !important;
-          }
+    #report > div,
+    #report table,
+    #report .grid {
+      width: 100% !important;
+      max-width: none !important;
+      margin: 0 0 6px 0 !important;
+      padding: 0 !important;
+    }
 
-          table {
-            table-layout: fixed;
-            width: 100% !important;
-          }
+    table {
+      table-layout: fixed;
+      width: 100% !important;
+      font-size: 9.5px !important; /* ← little smaller to fit better in landscape */
+    }
 
-          .print\\:hidden {
-            display: none !important;
-          }
-        }
-      `}</style>
+    .print\\:hidden {
+      display: none !important;
+    }
+
+    /* Optional: make header a bit more compact */
+    h1 {
+      font-size: 2.1rem !important;
+    }
+    h2 {
+      font-size: 1.5rem !important;
+    }
+  }
+`}</style>
     </>
   );
 };

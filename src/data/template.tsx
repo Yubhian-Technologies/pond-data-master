@@ -22,11 +22,12 @@ interface InvoiceState {
   subtotal: number;
   gstAmount: number;
   total: number;          // grand total
-  paymentMode: "cash" | "qr" | "neft" | "rtgs";
-  transactionRef?: string | null;  // ← added for reference number
+  paymentMode: "cash" | "qr" | "neft" | "rtgs" | "pending";
+  transactionRef?: string | null;
   isPartialPayment?: boolean;
   paidAmount?: number | null;
   balanceAmount?: number;
+  isZeroInvoice?: boolean;   // ← Add this optional field
 }
 
 interface InvoiceTemplateProps {
@@ -51,6 +52,8 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
     );
   }
 
+  const isZeroInvoice = state.isZeroInvoice ?? false;
+
   const getFinancialYear = (): string => {
     const today = new Date();
     const year = today.getFullYear();
@@ -64,6 +67,10 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
   const gstAmount = state.gstAmount;
   const grandTotal = state.total;
   const halfGst = gstAmount / 2;
+
+  // For zero invoice → always show paid = 0, balance = 0
+  const paidAmount = isZeroInvoice ? 0 : (state.paymentMode === "pending" ? 0 : grandTotal);
+  const balanceAmount = isZeroInvoice ? 0 : (state.paymentMode === "pending" ? grandTotal : 0);
 
   const numberToWords = (num: number): string => {
     const a = [
@@ -106,12 +113,14 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
     return result + " Only";
   };
 
-  const getPaymentModeLabel = (mode: "cash" | "qr" | "neft" | "rtgs") => {
+  const getPaymentModeLabel = (mode: InvoiceState["paymentMode"]) => {
     switch (mode) {
       case "cash": return "CASH";
       case "qr": return "QR SCAN / UPI";
-      case "neft": return "NEFT ";
-      case "rtgs": return "RTGS"
+      case "neft": return "NEFT";
+      case "rtgs": return "RTGS";
+      case "pending": return "PENDING";
+      default: return mode;
     }
   };
 
@@ -248,7 +257,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
           </section>
         ))}
 
-        {/* TOTALS WITH GST */}
+        {/* TOTALS + PAYMENT DETAILS (conditional) */}
         <section style={{ marginTop: "20px", pageBreakInside: "avoid" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
             <tbody>
@@ -295,14 +304,16 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                   ₹{grandTotal}
                 </td>
               </tr>
-              {state.isPartialPayment && (
+
+              {/* Payment rows - only show when NOT zero invoice */}
+              {!isZeroInvoice && (
                 <>
                   <tr>
                     <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
                       Amount Paid (₹)
                     </td>
                     <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                      ₹{state.paidAmount || 0}
+                      ₹{paidAmount}
                     </td>
                   </tr>
                   <tr>
@@ -310,7 +321,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                       Balance Due (₹)
                     </td>
                     <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                      ₹{state.balanceAmount || 0}
+                      ₹{balanceAmount}
                     </td>
                   </tr>
                 </>
@@ -322,28 +333,57 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
             Amount in Words: <strong>{numberToWords(grandTotal)}</strong>
           </p>
 
-          <div
-            style={{
-              marginTop: "15px",
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "12px",
-            }}
-          >
-            <div>
-              <p><strong>Mode of Payment:</strong> {getPaymentModeLabel(state.paymentMode)}</p>
-              {(state.paymentMode === "qr" || state.paymentMode === "neft" || state.paymentMode ==="rtgs") && state.transactionRef && (
+          {/* Payment mode section - completely hidden for zero invoices */}
+          {!isZeroInvoice && (
+            <div
+              style={{
+                marginTop: "15px",
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "12px",
+              }}
+            >
+              <div>
                 <p>
-                  <strong>Transaction Ref:</strong> {state.transactionRef}
+                  <strong>Mode of Payment: </strong>
+                  {state.paymentMode === "pending" ? (
+                    <span style={{ color: "red", fontWeight: "bold", fontSize: "14px" }}>
+                      PENDING
+                    </span>
+                  ) : (
+                    getPaymentModeLabel(state.paymentMode)
+                  )}
                 </p>
-              )}
+
+                {(state.paymentMode === "qr" || state.paymentMode === "neft" || state.paymentMode === "rtgs") &&
+                  state.transactionRef && (
+                    <p>
+                      <strong>Transaction Ref:</strong> {state.transactionRef}
+                    </p>
+                  )}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p>For Waterbase Aqua Diagnostic Center</p>
+                <div style={{ height: "70px" }}></div>
+                <p style={{ fontWeight: "600" }}>Authorised Signatory</p>
+              </div>
             </div>
-            <div style={{ textAlign: "right" }}>
+          )}
+
+          {/* For zero invoice → still show signature area, but without payment info */}
+          {isZeroInvoice && (
+            <div
+              style={{
+                marginTop: "15px",
+                textAlign: "right",
+                fontSize: "12px",
+              }}
+            >
               <p>For Waterbase Aqua Diagnostic Center</p>
               <div style={{ height: "70px" }}></div>
               <p style={{ fontWeight: "600" }}>Authorised Signatory</p>
             </div>
-          </div>
+          )}
         </section>
       </div>
 

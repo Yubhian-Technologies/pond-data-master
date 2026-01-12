@@ -12,14 +12,15 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Check, Users, Search, X, IndianRupee } from "lucide-react";
+import { Plus, Check, Users, Search, X, IndianRupee, Calendar } from "lucide-react";
 import { Farmer } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, query, where, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
+import { format } from "date-fns";
 
 import {
   Select,
@@ -38,6 +39,10 @@ const Samples = () => {
   const [branchTechnicians, setBranchTechnicians] = useState<{ id: string; name: string }[]>([]);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
 
+  // Date filter states
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
   type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology";
   const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology"];
 
@@ -51,10 +56,10 @@ const Samples = () => {
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [farmerSearchQuery, setFarmerSearchQuery] = useState("");
 
-  // Add Payment Dialog State
+  // Payment Dialog State
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState<any>(null);
-  const [paymentMode, setPaymentMode] = useState<"cash" | "qr" | "neft" | "">("");
+  const [paymentModeLocal, setPaymentModeLocal] = useState<"cash" | "qr" | "neft" | "">("");
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
 
@@ -102,7 +107,26 @@ const Samples = () => {
       try {
         const locationId = session.locationId;
         if (!locationId) return;
-        const snap = await getDocs(collection(db, "locations", locationId, "invoices"));
+
+        let invoicesQuery = query(
+          collection(db, "locations", locationId, "invoices"),
+          orderBy("createdAt", "desc")
+        );
+
+        if (startDate && endDate) {
+          const startT = new Date(startDate);
+          const endT = new Date(`${endDate}T23:59:59.999`);
+
+          invoicesQuery = query(
+            collection(db, "locations", locationId, "invoices"),
+            where("createdAt", ">=", startT),
+            where("createdAt", "<=", endT),
+            orderBy("createdAt", "desc")
+          );
+        }
+
+        const snap = await getDocs(invoicesQuery);
+
         const data = snap.docs.map((doc) => {
           const docData = doc.data();
           if ('id' in docData) {
@@ -113,6 +137,7 @@ const Samples = () => {
             ...docData,
           };
         });
+
         setInvoices(data);
       } catch (err) {
         console.error("Error fetching invoices:", err);
@@ -121,7 +146,7 @@ const Samples = () => {
       }
     };
     fetchInvoices();
-  }, [session.locationId]);
+  }, [session.locationId, startDate, endDate]);
 
   const resetForm = () => {
     setStep(1);
@@ -143,9 +168,7 @@ const Samples = () => {
         if (s && typeof s === "object" && s.type) return s.type.toString().toLowerCase().trim();
         return null;
       })
-      .filter((type: string | null): type is string => {
-        return type !== null && type !== "" && type !== "pl_pcr";
-      })
+      .filter((type: string | null): type is string => type !== null && type !== "" && type !== "pl_pcr")
       .filter((type: string, index: number) => {
         const originalEntry = sample.sampleType[index];
         let count = 0;
@@ -161,9 +184,7 @@ const Samples = () => {
       });
 
     if (activeTypes.length === 0) return true;
-    return activeTypes.every((type: string) =>
-      sample.reportsProgress[type] === "completed"
-    );
+    return activeTypes.every((type: string) => sample.reportsProgress[type] === "completed");
   };
 
   const filteredInvoices = invoices.filter((inv) => {
@@ -172,8 +193,8 @@ const Samples = () => {
   });
 
   const sortedInvoices = [...filteredInvoices].sort((a, b) => {
-    const timeA = a.createdAt?.toMillis() || 0;
-    const timeB = b.createdAt?.toMillis() || 0;
+    const timeA = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+    const timeB = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
     return timeB - timeA;
   });
 
@@ -186,7 +207,7 @@ const Samples = () => {
   }, [farmers, farmerSearchQuery]);
 
   const handleAddPayment = async () => {
-    if (!currentInvoice || !paymentMode || !paymentAmount) {
+    if (!currentInvoice || !paymentModeLocal || !paymentAmount) {
       toast({
         title: "Error",
         description: "Please fill all required fields",
@@ -205,7 +226,7 @@ const Samples = () => {
       return;
     }
 
-    if ((paymentMode === "qr" || paymentMode === "neft") && !transactionRef.trim()) {
+    if ((paymentModeLocal === "qr" || paymentModeLocal === "neft") && !transactionRef.trim()) {
       toast({
         title: "Error",
         description: "Transaction reference is required for QR/NEFT",
@@ -224,8 +245,8 @@ const Samples = () => {
         paidAmount: newPaid,
         balanceAmount: newBalance > 0 ? newBalance : 0,
         isPartialPayment: newBalance > 0,
-        paymentMode: paymentMode,
-        transactionRef: paymentMode !== "cash" ? transactionRef.trim() : null,
+        paymentMode: paymentModeLocal,
+        transactionRef: paymentModeLocal !== "cash" ? transactionRef.trim() : null,
         lastPaymentDate: new Date(),
       });
 
@@ -256,14 +277,14 @@ const Samples = () => {
     setCurrentInvoice(invoice);
     const pending = invoice.total - (invoice.paidAmount || 0);
     setPaymentAmount(pending.toString());
-    setPaymentMode("");
+    setPaymentModeLocal("");
     setTransactionRef("");
     setPaymentDialogOpen(true);
   };
 
   const resetPaymentForm = () => {
     setPaymentAmount("");
-    setPaymentMode("");
+    setPaymentModeLocal("");
     setTransactionRef("");
     setCurrentInvoice(null);
   };
@@ -283,6 +304,40 @@ const Samples = () => {
                 New Sample Submission
               </Button>
             </div>
+
+            {/* Date Range Filter */}
+            <Card className="shadow-sm mb-8">
+              <CardContent className="pt-6">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[180px]">
+                    <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                      Start Date
+                    </Label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                      End Date
+                    </Label>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    className="h-10 bg-cyan-600 hover:bg-cyan-700"
+                    onClick={() => {}}
+                  >
+                    Apply
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -314,12 +369,13 @@ const Samples = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Date</TableHead>
                       <TableHead>Invoice ID</TableHead>
                       <TableHead>Farmer Name</TableHead>
                       <TableHead>Phone Number</TableHead>
                       <TableHead>Submitted By</TableHead>
                       <TableHead>Bill Amount</TableHead>
-                      <TableHead>Amount Paid</TableHead>   {/* ← NEW COLUMN */}
+                      <TableHead>Amount Paid</TableHead>
                       <TableHead>Pending Amount</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -327,7 +383,7 @@ const Samples = () => {
                   <TableBody>
                     {loadingInvoices ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="h-32 text-center">  {/* ← Updated colSpan to 8 */}
+                        <TableCell colSpan={9} className="h-32 text-center">
                           <div className="flex flex-col items-center justify-center gap-3">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-primary"></div>
                             <p className="text-muted-foreground">Loading samples...</p>
@@ -336,8 +392,8 @@ const Samples = () => {
                       </TableRow>
                     ) : sortedInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground">  {/* ← Updated colSpan */}
-                          No samples found for selected technician
+                        <TableCell colSpan={9} className="text-center text-muted-foreground">
+                          No samples found for selected filters
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -349,22 +405,42 @@ const Samples = () => {
                         const paidSoFar = Number(sample.paidAmount || 0);
                         const pendingAmount = grandTotal - paidSoFar;
 
+                        // ────────────────────────────────────────────────
+                        // FIXED LOGIC: If payment was done at invoice time → treat as fully paid
+                        const isPaidAtGeneration = sample.paymentMode && sample.paymentMode !== "pending";
+                        const displayPaid = isPaidAtGeneration ? grandTotal : paidSoFar;
+                        const displayPending = isPaidAtGeneration ? 0 : pendingAmount;
+                        const showAddPaymentButton = sample.paymentMode === "pending" && displayPending > 0;
+                        // ────────────────────────────────────────────────
+
+                        const sampleDate = sample.createdAt
+                          ? format(
+                              sample.createdAt.toDate ? sample.createdAt.toDate() : new Date(sample.createdAt.seconds * 1000),
+                              "dd MMM yyyy"
+                            )
+                          : "N/A";
+
                         return (
                           <TableRow key={sample.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {sampleDate}
+                              </div>
+                            </TableCell>
                             <TableCell className="font-medium">{invoiceId}</TableCell>
                             <TableCell>{sample.farmerName}</TableCell>
                             <TableCell>{sample.farmerPhone ?? "N/A"}</TableCell>
                             <TableCell>{sample.technicianName}</TableCell>
                             <TableCell>₹{grandTotal}</TableCell>
-                            <TableCell className="font-medium text-green-600">₹{paidSoFar}</TableCell>  {/* ← NEW: Amount Paid */}
+                            <TableCell className="font-medium text-green-600">₹{displayPaid}</TableCell>
                             <TableCell
                               className={
-                                pendingAmount > 0
+                                displayPending > 0
                                   ? "text-red-600 font-medium"
                                   : "text-green-600 font-medium"
                               }
                             >
-                              ₹{pendingAmount}
+                              ₹{displayPending}
                             </TableCell>
 
                             <TableCell>
@@ -387,7 +463,7 @@ const Samples = () => {
                                   View Invoice
                                 </Button>
 
-                                {pendingAmount > 0 && (
+                                {showAddPaymentButton && (
                                   <Button
                                     className="bg-transparent text-black border hover:bg-blue-600 hover:text-white flex items-center gap-1"
                                     size="sm"
@@ -418,12 +494,12 @@ const Samples = () => {
               </CardContent>
             </Card>
 
-            {/* FULLY RESTORED: New Sample Submission Dialog */}
+            {/* New Sample Submission Dialog */}
             <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) resetForm(); }}>
               <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-2">
                   <DialogTitle className="text-xl">
-                    {step === 1 ? " Select Farmer" : " Sample Details"}
+                    {step === 1 ? "Select Farmer" : "Sample Details"}
                   </DialogTitle>
                 </DialogHeader>
 
@@ -464,7 +540,7 @@ const Samples = () => {
                                 >
                                   <div>
                                     <p className="font-semibold text-gray-800">{farmer.name}</p>
-                                    <p className="text-xs text-muted-foreground"> Ph: {farmer.phone}</p>
+                                    <p className="text-xs text-muted-foreground">Ph: {farmer.phone}</p>
                                   </div>
                                   {selectedFarmer?.id === farmer.id && (
                                     <Check className="w-5 h-5 text-cyan-600" />
@@ -631,7 +707,7 @@ const Samples = () => {
               </DialogContent>
             </Dialog>
 
-            {/* Add Payment Dialog */}
+            {/* Payment Dialog */}
             <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
@@ -670,7 +746,7 @@ const Samples = () => {
 
                   <div className="space-y-2">
                     <Label>Payment Mode</Label>
-                    <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as any)}>
+                    <Select value={paymentModeLocal} onValueChange={(v) => setPaymentModeLocal(v as any)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select payment mode" />
                       </SelectTrigger>
@@ -682,7 +758,7 @@ const Samples = () => {
                     </Select>
                   </div>
 
-                  {(paymentMode === "qr" || paymentMode === "neft") && (
+                  {(paymentModeLocal === "qr" || paymentModeLocal === "neft") && (
                     <div className="space-y-2">
                       <Label>Transaction Reference</Label>
                       <Input

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
@@ -24,7 +24,6 @@ export default function MicrobiologyForm({
 }: MicrobiologyFormProps) {
   const today = new Date().toISOString().split("T")[0];
 
-  // Get total microbiology samples from invoice
   const totalSamples =
     Number(
       invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "microbiology")?.count || 0
@@ -53,6 +52,21 @@ export default function MicrobiologyForm({
   const [microbiologyData, setMicrobiologyData] = useState<any>(emptyMicrobiologyData);
   const [loading, setLoading] = useState(true);
 
+  // ──────────────────────────────────────────────────────────────
+  // NEW: Per-sample selected microbiology tests from invoice
+  // ──────────────────────────────────────────────────────────────
+  const perSampleSelectedTests = invoice.perSampleSelectedTests?.microbiology || {};
+
+  // Mapping from test ID → display name (adjust keys to match your actual test IDs)
+  const testNameMap: Record<string, string> = {
+    yellowColonies: "Yellow Colonies",
+    greenColonies: "Green Colonies",
+    tpc: "Total Plate Count (TPC)",
+    testCode: "Test Code", // if you have it as selectable test
+    // Add any other microbiology test IDs you use in availableTests
+  };
+  // ──────────────────────────────────────────────────────────────
+
   useEffect(() => {
     const loadData = async () => {
       if (!invoiceId || !locationId || totalSamples === 0) {
@@ -78,7 +92,6 @@ export default function MicrobiologyForm({
         if (snap.exists()) {
           const data = snap.data();
 
-          // Restore farmer info
           if (data.farmerInfo) {
             setFarmerInfo({
               farmerName: data.farmerInfo.farmerName || invoice?.farmerName || "",
@@ -88,7 +101,6 @@ export default function MicrobiologyForm({
             });
           }
 
-          // Restore microbiology data
           const savedData = data.microbiologyData || {};
           const normalized: any = {};
 
@@ -98,7 +110,6 @@ export default function MicrobiologyForm({
 
           setMicrobiologyData(normalized);
         } else {
-          // First time load
           setFarmerInfo({
             farmerName: invoice?.farmerName ?? "",
             village: invoice?.village ?? "",
@@ -237,11 +248,25 @@ export default function MicrobiologyForm({
             <thead>
               <tr className="bg-blue-500 text-white">
                 <th className="border border-blue-400 px-4 py-3 text-left font-bold text-md">Parameter</th>
-                {Array.from({ length: totalSamples }, (_, i) => (
-                  <th key={i} className="border border-blue-400 px-4 py-3 text-center font-bold text-md">
-                    Sample {i + 1}
-                  </th>
-                ))}
+                {Array.from({ length: totalSamples }, (_, i) => {
+                  const sampleNumber = i + 1;
+                  // Get selected tests only for THIS sample
+                  const sampleSelectedIds = perSampleSelectedTests[sampleNumber] || [];
+                  const sampleSelectedNames = sampleSelectedIds
+                    .map((id: string) => testNameMap[id] || id)
+                    .filter(Boolean);
+
+                  return (
+                    <th key={i} className="border border-blue-400 px-4 py-3 text-center font-bold text-md">
+                      <div>Sample {sampleNumber}</div>
+                      {sampleSelectedNames.length > 0 && (
+                        <div className="mt-1 text-xs text-blue-100 font-normal">
+                          {sampleSelectedNames.join(" • ")}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -268,7 +293,6 @@ export default function MicrobiologyForm({
         </div>
       </section>
 
-      
       <div className="text-center">
         <button
           onClick={handleSave}

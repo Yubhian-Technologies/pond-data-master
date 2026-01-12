@@ -63,6 +63,13 @@ export default function PCRForm({
     pl_ihhnv: "IHHNV",
   };
 
+  // ──────────────────────────────────────────────────────────────
+  // NEW: Per-sample selected pathogens (from invoice.samplePathogens)
+  // invoice.samplePathogens = { 1: ["pl_wssv", "pl_ehp"], 2: ["pl_vibrio_pcr"], ... }
+  // ──────────────────────────────────────────────────────────────
+  const samplePathogens = invoice?.samplePathogens || {};
+  // ──────────────────────────────────────────────────────────────
+
   // Load all PCR samples
   useEffect(() => {
     const loadAllData = async () => {
@@ -102,10 +109,10 @@ export default function PCRForm({
               setGelImages((prev) => ({ ...prev, [i]: data.gelImageUrl }));
             }
           } else {
-            // New sample — initialize pathogens from invoice
-            const samplePathogens = invoice?.samplePathogens?.[i] || [];
+            // New sample — initialize pathogens from invoice.samplePathogens[i]
+            const selectedForThisSample = samplePathogens[i] || [];
 
-            const initialPathogens = samplePathogens.map((testId: string) => ({
+            const initialPathogens = selectedForThisSample.map((testId: string) => ({
               name: PATHOGEN_NAME_MAP[testId] || testId,
               result: "",
               ctValue: "",
@@ -278,11 +285,40 @@ export default function PCRForm({
       {samplesData.map((sample, sampleIndex) => {
         const sampleNum = sampleIndex + 1;
 
+        // Get selected pathogens only for THIS sample
+        const selectedForThisSample = samplePathogens[sampleNum] || [];
+        const selectedNames = selectedForThisSample.map(
+          (id: string) => PATHOGEN_NAME_MAP[id] || id
+        );
+
         return (
           <section key={sampleIndex} className="mb-16 pb-12 border-b-2 border-gray-200 last:border-0">
             <h3 className="text-2xl font-bold mb-8 text-blue-800">
               Sample {sampleNum}
             </h3>
+
+            {/* NEW: Show selected tests/pathogens for this specific sample */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm font-medium text-blue-800 mb-2">
+                Pathogens selected for Sample {sampleNum}:
+              </p>
+              {selectedNames.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedNames.map((name, i) => (
+                    <span
+                      key={i}
+                      className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">
+                  No pathogens selected for this sample
+                </p>
+              )}
+            </div>
 
             {/* Sample Details */}
             <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-8">

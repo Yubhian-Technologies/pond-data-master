@@ -1,9 +1,9 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileCheck2, Calendar, FileText, Users, UserCircle, IndianRupee } from "lucide-react";
+import { FileCheck2, Calendar, FileText, Users, UserCircle, IndianRupee, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, Timestamp } from "firebase/firestore";
+import { collection, getDocs, Timestamp, query, where, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 type ReportType = "Soil" | "Water" | "PL" | "PCR" | "Microbiology";
 
@@ -30,7 +31,7 @@ interface ReportEntry {
   total: number;
   paidAmount: number;
   isFullyPaid: boolean;
-  pendingAmount: number; // ← ADDED THIS LINE
+  pendingAmount: number;
 }
 
 const Reports = () => {
@@ -40,6 +41,10 @@ const Reports = () => {
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [branchTechnicians, setBranchTechnicians] = useState<{ id: string; name: string }[]>([]);
   const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
+
+  // Date filter states
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   const locationId = session.locationId;
 
@@ -65,9 +70,27 @@ const Reports = () => {
     const fetchReports = async () => {
       if (!locationId) return;
       setLoadingInvoices(true);
+
       try {
-        const invoicesRef = collection(db, "locations", locationId, "invoices");
-        const snap = await getDocs(invoicesRef);
+        let invoicesQuery = query(
+          collection(db, "locations", locationId, "invoices"),
+          orderBy("createdAt", "desc")
+        );
+
+        // Apply date filters if provided
+        if (startDate && endDate) {
+          const startT = Timestamp.fromDate(new Date(startDate));
+          const endT = Timestamp.fromDate(new Date(`${endDate}T23:59:59.999`));
+
+          invoicesQuery = query(
+            collection(db, "locations", locationId, "invoices"),
+            where("createdAt", ">=", startT),
+            where("createdAt", "<=", endT),
+            orderBy("createdAt", "desc")
+          );
+        }
+
+        const snap = await getDocs(invoicesQuery);
 
         const list: ReportEntry[] = [];
 
@@ -112,7 +135,7 @@ const Reports = () => {
               total,
               paidAmount,
               isFullyPaid,
-              pendingAmount, // Now valid
+              pendingAmount,
               displayDate: createdAt
                 ? createdAt.toDate().toLocaleDateString("en-IN", {
                     day: "2-digit",
@@ -124,11 +147,6 @@ const Reports = () => {
           }
         }
 
-        list.sort((a, b) => {
-          if (!a.createdAt || !b.createdAt) return 0;
-          return b.createdAt.toMillis() - a.createdAt.toMillis();
-        });
-
         setReports(list);
       } catch (err) {
         console.error("Failed to load reports:", err);
@@ -138,10 +156,15 @@ const Reports = () => {
     };
 
     fetchReports();
-  }, [locationId]);
+  }, [locationId, startDate, endDate, selectedTechnicianId]);
 
   const openReport = (invoiceId: string) => {
     navigate(`/lab-results/${invoiceId}?mode=view`);
+  };
+
+  const openInvoice = (invoiceId: string) => {
+    // Fixed: Now using the same pattern as in Samples.tsx
+    navigate(`/invoice/${invoiceId}/${session.locationId}`);
   };
 
   const filteredReports = reports.filter((report) => {
@@ -149,46 +172,102 @@ const Reports = () => {
     return report.technicianId === selectedTechnicianId;
   });
 
+  const handleResetFilters = () => {
+    setStartDate("");
+    setEndDate("");
+    setSelectedTechnicianId("all");
+  };
+
   return (
     <DashboardLayout>
       <div className="h-screen flex flex-col">
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
           <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-                  Completed Reports
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                  View all finalized laboratory reports for your farmers
-                </p>
+            {/* Header + Filters */}
+            <div className="mb-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+                    Completed Reports
+                  </h1>
+                  <p className="text-muted-foreground mt-2">
+                    View all finalized laboratory reports for your farmers
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {/* Technician Filter */}
+                  <div className="flex items-center gap-3 bg-white p-2 rounded-lg border shadow-sm">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 ml-2">
+                      <Users className="w-4 h-4 text-purple-600" />
+                      <span className="font-medium">Tech:</span>
+                    </div>
+                    <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
+                      <SelectTrigger className="w-56 h-10 border-none shadow-none focus:ring-0">
+                        <SelectValue placeholder="All Technicians" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Technicians</SelectItem>
+                        {branchTechnicians.map((tech) => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Reset Filters Button */}
+                  {(startDate || endDate || selectedTechnicianId !== "all") && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleResetFilters}
+                      title="Reset all filters"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              {/* Technician Filter */}
-              <div className="flex items-center gap-3 bg-white p-2 rounded-lg border shadow-sm">
-                <div className="flex items-center gap-2 text-sm text-gray-600 ml-2">
-                  <Users className="w-4 h-4 text-purple-600" />
-                  <span className="font-medium">Filter by Tech:</span>
-                </div>
-                <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
-                  <SelectTrigger className="w-56 h-10 border-none shadow-none focus:ring-0">
-                    <SelectValue placeholder="All Technicians" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Technicians</SelectItem>
-                    {branchTechnicians.map((tech) => (
-                      <SelectItem key={tech.id} value={tech.id}>
-                        {tech.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Date Range Filter */}
+              <Card className="shadow-sm">
+                <CardContent className="pt-6">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                        Start Date
+                      </label>
+                      <Input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                        End Date
+                      </label>
+                      <Input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      onClick={() => {} /* Empty - useEffect handles it */}
+                      className="h-10 bg-cyan-600 hover:bg-cyan-700"
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {loadingInvoices === true ? (
-              <div className="flex flex-col items-center justify-center gap-3">
+            {loadingInvoices ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-12">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-primary"></div>
                 <p className="text-muted-foreground">Loading Reports...</p>
               </div>
@@ -199,12 +278,17 @@ const Reports = () => {
                     <FileText className="w-10 h-10 text-gray-400" />
                   </div>
                   <h3 className="text-xl font-medium text-muted-foreground mb-2">
-                    {selectedTechnicianId === "all" ? "No completed reports yet" : "No reports found for this technician"}
+                    {selectedTechnicianId !== "all" || startDate || endDate
+                      ? "No reports found for selected filters"
+                      : "No completed reports yet"}
                   </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Try adjusting the technician or date range filters
+                  </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4 ">
+              <div className="space-y-4">
                 {filteredReports.map((report) => (
                   <Card
                     key={report.invoiceId}
@@ -253,24 +337,30 @@ const Reports = () => {
                               ))}
                             </div>
                           </div>
-                          
+
                           <div className="space-y-2">
-                            {/* Technician Name */}
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <UserCircle className="w-4 h-4 text-purple-500" />
-                              <span>Submitted by: <span className="font-medium text-gray-700">{report.technicianName}</span></span>
+                              <span>
+                                Submitted by:{" "}
+                                <span className="font-medium text-gray-700">
+                                  {report.technicianName}
+                                </span>
+                              </span>
                             </div>
 
-                            {/* Payment Status with Amounts */}
                             <div className="flex items-center gap-2 text-sm">
-                              {/* <IndianRupee className="w-4 h-4" /> */}
-                              <span className={report.isFullyPaid ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                              <span
+                                className={
+                                  report.isFullyPaid
+                                    ? "text-green-600 font-medium"
+                                    : "text-red-600 font-medium"
+                                }
+                              >
                                 Payment {report.isFullyPaid ? "Completed" : "Pending"}
                               </span>
                               <span className="text-gray-600">|</span>
-                              <span className="font-medium">
-                                Paid: ₹{report.paidAmount}
-                              </span>
+                              <span className="font-medium">₹{report.paidAmount}</span>
                               <span className="text-gray-600">|</span>
                               <span className="font-medium">
                                 Pending: ₹{report.pendingAmount}
@@ -279,13 +369,24 @@ const Reports = () => {
                           </div>
                         </div>
 
-                        <Button
-                          onClick={() => openReport(report.invoiceId)}
-                          size="sm"
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white font-medium shadow-sm px-5"
-                        >
-                          View Reports
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <Button
+                            onClick={() => openReport(report.invoiceId)}
+                            size="sm"
+                            className="bg-cyan-600 hover:bg-cyan-700 text-white font-medium shadow-sm px-5"
+                          >
+                            View Reports
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openInvoice(report.invoiceId)}
+                            className="border-cyan-600 text-cyan-700 hover:bg-cyan-50 px-5"
+                          >
+                            View Invoice
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

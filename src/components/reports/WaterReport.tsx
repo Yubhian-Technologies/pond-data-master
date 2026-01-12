@@ -129,6 +129,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
     contactNumber: "",
   });
 
+  // NEW: State for shared Remarks & Recommendations
+  const [remarksAndRecommendations, setRemarksAndRecommendations] = useState<string>("");
+
   const handlePrint = () => window.print();
 
   useEffect(() => {
@@ -173,9 +176,18 @@ const WaterReport: React.FC<WaterReportProps> = ({
         const samplesSnap = await getDocs(samplesCollection);
         const pondList: Pond[] = [];
 
+        // Load remarks from the first sample that has it (since it's saved in all)
+        let loadedRemarks = "";
+
         for (let i = 1; i <= waterCount; i++) {
           const sampleDoc = samplesSnap.docs.find(d => d.id === `sample_${i}`);
           const data = sampleDoc?.data() || {};
+
+          // Load remarks once (shared)
+          if (data.remarksAndRecommendations && !loadedRemarks) {
+            loadedRemarks = data.remarksAndRecommendations;
+          }
+
           pondList.push({
             id: i,
             pondNo: data.pondNo || `Pond ${i}`,
@@ -227,7 +239,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
             favella: data.favella || "-",
           });
         }
+
         setPonds(pondList);
+        setRemarksAndRecommendations(loadedRemarks);
       } catch (error) {
         console.error("Error loading water report:", error);
       } finally {
@@ -263,7 +277,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
     <>
       <div className="mb-6 print:hidden text-center">
         <button
-          onClick={handlePrint}
+          onClick={() => window.print()}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 mx-auto"
         >
           <Printer size={20} /> Print Report
@@ -483,10 +497,12 @@ const WaterReport: React.FC<WaterReportProps> = ({
           </div>
         </div>
 
-        {/* Remarks */}
+        {/* Remarks & Recommendations - NOW DISPLAYS THE SAVED VALUE */}
         <div className="mb-4 border border-black p-2">
           <h4 className="font-bold text-xs mb-1">Remarks & Recommendations:</h4>
-          <div className="min-h-[40px] border-t border-dashed border-gray-400 mt-1"></div>
+          <div className="min-h-[60px] mt-1 text-[11px] whitespace-pre-wrap">
+            {remarksAndRecommendations || "No remarks provided."}
+          </div>
         </div>
 
         {/* Footer Signatures */}
@@ -495,15 +511,15 @@ const WaterReport: React.FC<WaterReportProps> = ({
           <p className="font-bold text-xs">Checked by: ________________</p>
         </div>
 
-        <div className="mt-2 text-[9px] italic text-gray-600 leading-tight">
+        {/* <div className="mt-2 text-[9px] italic text-gray-600 leading-tight">
           <p>Note: The Samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose, Not for any Litigation.</p>
-        </div>
+        </div> */}
       </div>
 
       <style>{`
         @media print {
           @page {
-            size: A4 portrait;
+            size: A4 landscape;
             margin: 0.2cm;
           }
           body * { visibility: hidden; }

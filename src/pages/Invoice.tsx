@@ -44,10 +44,10 @@ const InvoicePage = () => {
   const location = useLocation();
   const state = location.state as LocationState | undefined;
 
-  const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft" | "rtgs">("");
+  const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft" | "rtgs" | "pending">("");
   const [transactionRef, setTransactionRef] = useState<string>("");
-  const [isPartialPayment, setIsPartialPayment] = useState<boolean>(false);
-  const [partialAmount, setPartialAmount] = useState<string>("");
+
+  const [isZeroInvoice, setIsZeroInvoice] = useState(false);
 
   const locationId = session.locationId;
   const technicianId = session.technicianId;
@@ -198,6 +198,15 @@ const InvoicePage = () => {
   };
 
   const calculateTotals = () => {
+    if (isZeroInvoice) {
+      return {
+        subtotal: 0,
+        gstAmount: 0,
+        grandTotal: 0,
+        groupedItems: {},
+      };
+    }
+
     const groupedItems: {
       [type: string]: { name: string; quantity: number; total: number; price: number }[];
     } = {};
@@ -271,7 +280,7 @@ const InvoicePage = () => {
   const { subtotal, gstAmount, grandTotal, groupedItems } = calculateTotals();
 
   const handleGenerateInvoice = async () => {
-    if (grandTotal === 0) {
+    if (!isZeroInvoice && grandTotal === 0) {
       toast({
         title: "Error",
         description: "Please select at least one test",
@@ -289,7 +298,7 @@ const InvoicePage = () => {
       return;
     }
 
-    if ((paymentMode === "qr" || paymentMode === "neft" || paymentMode === "rtgs") && !transactionRef.trim()) {
+    if (!isZeroInvoice && paymentMode !== "pending" && paymentMode !== "cash" && !transactionRef.trim()) {
       toast({
         title: "Error",
         description: "Please enter transaction/reference number",
@@ -298,24 +307,36 @@ const InvoicePage = () => {
       return;
     }
 
-    if (isPartialPayment) {
-      const amount = parseFloat(partialAmount);
-      if (!partialAmount || isNaN(amount) || amount <= 0 || amount > grandTotal) {
-        toast({
-          title: "Error",
-          description: "Please enter a valid partial amount",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
     const today = new Date();
     const formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(
       today.getMonth() + 1
     ).toString().padStart(2, "0")}-${today.getFullYear()}`;
 
     const invoiceId = generateInvoiceId();
+
+    // ──────────────────────────────────────────────────────────────
+    // CHANGED: Save per-sample selected tests instead of global list
+    // Structure: { "water": { 1: ["pH","salinity"], 2: ["tpc","do"], ... } }
+    // ──────────────────────────────────────────────────────────────
+    const perSampleSelectedTests: Record<string, Record<number, string[]>> = {};
+
+    // For other sample types (water, soil, etc.)
+    sampleSummary.forEach((s) => {
+      const type = s.type.toLowerCase();
+      if (type === "pl" || type === "pcr") return;
+
+      if (perSampleTests[type]?.length) {
+        perSampleSelectedTests[type] = {};
+        perSampleTests[type].forEach((selectedSet, sampleIndex) => {
+          if (selectedSet.size > 0) {
+            perSampleSelectedTests[type][sampleIndex + 1] = Array.from(selectedSet);
+          }
+        });
+      }
+    });
+
+    // Optional: you can still keep global selectedTests if needed somewhere else
+    // But for per-sample display in forms → perSampleSelectedTests is what matters
 
     const sampleType = sampleSummary.map((s) => ({
       type: s.type.toLowerCase(),
@@ -334,12 +355,8 @@ const InvoicePage = () => {
       }
     });
 
-    const paidAmount = isPartialPayment ? parseFloat(partialAmount) : grandTotal;
-    const balanceAmount = isPartialPayment ? grandTotal - paidAmount : 0;
-
     const invoiceData = {
-      
-      invoiceId, 
+      invoiceId,
       farmerName,
       farmerId,
       farmerPhone: mobile,
@@ -348,22 +365,29 @@ const InvoicePage = () => {
       technicianId,
       dateOfCulture,
       tests: groupedItems,
-      subtotal,
-      gstAmount,
-      total: grandTotal,
+      subtotal: isZeroInvoice ? 0 : subtotal,
+      gstAmount: isZeroInvoice ? 0 : gstAmount,
+      total: isZeroInvoice ? 0 : grandTotal,
       village,
       mobile,
-      paymentMode,
-      transactionRef: paymentMode !== "cash" ? transactionRef.trim() : null,
-      isPartialPayment,
-      partialAmount: isPartialPayment ? paidAmount : null,
-      paidAmount,
-      balanceAmount,
+      paymentMode: isZeroInvoice ? "pending" : paymentMode,
+      transactionRef: paymentMode !== "cash" && paymentMode !== "pending" ? transactionRef.trim() : null,
+      isPartialPayment: false,
+      paidAmount: 0,
+      balanceAmount: isZeroInvoice ? 0 : grandTotal,
       sampleType,
       reportsProgress,
       samplePathogens,
       formattedDate,
       createdAt: serverTimestamp(),
+      isZeroInvoice: isZeroInvoice,
+      note: isZeroInvoice ? "Lab Equipment Testing - Zero Charge" : null,
+
+      // ─── NEW / REPLACED FIELD ──────────────────────────────────────
+      perSampleSelectedTests,   // ← This is the important one for per-sample display
+      // You can keep selectedTests too if needed, but it's optional now
+      // selectedTests: { ... } // ← remove or keep, up to you
+      // ──────────────────────────────────────────────────────────────
     };
 
     try {
@@ -374,13 +398,15 @@ const InvoicePage = () => {
           ...invoiceData,
           invoiceId,
           formattedDate,
-          total: grandTotal,
+          total: isZeroInvoice ? 0 : grandTotal,
         },
       });
 
       toast({
         title: "Success",
-        description: "Invoice generated successfully!",
+        description: isZeroInvoice
+          ? "Zero invoice generated successfully for lab testing!"
+          : "Invoice generated successfully!",
       });
     } catch (error) {
       console.error("Error generating invoice:", error);
@@ -406,7 +432,6 @@ const InvoicePage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-8">
-                    {/* Other sample types */}
                     {sampleSummary
                       .filter((s) => s.type !== "pl" && s.type !== "pcr")
                       .map((s) => (
@@ -470,7 +495,6 @@ const InvoicePage = () => {
                         </div>
                       ))}
 
-                    {/* PL / PCR Section */}
                     {plPcrSampleCount > 0 && (
                       <div>
                         <h4 className="font-semibold mb-3">
@@ -546,7 +570,16 @@ const InvoicePage = () => {
                     <CardTitle>Invoice Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {Object.keys(groupedItems).length > 0 ? (
+                    {isZeroInvoice ? (
+                      <div className="text-center py-8">
+                        <p className="font-medium text-lg text-muted-foreground">
+                          Zero Invoice Mode (Lab Equipment Testing)
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          All charges set to ₹0
+                        </p>
+                      </div>
+                    ) : Object.keys(groupedItems).length > 0 ? (
                       <>
                         {Object.entries(groupedItems).map(([type, items]) => (
                           <div key={type} className="mb-4">
@@ -591,86 +624,72 @@ const InvoicePage = () => {
                     <CardTitle>Payment Details</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <Label>Payment Mode</Label>
-                      <Select
-                        value={paymentMode}
-                        onValueChange={(value: "cash" | "qr" | "neft" | "rtgs" | "") => {
-                          setPaymentMode(value);
-                          if (value === "cash") setTransactionRef("");
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="zero-invoice"
+                        checked={isZeroInvoice}
+                        onCheckedChange={(checked) => {
+                          setIsZeroInvoice(!!checked);
+                          if (checked) {
+                            setPaymentMode("pending");
+                            setTransactionRef("");
+                          }
                         }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment mode" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="qr">QR Code / UPI</SelectItem>
-                          <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
-                          <SelectItem value="rtgs">RTGS / Bank Transfer</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      />
+                      <Label htmlFor="zero-invoice" className="text-sm font-medium leading-none cursor-pointer">
+                        Zero Invoice (Lab Equipment Testing)
+                      </Label>
                     </div>
 
-                    {(paymentMode === "qr" || paymentMode === "neft" || paymentMode === "rtgs") && (
-                      <div>
-                        <Label htmlFor="transactionRef">Transaction ID / Reference No.</Label>
-                        <Input
-                          id="transactionRef"
-                          type="text"
-                          value={transactionRef}
-                          onChange={(e) => setTransactionRef(e.target.value)}
-                          placeholder="Enter transaction reference"
-                        />
-                      </div>
-                    )}
-
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="partialPayment"
-                          checked={isPartialPayment}
-                          onCheckedChange={(checked) => {
-                            setIsPartialPayment(checked as boolean);
-                            if (!checked) setPartialAmount("");
-                          }}
-                        />
-                        <Label htmlFor="partialPayment" className="cursor-pointer font-medium">
-                          Partial Payment
-                        </Label>
-                      </div>
-
-                      {isPartialPayment && (
+                    {!isZeroInvoice && (
+                      <>
                         <div>
-                          <Label htmlFor="partialAmount">Amount Received (₹)</Label>
-                          <Input
-                            id="partialAmount"
-                            type="number"
-                            value={partialAmount}
-                            onChange={(e) => setPartialAmount(e.target.value)}
-                            placeholder={`Maximum: ${grandTotal}`}
-                            min="1"
-                            max={grandTotal}
-                          />
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Balance Due: ₹{(grandTotal - (parseFloat(partialAmount) || 0))}
-                          </p>
+                          <Label>Payment Mode</Label>
+                          <Select
+                            value={paymentMode}
+                            onValueChange={(value: "cash" | "qr" | "neft" | "rtgs" | "pending" | "") => {
+                              setPaymentMode(value);
+                              if (value === "cash" || value === "pending") {
+                                setTransactionRef("");
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select payment mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="qr">QR Code / UPI</SelectItem>
+                              <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
+                              <SelectItem value="rtgs">RTGS / Bank Transfer</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                      )}
-                    </div>
+
+                        {(paymentMode === "qr" || paymentMode === "neft" || paymentMode === "rtgs") && (
+                          <div>
+                            <Label htmlFor="transactionRef">Transaction ID / Reference No.</Label>
+                            <Input
+                              id="transactionRef"
+                              type="text"
+                              value={transactionRef}
+                              onChange={(e) => setTransactionRef(e.target.value)}
+                              placeholder="Enter transaction reference"
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
 
                     <Button
                       onClick={handleGenerateInvoice}
                       className="w-full"
                       size="lg"
                       disabled={
-                        grandTotal === 0 ||
+                        (!isZeroInvoice && grandTotal === 0) ||
                         !paymentMode ||
-                        (["qr", "neft"].includes(paymentMode) && !transactionRef.trim()) ||
-                        (isPartialPayment &&
-                          (!partialAmount ||
-                            parseFloat(partialAmount) <= 0 ||
-                            parseFloat(partialAmount) > grandTotal))
+                        (!isZeroInvoice && ["qr", "neft", "rtgs"].includes(paymentMode) && !transactionRef.trim())
                       }
                     >
                       Generate Invoice & Proceed

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../pages/firebase";
-import { collection, doc, getDoc, setDoc, updateDoc, getDocs } from "firebase/firestore";
+import { Invoice } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../../contexts/UserSessionContext";
 
@@ -39,7 +40,7 @@ interface SoilFormProps {
   invoice: any;
   invoiceId: string;
   locationId: string;
-  onSubmit: () => void; // Now simplified — parent handles navigation/report
+  onSubmit: () => void;
 }
 
 export default function SoilForm({
@@ -79,6 +80,27 @@ export default function SoilForm({
   const totalSamples = Number(
     invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")?.count || 1
   );
+
+  // ──────────────────────────────────────────────────────────────
+  // NEW: Per-sample selected soil tests from invoice
+  // ──────────────────────────────────────────────────────────────
+  const perSampleSelectedTests = invoice.perSampleSelectedTests?.soil || {};
+
+  // Mapping from test ID → display name (adjust keys to match your actual test IDs)
+  const testNameMap: Record<string, string> = {
+    pondNo: "Pond No.",
+    pH: "pH",
+    ec: "EC",
+    caco3: "CaCO₃",
+    soilTexture: "Soil Texture",
+    organicCarbon: "Organic Carbon",
+    availableNitrogen: "Available Nitrogen",
+    availablePhosphorus: "Available Phosphorus",
+    redoxPotential: "Redox Potential",
+    remarks: "Remarks",
+    // Add any other soil test IDs you use in availableTests
+  };
+  // ──────────────────────────────────────────────────────────────
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -302,49 +324,62 @@ export default function SoilForm({
       </div>
 
       {/* All Samples - One Section Per Sample */}
-      {samples.map((sample, index) => (
-        <div key={index} className="mb-10">
-          <h3 className="font-bold mb-3 text-gray-700">
-            Test Results - Sample {index + 1} of {totalSamples}
-          </h3>
-          <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {Object.entries(sample).map(([key, value]) => (
-                <div key={key}>
-                  <label className="block text-xs font-medium mb-1 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </label>
-                  <input
-                    type="text"
-                    value={value}
-                    onChange={(e) => handleSampleChange(index, key as keyof Sample, e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+      {samples.map((sample, index) => {
+        const sampleNumber = index + 1;
+        // Get selected tests only for THIS sample
+        const sampleSelectedIds = perSampleSelectedTests[sampleNumber] || [];
+        const sampleSelectedNames = sampleSelectedIds
+          .map(id => testNameMap[id] || id)
+          .filter(Boolean);
+
+        return (
+          <div key={index} className="mb-10">
+            {/* NEW: Selected tests for this specific sample */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm font-medium text-blue-800 mb-1">
+                Tests selected for Sample #{sampleNumber}:
+              </p>
+              {sampleSelectedNames.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {sampleSelectedNames.map((name, i) => (
+                    <span
+                      key={i}
+                      className="inline-block px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
+                    >
+                      {name}
+                    </span>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <p className="text-sm text-gray-500 italic">
+                  No specific tests selected for this sample
+                </p>
+              )}
+            </div>
+
+            <h3 className="font-bold mb-3 text-gray-700">
+              Test Results - Sample {sampleNumber} of {totalSamples}
+            </h3>
+            <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {Object.entries(sample).map(([key, value]) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium mb-1 capitalize">
+                      {key.replace(/([A-Z])/g, ' $1').trim()}
+                    </label>
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => handleSampleChange(index, key as keyof Sample, e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
-
-      {/* Verification */}
-      {/* <div className="mb-6">
-        <h3 className="font-bold mb-3 text-gray-700">Verification</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Reported By</label>
-            <input type="text" value={formData.reportedBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Checked By</label>
-            <input type="text" value={formData.checkedBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">CMIS By</label>
-            <input type="text" value={formData.cmisBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
-          </div>
-        </div>
-      </div> */}
+        );
+      })}
 
       {/* Final Submit Button */}
       <div className="flex justify-center mt-8">
