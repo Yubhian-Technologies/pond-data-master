@@ -13,7 +13,7 @@ interface FormData {
   sourceOfSoil: string;
   noOfSamples: string;
   mobile: string;
-  sampleDate: string;
+  sampleDate: string;           // ← added
   reportDate: string;
   sampleCollectionTime: string;
   sampleTime: string;
@@ -64,7 +64,7 @@ export default function SoilForm({
     sourceOfSoil: '',
     noOfSamples: '1',
     mobile: '',
-    sampleDate: today,
+    sampleDate: today,           // ← default to today
     reportDate: today,
     sampleCollectionTime: '',
     sampleTime: '',
@@ -131,21 +131,23 @@ export default function SoilForm({
       try {
         setLoading(true);
 
-       if (invoice.farmerId) {
-  const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
-  const farmerSnap = await getDoc(farmerRef);
-  if (farmerSnap.exists()) {
-    const farmer = farmerSnap.data();
-    setFormData(prev => ({
-      ...prev,
-      farmerName: farmer.name || "",
-      farmerUID: farmer.farmerId || "",           // ← Changed to farmer.farmerId
-      farmerAddress: `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
-      mobile: farmer.phone || "",
-      noOfSamples: String(totalSamples),
-    }));
-  }
-}
+        // Pre-fill farmer info
+        if (invoice.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+          const farmerSnap = await getDoc(farmerRef);
+          if (farmerSnap.exists()) {
+            const farmer = farmerSnap.data();
+            setFormData(prev => ({
+              ...prev,
+              farmerName: farmer.name || "",
+              farmerUID: farmer.farmerId || "",
+              farmerAddress: `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
+              mobile: farmer.phone || "",
+              noOfSamples: String(totalSamples),
+              sampleDate: invoice.dateOfCulture || today,           // ← use Date of Culture from invoice
+            }));
+          }
+        }
 
         // Load existing report header
         const reportHeaderRef = doc(db, "locations", locationId, "reports", invoiceId);
@@ -162,6 +164,7 @@ export default function SoilForm({
             reportedBy: headerData.technicianName || technicianName,
             checkedBy: headerData.technicianName || technicianName,
             cmisBy: headerData.technicianName || technicianName,
+            sampleDate: headerData.sampleDate || invoice.dateOfCulture || today,  // ← prefer saved, fallback to invoice
           }));
         }
 
@@ -222,6 +225,7 @@ export default function SoilForm({
         sampleTime: formData.sampleTime,
         reportTime: formData.reportTime,
         technicianName: technicianName,
+        sampleDate: formData.sampleDate,           // ← save it too
       }, { merge: true });
 
       // Save all samples
@@ -305,6 +309,17 @@ export default function SoilForm({
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-1">Sample Date</label>
+            <input 
+              type="date" 
+              name="sampleDate" 
+              value={formData.sampleDate} 
+              readOnly 
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-1">Sample Collection Time</label>
             <input type="time" name="sampleCollectionTime" value={formData.sampleCollectionTime} onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
@@ -325,7 +340,7 @@ export default function SoilForm({
       {/* All Samples - One Section Per Sample */}
       {samples.map((sample, index) => {
         const sampleNumber = index + 1;
-        // Get selected tests only for THIS sample
+        // Get selected tests only for this specific sample
         const sampleSelectedIds = perSampleSelectedTests[sampleNumber] || [];
         const sampleSelectedNames = sampleSelectedIds
           .map(id => testNameMap[id] || id)

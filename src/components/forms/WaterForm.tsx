@@ -39,6 +39,7 @@ interface Pond {
   copepod: string;
   rotifer: string;
   nauplius: string;
+  brachionus: string;           // ← added
   spirulina: string;
   chaetoceros: string;
   skeletonema: string;
@@ -102,6 +103,7 @@ export default function WaterForm({
     dissolvedOxygen: "", totalDissolvedMatter: "",
     yellowColonies: "", greenColonies: "", tpc: "",
     phacus: "", chlorella: "", desmids: "", scenedesmus: "", copepod: "", rotifer: "", nauplius: "",
+    brachionus: "",           // ← added
     spirulina: "", chaetoceros: "", skeletonema: "", rhizosolenia: "",
     anabaena: "", oscillatoria: "", microcystis: "",
     coscinodiscus: "", nitzchia: "", navicula: "",
@@ -143,13 +145,14 @@ export default function WaterForm({
     yellowColonies: "Yellow Colonies",
     greenColonies: "Green Colonies",
     tpc: "Total Plate Count (TPC)",
-    phacus: "Phacus",
+    phacus: "Oocystis",
     chlorella: "Chlorella",
-    desmids: "Desmids",
+    desmids: "Eudorina",
     scenedesmus: "Scenedesmus",
     copepod: "Copepod",
     rotifer: "Rotifer",
     nauplius: "Nauplius",
+    brachionus: "Brachionus",           // ← added + fixed spelling
     spirulina: "Spirulina",
     chaetoceros: "Chaetoceros",
     skeletonema: "Skeletonema",
@@ -158,14 +161,14 @@ export default function WaterForm({
     oscillatoria: "Oscillatoria",
     microcystis: "Microcystis",
     coscinodiscus: "Coscinodiscus",
-    nitzchia: "Nitzchia",
+    nitzchia: "Nitzschia",
     navicula: "Navicula",
     noctiluca: "Noctiluca",
     ceratium: "Ceratium",
     dinophysis: "Dinophysis",
     gymnodinium: "Gymnodinium",
     zoothamnium: "Zoothamnium",
-    tintinnopsis: "Tintinnopsis",
+    tintinnopsis: "Vorticella",
     favella: "Favella",
   };
 
@@ -193,7 +196,7 @@ export default function WaterForm({
               ...prev,
               farmerName: farmer.name || "",
               mobile: farmer.phone || "",
-              farmerUID: farmer.farmerId || "",           // ← Correct field: the formatted ID
+              farmerUID: farmer.farmerId || "",
               farmerAddress: [farmer.address, farmer.city].filter(Boolean).join(", "),
               sdDoc: invoice.dateOfCulture || "",
               sourceOfWater: farmer.waterSource || "",
@@ -256,6 +259,7 @@ export default function WaterForm({
               copepod: data.copepod || "",
               rotifer: data.rotifer || "",
               nauplius: data.nauplius || "",
+              brachionus: data.brachionus || "",           // ← added
               spirulina: data.spirulina || "",
               chaetoceros: data.chaetoceros || "",
               skeletonema: data.skeletonema || "",
@@ -486,21 +490,29 @@ export default function WaterForm({
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {([
                   "phacus", "chlorella", "desmids", "scenedesmus",
-                  "copepod", "rotifer", "nauplius", "spirulina",
+                  "copepod", "rotifer", "nauplius", "brachionus",     // ← added here
+                  "spirulina",
                   "chaetoceros", "skeletonema", "rhizosolenia",
-                ] as const).map((field) => (
-                  <div key={field}>
-                    <label className="block text-xs font-medium mb-1 capitalize">
-                      {field.replace(/([A-Z])/g, " $1").trim()}
-                    </label>
-                    <input
-                      type="text"
-                      value={pond[field]}
-                      onChange={(e) => handlePondChange(pond.id, field, e.target.value)}
-                      className="w-full border border-gray-400 rounded px-2 py-1 text-xs"
-                    />
-                  </div>
-                ))}
+                ] as const).map((field) => {
+                  let displayName = field.replace(/([A-Z])/g, " $1").trim();
+                  if (field === "phacus") displayName = "Oocystis";
+                  if (field === "desmids") displayName = "Eudorina";
+                  if (field === "brachionus") displayName = "Brachionus";
+
+                  return (
+                    <div key={field}>
+                      <label className="block text-xs font-medium mb-1">
+                        {displayName}
+                      </label>
+                      <input
+                        type="text"
+                        value={pond[field]}
+                        onChange={(e) => handlePondChange(pond.id, field, e.target.value)}
+                        className="w-full border border-gray-400 rounded px-2 py-1 text-xs"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -512,19 +524,24 @@ export default function WaterForm({
                   "coscinodiscus", "nitzchia", "navicula",
                   "noctiluca", "ceratium", "dinophysis", "gymnodinium",
                   "zoothamnium", "tintinnopsis", "favella",
-                ] as const).map((field) => (
-                  <div key={field}>
-                    <label className="block text-xs font-medium mb-1 capitalize">
-                      {field.replace(/([A-Z])/g, " $1").trim()}
-                    </label>
-                    <input
-                      type="text"
-                      value={pond[field]}
-                      onChange={(e) => handlePondChange(pond.id, field, e.target.value)}
-                      className="w-full border border-gray-400 rounded px-2 py-1 text-xs"
-                    />
-                  </div>
-                ))}
+                ] as const).map((field) => {
+                  let displayName = field.replace(/([A-Z])/g, " $1").trim();
+                  if (field === "tintinnopsis") displayName = "Vorticella";
+
+                  return (
+                    <div key={field}>
+                      <label className="block text-xs font-medium mb-1">
+                        {displayName}
+                      </label>
+                      <input
+                        type="text"
+                        value={pond[field]}
+                        onChange={(e) => handlePondChange(pond.id, field, e.target.value)}
+                        className="w-full border border-gray-400 rounded px-2 py-1 text-xs"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

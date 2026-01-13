@@ -87,138 +87,139 @@ const SoilReport: React.FC<SoilReportProps> = ({
   const handlePrint = () => window.print();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        if (!invoiceId || !locationId) return;
+  const fetchData = async () => {
+    try {
+      if (!invoiceId || !locationId) return;
 
-        // Fetch report data (soil-specific fields)
-        const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
-        const reportSnap = await getDoc(reportRef);
+      // Fetch report data (soil-specific fields)
+      const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
+      const reportSnap = await getDoc(reportRef);
 
-        let technicianName = "";
-        let soilType = "";
-        let sourceOfSoil = "";
-        let sampleCollectionTime = "-";
-        let sampleTime = "-";
-        let reportTime = new Date().toTimeString().slice(0, 5);
+      let technicianName = "";
+      let soilType = "";
+      let sourceOfSoil = "";
+      let sampleCollectionTime = "-";
+      let sampleTime = "-";
+      let reportTime = new Date().toTimeString().slice(0, 5);
+      let savedSampleDate = ""; // ← from saved report
 
-        if (reportSnap.exists()) {
-          const data = reportSnap.data();
-          technicianName = data?.technicianName || "";
-          soilType = data?.soilType || "";
-          sourceOfSoil = data?.sourceOfSoil || "";
-          sampleCollectionTime = data?.sampleCollectionTime || "-";
-          sampleTime = data?.sampleTime || "-";
-          reportTime = data?.reportTime || reportTime;
-        }
-
-        // Fetch invoice data — now supports both new and old invoices
-        const invoicesRef = collection(db, "locations", locationId, "invoices");
-        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
-        let snapshot = await getDocs(q);
-
-        // Fallback for old invoices that used 'id' field
-        if (snapshot.empty) {
-          q = query(invoicesRef, where("id", "==", invoiceId));
-          snapshot = await getDocs(q);
-        }
-
-        if (snapshot.empty) {
-          console.log("Invoice not found for invoiceId:", invoiceId);
-          setLoading(false);
-          return;
-        }
-
-        const invoiceDoc = snapshot.docs[0];
-        const data = invoiceDoc.data();
-
-        const calculatedSoilCount =
-          data.sampleType
-            ?.filter((s: any) => s.type?.toLowerCase() === "soil")
-            .reduce((sum: number, item: any) => sum + Number(item.count || 0), 0) || 0;
-
-        const displaySampleCount = allSampleCount > 0 ? allSampleCount : calculatedSoilCount;
-
-        const sampleDate =
-          data.sampleDate ||
-          data.formattedDate ||
-          data.createdAt?.toDate?.()?.toISOString().split("T")[0] ||
-          new Date().toISOString().split("T")[0];
-
-        // ──────────────────────────────────────────────────────────────
-// Set initial form data from invoice
-// ──────────────────────────────────────────────────────────────
-setFormData((prev) => ({
-  ...prev,
-  reportedBy: technicianName || "",
-  checkedBy: "",
-  farmerName: data.farmerName || "",
-  farmerUID: data.farmerId || "",           // temporary - will be overwritten with real ID
-  farmerAddress: data.village || data.farmerAddress || "",
-  mobile: data.farmerPhone || data.mobile || "",
-  noOfSamples: displaySampleCount.toString(),
-  sampleDate,
-  reportDate: new Date().toISOString().split("T")[0],
-  soilType,
-  sourceOfSoil,
-  sampleCollectionTime,
-  sampleTime,
-  reportTime,
-}));
-
-// ──────────────────────────────────────────────────────────────
-// IMPORTANT: Fetch REAL formatted farmerId from farmer document
-// ──────────────────────────────────────────────────────────────
-if (data.farmerId) {
-  const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
-  const farmerSnap = await getDoc(farmerRef);
-
-  if (farmerSnap.exists()) {
-    const farmerData = farmerSnap.data();
-
-    setFormData((prev) => ({
-      ...prev,
-      farmerUID: farmerData.farmerId || prev.farmerUID,  // ← This is the correct formatted ID!
-      farmerAddress: [farmerData.address, farmerData.city, farmerData.state]
-        .filter(Boolean)
-        .join(", ") || prev.farmerAddress,
-      mobile: farmerData.phone || prev.mobile,
-    }));
-  }
-}
-
-        // Fetch soil samples
-        const samplesRef = collection(
-          db,
-          "locations",
-          locationId,
-          "reports",
-          invoiceId,
-          "soil samples"
-        );
-
-        const sampleSnap = await getDocs(samplesRef);
-        const list = sampleSnap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
-
-        const formattedSamples = list.map((s: any, i: number) => ({
-          id: s.id,
-          ...s,
-          pondNo: s.pondNo || `Sample ${i + 1}`,
-        }));
-
-        setSamples(formattedSamples);
-      } catch (error) {
-        console.error("Error loading soil report:", error);
-      } finally {
-        setLoading(false);
+      if (reportSnap.exists()) {
+        const data = reportSnap.data();
+        technicianName = data?.technicianName || "";
+        soilType = data?.soilType || "";
+        sourceOfSoil = data?.sourceOfSoil || "";
+        sampleCollectionTime = data?.sampleCollectionTime || "-";
+        sampleTime = data?.sampleTime || "-";
+        reportTime = data?.reportTime || reportTime;
+        savedSampleDate = data?.sampleDate || ""; // ← saved value has priority
       }
-    };
 
-    fetchData();
-  }, [invoiceId, locationId, allSampleCount]);
+      // Fetch invoice data — supports both new and old invoices
+      const invoicesRef = collection(db, "locations", locationId, "invoices");
+      let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+      let snapshot = await getDocs(q);
+
+      // Fallback for old invoices that used 'id' field
+      if (snapshot.empty) {
+        q = query(invoicesRef, where("id", "==", invoiceId));
+        snapshot = await getDocs(q);
+      }
+
+      if (snapshot.empty) {
+        console.log("Invoice not found for invoiceId:", invoiceId);
+        setLoading(false);
+        return;
+      }
+
+      const invoiceDoc = snapshot.docs[0];
+      const data = invoiceDoc.data();
+
+      const calculatedSoilCount =
+        data.sampleType
+          ?.filter((s: any) => s.type?.toLowerCase() === "soil")
+          .reduce((sum: number, item: any) => sum + Number(item.count || 0), 0) || 0;
+
+      const displaySampleCount = allSampleCount > 0 ? allSampleCount : calculatedSoilCount;
+
+      // Priority for sampleDate: saved report → invoice.dateOfCulture → today
+      const finalSampleDate =
+        savedSampleDate ||
+        data.dateOfCulture ||
+        data.sampleDate ||
+        data.formattedDate ||
+        (data.createdAt?.toDate?.()?.toISOString().split("T")[0]) ||
+        new Date().toISOString().split("T")[0];
+
+      // Set initial form data from invoice + saved report
+      setFormData((prev) => ({
+        ...prev,
+        reportedBy: technicianName || "",
+        checkedBy: "",
+        farmerName: data.farmerName || "",
+        farmerUID: data.farmerId || "",
+        farmerAddress: data.village || data.farmerAddress || "",
+        mobile: data.farmerPhone || data.mobile || "",
+        noOfSamples: displaySampleCount.toString(),
+        sampleDate: finalSampleDate,           // ← now correctly prioritized
+        reportDate: new Date().toISOString().split("T")[0],
+        soilType,
+        sourceOfSoil,
+        sampleCollectionTime,
+        sampleTime,
+        reportTime,
+      }));
+
+      // Fetch REAL formatted farmerId from farmer document (overrides temp value)
+      if (data.farmerId) {
+        const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
+        const farmerSnap = await getDoc(farmerRef);
+
+        if (farmerSnap.exists()) {
+          const farmerData = farmerSnap.data();
+
+          setFormData((prev) => ({
+            ...prev,
+            farmerUID: farmerData.farmerId || prev.farmerUID,  // correct formatted ID
+            farmerAddress: [farmerData.address, farmerData.city, farmerData.state]
+              .filter(Boolean)
+              .join(", ") || prev.farmerAddress,
+            mobile: farmerData.phone || prev.mobile,
+          }));
+        }
+      }
+
+      // Fetch soil samples
+      const samplesRef = collection(
+        db,
+        "locations",
+        locationId,
+        "reports",
+        invoiceId,
+        "soil samples"
+      );
+
+      const sampleSnap = await getDocs(samplesRef);
+      const list = sampleSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      const formattedSamples = list.map((s: any, i: number) => ({
+        id: s.id,
+        ...s,
+        pondNo: s.pondNo || `Sample ${i + 1}`,
+      }));
+
+      setSamples(formattedSamples);
+    } catch (error) {
+      console.error("Error loading soil report:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, [invoiceId, locationId, allSampleCount]);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {

@@ -10,14 +10,14 @@ interface FarmerInfo {
   sampleTime: string;
   reportDate: string;
   reportTime: string;
-  farmerId: string;          // ← Added
+  farmerId: string;
 }
 
 interface PLFormProps {
   invoice: any;
   invoiceId: string;
   locationId: string;
-  onSubmit: () => void; // Parent handles completion
+  onSubmit: () => void;
 }
 
 export default function PLForm({
@@ -69,11 +69,11 @@ export default function PLForm({
     farmerName: invoice?.farmerName ?? "",
     village: invoice?.village ?? "",
     mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
-    sampleDate: invoice?.sampleDate || today,
+    sampleDate: invoice?.dateOfCulture || today,           // ← Uses Date of Culture from Samples page
     sampleTime: "",
     reportDate: today,
     reportTime: currentTime,
-    farmerId: "",                      // ← Added
+    farmerId: "",
   });
 
   const [plData, setPlData] = useState<any>(emptyPLData);
@@ -128,11 +128,11 @@ export default function PLForm({
               farmerName: data.farmerInfo.farmerName || invoice?.farmerName || "",
               village: data.farmerInfo.village || invoice?.village || "",
               mobile: data.farmerInfo.mobile || invoice?.farmerPhone || invoice?.mobile || "",
-              sampleDate: data.farmerInfo.sampleDate || invoice?.sampleDate || today,
+              sampleDate: data.farmerInfo.sampleDate || invoice?.dateOfCulture || today,  // ← Prioritize saved → invoice Date of Culture
               sampleTime: data.farmerInfo.sampleTime || "",
               reportDate: data.farmerInfo.reportDate || today,
               reportTime: data.farmerInfo.reportTime || currentTime,
-              farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",  // ← Use saved or freshly loaded
+              farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",
             });
           }
 
@@ -146,9 +146,10 @@ export default function PLForm({
 
           setPlData(normalized);
         } else {
-          // First time — use freshly loaded farmerId
+          // First time — use invoice.dateOfCulture if available
           setFarmerInfo((prev) => ({
             ...prev,
+            sampleDate: invoice?.dateOfCulture || today,
             farmerId: loadedFarmerId,
           }));
           setPlData(emptyPLData);
@@ -191,10 +192,10 @@ export default function PLForm({
       await setDoc(
         plReportRef,
         {
-          farmerInfo,           // Now includes farmerId
+          farmerInfo,
           plData,
           totalSamples,
-          sampleType,           // Optional: also save sampleType if you want
+          sampleType,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -285,9 +286,9 @@ export default function PLForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">Sample Date</label>
             <input
               type="date"
-              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full border border-gray-300 p-2 rounded bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={farmerInfo.sampleDate}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, sampleDate: e.target.value })}
+              readOnly
             />
           </div>
 

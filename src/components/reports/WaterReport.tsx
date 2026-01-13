@@ -21,6 +21,7 @@ import scenedesmus from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alg
 import copepod from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/1-Copepods.webp";
 import rotifer from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/3-ROTIFERS.jpg";
 import nauplius from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/2-Nauplius.jpg";
+import brachionus from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/4-Brachionus.jpg";
 import spirulina from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/2.BLUE GREEN ALGE/SPIRULINA.jpg";
 import chaetoceros from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/3.DIATAM/2-Chaetoceros.jpg";
 import skeletonema from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/3.DIATAM/1-SKELETOEMA.jpg";
@@ -71,6 +72,7 @@ interface Pond {
   copepod: string;
   rotifer: string;
   nauplius: string;
+  brachionus: string;
   spirulina: string;
   chaetoceros: string;
   skeletonema: string;
@@ -220,6 +222,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
             copepod: data.copepod || "-",
             rotifer: data.rotifer || "-",
             nauplius: data.nauplius || "-",
+            brachionus: data.brachionus || "-",           // ← added missing field
             spirulina: data.spirulina || "-",
             chaetoceros: data.chaetoceros || "-",
             skeletonema: data.skeletonema || "-",
@@ -294,18 +297,16 @@ const WaterReport: React.FC<WaterReportProps> = ({
             <h1 className="text-2xl font-bold text-blue-700">WATERBASE AQUA DIAGNOSTIC CENTER</h1>
             <p className="text-[10px] text-black font-semibold">{locationDetails.address}</p>
             <p className="text-xs text-black">Contact No: {locationDetails.contactNumber} | Mail Id: {locationDetails.email}</p>
-            
           </div>
           <div className="w-32 h-24 flex items-center justify-center">
             <img src={AV} alt="AV" className="max-w-full max-h-full object-contain" />
           </div>
         </div>
 
-       
-
         <div className="text-center flex-1 m-5">
           <h2 className="text-xl font-bold mt-1 text-red-600 uppercase">Water Quality Report</h2>
         </div>
+
         {/* Farmer Info Grid */}
         <div className="grid grid-cols-10 text-[11px] mb-3 border border-black border-collapse">
           <div className="col-span-1 border-r border-black p-1 font-bold bg-gray-100">Farmer Name</div>
@@ -344,30 +345,30 @@ const WaterReport: React.FC<WaterReportProps> = ({
             <table className="w-full text-[11px] border-collapse">
               <thead>
                 <tr className="bg-gray-100 font-bold">
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Pond</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>pH</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Sal</td>
-                  <td className="border-r border-black p-0.5 text-center" colSpan={2}>Alkalinity</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Total Alk</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Hard</td>
-                  <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>NH₃</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>U.NH₃</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>H₂S</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>NO₂</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>NO₃</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Fe</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Cl</td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={2}>DO</td>
-                  <td className="p-0.5 text-center" rowSpan={2}>TDM</td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[9px]"></span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>pH<br/><span className="text-[9px]">pH</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Salinity<br/><span className="text-[9px]">సాలినిటీ</span></td>
+                  <td className="border-r border-black p-0.5 text-center" colSpan={3}>Alkalinity(PPM as Caco3)<br/><span className="text-[9px]">ఆల్కలినిటీ</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[9px]">మొత్తం కఠినత</span></td>
+                  <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/><span className="text-[9px]">PPM as Caco3</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/><span className="text-[9px]">అమ్మోనియా</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Unionized NH₃<br/><span className="text-[9px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/><span className="text-[9px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₂<br/><span className="text-[9px]">నైట్రైట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₃<br/><span className="text-[9px]">నైట్రేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Fe<br/><span className="text-[9px]">ఇనుము</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Cl<br/><span className="text-[9px]">క్లోరిన్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>DO<br/><span className="text-[9px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
+                  <td className="p-0.5 text-center" rowSpan={3}>TOM<br/><span className="text-[9px]">Total Organic Matter</span></td>
                 </tr>
                 <tr className="bg-gray-100 border-t border-black text-[10px]">
-                  <td className="border-r border-black p-0.5 text-center font-bold">CO₃</td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">HCO₃</td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Ca</td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Mg</td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Na</td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">K</td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">CO₃<br/><span className="text-[9px]">కార్బొనేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">HCO₃<br/><span className="text-[9px]">బైకార్బొనేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Total <br/><span className="text-[9px]">మొత్తం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Ca<br/><span className="text-[9px]">కాల్షియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Mg<br/><span className="text-[9px]">మెగ్నీషియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Na<br/><span className="text-[9px]">సోడియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">K<br/><span className="text-[9px]">పొటాషియం</span></td>
                 </tr>
               </thead>
               <tbody>
@@ -430,9 +431,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-b border-black text-center py-[6px]" colSpan={3}>Vibrio CFU /ml</td>
                 </tr>
                 <tr className="bg-gray-100 text-[11px] font-bold">
-                  <td className="border-r border-black p-0.5 text-center">Yellow</td>
-                  <td className="border-r border-black p-0.5 text-center">Green</td>
-                  <td className="p-0.5 text-center">TPC</td>
+                  <td className="border-r border-black p-0.5 text-center">Yellow <br />Colonies <br /> <span className="text-[9px]">పసుపు కాలనీలు</span></td>
+                  <td className="border-r border-black p-0.5 text-center">Green <br />Colonies <br /><span className="text-[9px]">పచ్చ కాలనీలు</span></td>
+                  <td className="p-0.5 text-center">TPC <br /><span className="text-[8px]">Total Plate Count</span></td>
                 </tr>
               </thead>
               <tbody>
@@ -443,7 +444,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                     <td className="p-0.5 text-center">{p.tpc}</td>
                   </tr>
                 ))}
-                <tr className="border-t border-black font-bold text-[8px] text-red-600 bg-gray-50">
+                <tr className="border-t border-black font-bold text-[10px] text-red-600 bg-gray-50">
                   <td className="border-r border-black p-0.5 text-center">&lt;300</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;10</td>
                   <td className="p-0.5 text-center">&lt;300</td>
@@ -461,13 +462,13 @@ const WaterReport: React.FC<WaterReportProps> = ({
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border-r border-b border-black p-1 w-10">Pond</th>
-                  <th className="border-r border-b border-black p-0.5 text-green-700 text-[11px]" colSpan={11}>USEFUL PLANKTON - ఉపయోగకరమైన పలాంక్టన్లు</th>
-                  <th className="border-b border-black p-0.5 text-red-700 text-[11px]" colSpan={14}>HARMFUL PLANKTON - హానికరమైన పలాంక్టన్లు</th>
+                  <th className="border-r border-b border-black p-0.5 text-green-700 text-[11px]" colSpan={11}>USEFUL PLANKTON - ఉపయోగకరమైన ప్లవకములు</th>
+                  <th className="border-b border-black p-0.5 text-red-700 text-[11px]" colSpan={14}>HARMFUL PLANKTON - హానికరమైన ప్లవకములు</th>
                 </tr>
-                <tr className="bg-gray-50 text-[9px] border-b border-black">
+                <tr className="bg-gray-50 text-[10px] border-b border-black">
                   <th className="border-r border-black"></th>
-                  <th className="border-r border-black" colSpan={4}>Phyto Plankton</th>
-                  <th className="border-r border-black" colSpan={3}>Zooplankton</th>
+                  <th className="border-r border-black" colSpan={4}>Green alge</th>
+                  <th className="border-r border-black" colSpan={4}>Zooplankton</th>
                   <th className="border-r border-black">B.G Algae</th>
                   <th className="border-r border-black" colSpan={3}>Diatom</th>
                   <th className="border-r border-black" colSpan={3}>Blue Green Algae</th>
@@ -477,9 +478,41 @@ const WaterReport: React.FC<WaterReportProps> = ({
                 </tr>
                 <tr className="bg-white">
                   <th className="border-r border-b border-black"></th>
-                  {[phacus, corrella, desmids, scenedesmus, copepod, rotifer, nauplius, spirulina, chaetoceros, skeletonema, rhizosolenia, anabaena, oscillatoria, microcystis, coscinodiscus, nitzchia, navicula, noctiluca, ceratium, dinophysis, gymnodinium, zoothamnium, tintinnopsis, favella].map((img, idx) => (
-                    <th key={idx} className={`border-b border-black ${idx === 23 ? "" : "border-r"} p-0.5`}>
-                      <img className="w-8 h-8 mx-auto" src={img} alt="plankton" />
+
+                  {[
+                    
+                    { img: phacus, name: "Oosystis" },
+                    { img: corrella, name: "Chlorella" },
+                    { img: desmids, name: "Eudorina" },
+                    { img: scenedesmus, name: "Scenedesmus" },
+                    { img: copepod, name: "Copepod" },
+                    { img: rotifer, name: "Rotifer" },
+                    { img: nauplius, name: "Nauplius" },
+                    { img: brachionus, name: "Brachionus" },           // ← fixed spelling
+                    { img: spirulina, name: "Spirulina" },
+                    { img: chaetoceros, name: "Chaetoceros" },
+                    { img: skeletonema, name: "Skeletonema" },
+                    { img: rhizosolenia, name: "Rhizosolenia" },
+                    { img: anabaena, name: "Anabaena" },
+                    { img: oscillatoria, name: "Oscillatoria" },
+                    { img: microcystis, name: "Microcystis" },
+                    { img: coscinodiscus, name: "Coscinodiscus" },
+                    { img: nitzchia, name: "Nitzschia" },
+                    { img: navicula, name: "Navicula" },
+                    { img: noctiluca, name: "Noctiluca" },
+                    { img: ceratium, name: "Ceratium" },
+                    { img: dinophysis, name: "Dinophysis" },
+                    { img: gymnodinium, name: "Gymnodinium" },
+                    { img: zoothamnium, name: "Zoothamnium" },
+                    { img: tintinnopsis, name: "Vorticella" },
+                    { img: favella, name: "Favella" },
+                  ].map((item, idx) => (
+                    <th
+                      key={idx}
+                      className={`border-b border-black ${idx === 24 ? "" : "border-r"} p-1 text-center`}
+                    >
+                      <img className="w-6 h-6 mx-auto" src={item.img} alt={item.name} />
+                      <div className="text-[7px] mt-1 leading-tight">{item.name}</div>
                     </th>
                   ))}
                 </tr>
@@ -487,9 +520,41 @@ const WaterReport: React.FC<WaterReportProps> = ({
               <tbody>
                 {ponds.map((pond) => (
                   <tr key={pond.id} className="border-b border-black last:border-b-0">
-                    <td className="border-r border-black p-1 text-center font-bold bg-gray-50">{pond.pondNo}</td>
-                    {[pond.phacus, pond.chlorella, pond.desmids, pond.scenedesmus, pond.copepod, pond.rotifer, pond.nauplius, pond.spirulina, pond.chaetoceros, pond.skeletonema, pond.rhizosolenia, pond.anabaena, pond.oscillatoria, pond.microcystis, pond.coscinodiscus, pond.nitzchia, pond.navicula, pond.noctiluca, pond.ceratium, pond.dinophysis, pond.gymnodinium, pond.zoothamnium, pond.tintinnopsis, pond.favella].map((val, idx) => (
-                      <td key={idx} className={`text-center ${idx === 23 ? "" : "border-r"} border-black p-1`}>{val || "-"}</td>
+                    <td className="border-r border-black text-center font-bold bg-gray-50">{pond.pondNo}</td>
+                    {[
+                     
+                      pond.phacus,
+                      pond.chlorella,
+                      pond.desmids,
+                      pond.scenedesmus,
+                      pond.copepod,
+                      pond.rotifer,
+                      pond.nauplius,
+                      pond.brachionus,           // ← added missing value
+                      pond.spirulina,
+                      pond.chaetoceros,
+                      pond.skeletonema,
+                      pond.rhizosolenia,
+                      pond.anabaena,
+                      pond.oscillatoria,
+                      pond.microcystis,
+                      pond.coscinodiscus,
+                      pond.nitzchia,
+                      pond.navicula,
+                      pond.noctiluca,
+                      pond.ceratium,
+                      pond.dinophysis,
+                      pond.gymnodinium,
+                      pond.zoothamnium,
+                      pond.tintinnopsis,
+                      pond.favella,
+                    ].map((val, idx) => (
+                      <td
+                        key={idx}
+                        className={`text-center ${idx === 24 ? "" : "border-r"} border-black`}
+                      >
+                        {val || "-"}
+                      </td>
                     ))}
                   </tr>
                 ))}
