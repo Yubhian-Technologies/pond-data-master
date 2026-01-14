@@ -93,6 +93,39 @@ export default function PLForm({
   // Read-only display field
   const [farmerUID, setFarmerUID] = useState<string>("");
 
+  useEffect(() => {
+  if (!invoiceId || !locationId) return;
+
+  const fetchInvoice = async () => {
+    try {
+      const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+      // Try new invoices
+      let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+      let snap = await getDocs(q);
+
+      // Fallback to old invoices
+      if (snap.empty) {
+        q = query(invoicesRef, where("id", "==", invoiceId));
+        snap = await getDocs(q);
+      }
+
+      if (!snap.empty) {
+        const docSnap = snap.docs[0];
+        setLocalInvoice({ ...docSnap.data(), docId: docSnap.id });
+        console.log("PLForm loaded invoice:", docSnap.id);
+      } else {
+        console.error("PLForm invoice not found:", invoiceId);
+      }
+    } catch (err) {
+      console.error("PLForm invoice fetch error:", err);
+    }
+  };
+
+  fetchInvoice();
+}, [invoiceId, locationId]);
+
+
  // Pre-fill from invoice + load saved report data
 useEffect(() => {
   const loadData = async () => {
