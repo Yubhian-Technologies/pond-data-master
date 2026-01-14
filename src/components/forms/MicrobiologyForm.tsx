@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  setDoc, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
 interface FarmerInfo {
@@ -7,27 +15,27 @@ interface FarmerInfo {
   village: string;
   mobile: string;
   date: string;
-  farmerId: string;          // ← Added
+  farmerId: string;
 }
 
 interface MicrobiologyFormProps {
-  invoice: any;
   invoiceId: string;
   locationId: string;
   onSubmit: () => void;
 }
 
 export default function MicrobiologyForm({
-  invoice,
   invoiceId,
   locationId,
   onSubmit,
 }: MicrobiologyFormProps) {
   const today = new Date().toISOString().split("T")[0];
 
+  const [localInvoice, setLocalInvoice] = useState<any>(null);
+
   const totalSamples =
     Number(
-      invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "microbiology")?.count || 0
+      localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "microbiology")?.count || 0
     );
 
   const createEmptyArray = (length: number) =>
@@ -44,39 +52,73 @@ export default function MicrobiologyForm({
   };
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
-    farmerName: invoice?.farmerName ?? "",
-    village: invoice?.village ?? "",
-    mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
+    farmerName: "",
+    village: "",
+    mobile: "",
     date: today,
-    farmerId: "",                    // ← Added
+    farmerId: "",
   });
 
   const [microbiologyData, setMicrobiologyData] = useState<any>(emptyMicrobiologyData);
   const [loading, setLoading] = useState(true);
 
-  // NEW: Farmer UID (display + save)
   const [farmerUID, setFarmerUID] = useState<string>("");
 
-  // Sample Type field
   const [sampleType, setSampleType] = useState<string>("Microbiology");
 
-  // ──────────────────────────────────────────────────────────────
-  // NEW: Per-sample selected microbiology tests from invoice
-  // ──────────────────────────────────────────────────────────────
-  const perSampleSelectedTests = invoice.perSampleSelectedTests?.microbiology || {};
+  const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.microbiology || {};
 
-  // Mapping from test ID → display name
   const testNameMap: Record<string, string> = {
     yellowColonies: "Yellow Colonies",
     greenColonies: "Green Colonies",
     tpc: "Total Plate Count (TPC)",
     testCode: "Test Code",
   };
-  // ──────────────────────────────────────────────────────────────
 
+  // Fetch invoice
+  useEffect(() => {
+    if (!locationId || !invoiceId) {
+      console.warn("Missing locationId or invoiceId for invoice fetch");
+      return;
+    }
+
+    const fetchInvoice = async () => {
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          querySnapshot = await getDocs(q);
+        }
+
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const data = docSnap.data();
+          const docId = docSnap.id;
+
+          setLocalInvoice({ ...data, docId });
+          console.log("Invoice loaded OK:", { 
+            docId, 
+            invoiceId: data.invoiceId || data.id || "unknown" 
+          });
+        } else {
+          console.error("Invoice NOT FOUND for ID:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice in form:", err);
+      }
+    };
+
+    fetchInvoice();
+  }, [locationId, invoiceId]);
+
+  // Pre-fill farmer data + load saved report
   useEffect(() => {
     const loadData = async () => {
-      if (!invoiceId || !locationId || totalSamples === 0) {
+      if (!localInvoice) {
         setLoading(false);
         return;
       }
@@ -84,24 +126,35 @@ export default function MicrobiologyForm({
       try {
         setLoading(true);
 
-        // Load formatted Farmer ID
+        // ALWAYS pre-fill from farmer master (runs on first load)
         let loadedFarmerId = "";
-        if (invoice?.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+        if (localInvoice?.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
           const farmerSnap = await getDoc(farmerRef);
           if (farmerSnap.exists()) {
             const farmerData = farmerSnap.data();
             loadedFarmerId = farmerData.farmerId || "";
             setFarmerUID(loadedFarmerId);
+
+            // Pre-fill name, village, mobile, date
+            setFarmerInfo(prev => ({
+              ...prev,
+              farmerName: farmerData.name || prev.farmerName || "",
+              village: farmerData.city || prev.village || "",
+              mobile: farmerData.phone || prev.mobile || "",
+              date: localInvoice.dateOfCulture || today,
+              farmerId: loadedFarmerId,
+            }));
           }
         }
 
+        // Load saved microbiology report (overrides pre-fill if exists)
         const reportRef = doc(
           db,
           "locations",
           locationId,
           "invoices",
-          invoiceId,
+          localInvoice.docId,  // ← Fixed: use real docId
           "microbiologyReports",
           "data"
         );
@@ -109,19 +162,18 @@ export default function MicrobiologyForm({
         const snap = await getDoc(reportRef);
 
         if (snap.exists()) {
-          const data = snap.data();
+          const data = snap.data() || {};
 
           if (data.farmerInfo) {
             setFarmerInfo({
-              farmerName: data.farmerInfo.farmerName || invoice?.farmerName || "",
-              village: data.farmerInfo.village || invoice?.village || "",
-              mobile: data.farmerInfo.mobile || invoice?.farmerPhone || invoice?.mobile || "",
-              date: data.farmerInfo.date || today,
+              farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
+              village: data.farmerInfo.village || farmerInfo.village,
+              mobile: data.farmerInfo.mobile || farmerInfo.mobile,
+              date: data.farmerInfo.date || localInvoice?.dateOfCulture || today,
               farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",
             });
           }
 
-          // Load saved sample type if exists
           if (data.sampleType) {
             setSampleType(data.sampleType);
           }
@@ -135,11 +187,7 @@ export default function MicrobiologyForm({
 
           setMicrobiologyData(normalized);
         } else {
-          // First time - set farmerId from loaded value
-          setFarmerInfo((prev) => ({
-            ...prev,
-            farmerId: loadedFarmerId,
-          }));
+          // First time - keep pre-filled values
           setMicrobiologyData(emptyMicrobiologyData);
         }
       } catch (error) {
@@ -151,7 +199,7 @@ export default function MicrobiologyForm({
     };
 
     loadData();
-  }, [invoice, invoiceId, locationId, totalSamples, today]);
+  }, [localInvoice, locationId, today]);
 
   const updateColumn = (field: keyof typeof emptyMicrobiologyData, index: number, value: string) => {
     setMicrobiologyData((prev: any) => ({
@@ -161,7 +209,10 @@ export default function MicrobiologyForm({
   };
 
   const handleSave = async () => {
-    if (!invoiceId || !locationId) return;
+    if (!invoiceId || !locationId || !localInvoice?.docId) {
+      alert("Cannot save: Invoice not loaded or missing ID");
+      return;
+    }
 
     try {
       const reportRef = doc(
@@ -169,7 +220,7 @@ export default function MicrobiologyForm({
         "locations",
         locationId,
         "invoices",
-        invoiceId,
+        localInvoice.docId,
         "microbiologyReports",
         "data"
       );
@@ -177,10 +228,10 @@ export default function MicrobiologyForm({
       await setDoc(
         reportRef,
         {
-          farmerInfo,           // now includes farmerId
+          farmerInfo,
           microbiologyData,
           totalSamples,
-          sampleType,           // ← saving sample type too
+          sampleType,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }

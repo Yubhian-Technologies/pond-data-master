@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  setDoc, 
+  updateDoc, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
-import { Invoice } from "../../types";
 import { useNavigate } from "react-router-dom";
 
 interface Pond {
@@ -39,7 +47,7 @@ interface Pond {
   copepod: string;
   rotifer: string;
   nauplius: string;
-  brachionus: string;           // ← added
+  brachionus: string;
   spirulina: string;
   chaetoceros: string;
   skeletonema: string;
@@ -66,18 +74,17 @@ interface Pond {
 interface WaterFormProps {
   invoiceId: string;
   locationId: string;
-  invoice: Invoice;
   onSubmit: () => void;
 }
 
 export default function WaterForm({
   invoiceId,
   locationId,
-  invoice,
   onSubmit,
 }: WaterFormProps) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [localInvoice, setLocalInvoice] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     farmerName: "",
@@ -103,7 +110,7 @@ export default function WaterForm({
     dissolvedOxygen: "", totalDissolvedMatter: "",
     yellowColonies: "", greenColonies: "", tpc: "",
     phacus: "", chlorella: "", desmids: "", scenedesmus: "", copepod: "", rotifer: "", nauplius: "",
-    brachionus: "",           // ← added
+    brachionus: "",
     spirulina: "", chaetoceros: "", skeletonema: "", rhizosolenia: "",
     anabaena: "", oscillatoria: "", microcystis: "",
     coscinodiscus: "", nitzchia: "", navicula: "",
@@ -113,14 +120,56 @@ export default function WaterForm({
 
   const [ponds, setPonds] = useState<Pond[]>([]);
 
+  // Fetch invoice using query (matches LabResults and InvoicePage logic)
+  useEffect(() => {
+    if (!locationId || !invoiceId) {
+      console.warn("Missing locationId or invoiceId for WaterForm fetch");
+      return;
+    }
+
+    const fetchInvoice = async () => {
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        // Try by 'invoiceId' field first (new invoices)
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let querySnapshot = await getDocs(q);
+
+        // Fallback to old 'id' field (legacy invoices)
+        if (querySnapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          querySnapshot = await getDocs(q);
+        }
+
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const data = docSnap.data();
+          const docId = docSnap.id;
+
+          setLocalInvoice({ ...data, docId });
+          console.log("WaterForm - Invoice loaded OK:", { 
+            docId, 
+            invoiceId: data.invoiceId || data.id || "unknown" 
+          });
+        } else {
+          console.error("WaterForm - Invoice NOT FOUND for ID:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice in WaterForm:", err);
+      }
+    };
+
+    fetchInvoice();
+  }, [locationId, invoiceId]);
+
   const totalSamples =
     Number(
-      invoice.sampleType?.find(
+      localInvoice?.sampleType?.find(
         (s: any) => s.type?.toLowerCase() === "water"
       )?.count
     ) || 1;
 
-  const perSampleSelectedTests = invoice.perSampleSelectedTests?.water || {};
+  const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.water || {};
 
   const testNameMap: Record<string, string> = {
     pH: "pH",
@@ -152,7 +201,7 @@ export default function WaterForm({
     copepod: "Copepod",
     rotifer: "Rotifer",
     nauplius: "Nauplius",
-    brachionus: "Brachionus",           // ← added + fixed spelling
+    brachionus: "Brachionus",
     spirulina: "Spirulina",
     chaetoceros: "Chaetoceros",
     skeletonema: "Skeletonema",
@@ -174,7 +223,7 @@ export default function WaterForm({
 
   useEffect(() => {
     const loadData = async () => {
-      if (!invoice || !locationId || !invoiceId) {
+      if (!localInvoice || !locationId || !invoiceId) {
         setLoading(false);
         return;
       }
@@ -186,8 +235,8 @@ export default function WaterForm({
         const todayDate = today.toISOString().split("T")[0];
         const currentTime = today.toTimeString().slice(0, 5);
 
-        if (invoice.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+        if (localInvoice.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
           const farmerSnap = await getDoc(farmerRef);
           if (farmerSnap.exists()) {
             const farmer = farmerSnap.data();
@@ -198,7 +247,7 @@ export default function WaterForm({
               mobile: farmer.phone || "",
               farmerUID: farmer.farmerId || "",
               farmerAddress: [farmer.address, farmer.city].filter(Boolean).join(", "),
-              sdDoc: invoice.dateOfCulture || "",
+              sdDoc: localInvoice.dateOfCulture || "",
               sourceOfWater: farmer.waterSource || "",
               sampleDate: todayDate,
               reportDate: todayDate,
@@ -214,7 +263,7 @@ export default function WaterForm({
           "locations",
           locationId,
           "invoices",
-          invoiceId,
+          localInvoice.docId,  // ← Use real docId here!
           "water_reports"
         );
         const snapshot = await getDocs(waterReportsRef);
@@ -259,7 +308,7 @@ export default function WaterForm({
               copepod: data.copepod || "",
               rotifer: data.rotifer || "",
               nauplius: data.nauplius || "",
-              brachionus: data.brachionus || "",           // ← added
+              brachionus: data.brachionus || "",
               spirulina: data.spirulina || "",
               chaetoceros: data.chaetoceros || "",
               skeletonema: data.skeletonema || "",
@@ -295,8 +344,10 @@ export default function WaterForm({
       }
     };
 
-    loadData();
-  }, [invoice, invoiceId, locationId, totalSamples]);
+    if (localInvoice) {
+      loadData();
+    }
+  }, [localInvoice, invoiceId, locationId, totalSamples]);
 
   const handlePondChange = (id: number, field: keyof Pond, value: string) => {
     setPonds((prev) =>
@@ -305,9 +356,14 @@ export default function WaterForm({
   };
 
   const saveAllPonds = async () => {
+    if (!localInvoice?.docId) {
+      alert("Cannot save: Invoice not loaded or missing ID");
+      return;
+    }
+
     const savePromises = ponds.map((pond, index) => {
       const ref = doc(
-        collection(db, "locations", locationId, "invoices", invoiceId, "water_reports"),
+        collection(db, "locations", locationId, "invoices", localInvoice.docId, "water_reports"),
         `sample_${index + 1}`
       );
       return setDoc(ref, {
@@ -325,7 +381,12 @@ export default function WaterForm({
     try {
       await saveAllPonds();
 
-      const invoiceRef = doc(db, "locations", locationId, "invoices", invoice.docId || invoiceId);
+      if (!localInvoice?.docId) {
+        alert("Cannot update invoice: Invoice not loaded");
+        return;
+      }
+
+      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
 
       await updateDoc(invoiceRef, {
         "reportsProgress.water": "completed",
@@ -490,7 +551,7 @@ export default function WaterForm({
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {([
                   "phacus", "chlorella", "desmids", "scenedesmus",
-                  "copepod", "rotifer", "nauplius", "brachionus",     // ← added here
+                  "copepod", "rotifer", "nauplius", "brachionus",
                   "spirulina",
                   "chaetoceros", "skeletonema", "rhizosolenia",
                 ] as const).map((field) => {

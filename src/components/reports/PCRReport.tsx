@@ -1,12 +1,19 @@
 // src/components/reports/PCRReport.tsx
 
 import React, { useEffect, useState } from "react";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { 
+  doc, 
+  getDoc, 
+  collection, 
+  getDocs, 
+  query, 
+  where 
+} from "firebase/firestore";
 import { db } from "@/pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import { Printer } from "lucide-react";
-import { useUserSession } from "@/contexts/UserSessionContext"; // ← Added
+import { useUserSession } from "@/contexts/UserSessionContext";
 
 interface PCRReportProps {
   invoiceId: string;
@@ -25,24 +32,66 @@ export default function PCRReport({
   allSampleCount = 1,
   compact = false,
 }: PCRReportProps) {
-  const { session } = useUserSession(); // ← Get current technician from session
-
+  const { session } = useUserSession();
   const [farmerInfo, setFarmerInfo] = useState<any>(null);
   const [reports, setReports] = useState<any[]>([]);
-  const [technicianName, setTechnicianName] = useState<string>(""); // ← Added
+  const [technicianName, setTechnicianName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [locationDetails, setLocationDetails] = useState<{
-  address: string;
-  email: string;
-  contactNumber: string;
-}>({
-  address: "",
-  email: "",
-  contactNumber: "",
-});
+    address: string;
+    email: string;
+    contactNumber: string;
+  }>({
+    address: "",
+    email: "",
+    contactNumber: "",
+  });
 
+  // NEW: Real invoice document ID
+  const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
+
+  // Step 1: Fetch real invoice docId using query
+  useEffect(() => {
+    const fetchRealDocId = async () => {
+      if (!invoiceId || !locationId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let snap = await getDocs(q);
+
+        if (snap.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          snap = await getDocs(q);
+        }
+
+        if (!snap.empty) {
+          const docSnap = snap.docs[0];
+          setRealInvoiceDocId(docSnap.id);
+          console.log("PCRReport - Found real docId:", docSnap.id);
+        } else {
+          console.error("PCRReport - Invoice document not found for:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice docId:", err);
+      }
+    };
+
+    fetchRealDocId();
+  }, [invoiceId, locationId]);
+
+  // Step 2: Fetch report data using real docId
   useEffect(() => {
     const fetchPCRReport = async () => {
+      if (!realInvoiceDocId || !locationId) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
 
@@ -56,7 +105,7 @@ export default function PCRReport({
             "locations",
             locationId,
             "invoices",
-            invoiceId,
+            realInvoiceDocId,          // ← FIXED: Use real docId
             "pcr_reports"
           );
 
@@ -82,18 +131,17 @@ export default function PCRReport({
               sampleType: data.sampleType || "PL",
               pathogens: data.pathogens || [],
               gelImageUrl: data.gelImageUrl || null,
-             farmerInfo: {
-  farmerName: data.farmerName || "",
-  village: data.village || "",
-  mobile: data.mobile || "",
-  farmerId: data.farmerId || "",
-  sampleCollectionTime: data.sampleCollectionTime || "",
-  sampleType: data.sampleType || "",
-  noOfSamples: data.noOfSamples || "",
-  reportDate: data.reportDate || "",
-  docDifference: data.docDifference || "",
-},
-
+              farmerInfo: {
+                farmerName: data.farmerName || "",
+                village: data.village || "",
+                mobile: data.mobile || "",
+                farmerId: data.farmerId || "",
+                sampleCollectionTime: data.sampleCollectionTime || "",
+                sampleType: data.sampleType || "",
+                noOfSamples: data.noOfSamples || "",
+                reportDate: data.reportDate || "",
+                docDifference: data.docDifference || "",
+              },
             };
           });
 
@@ -114,7 +162,7 @@ export default function PCRReport({
             "locations",
             locationId,
             "invoices",
-            invoiceId,
+            realInvoiceDocId,          // ← FIXED: Use real docId
             "pcr_reports",
             `sample_${sampleNumber}`
           );
@@ -124,21 +172,19 @@ export default function PCRReport({
           if (snap.exists()) {
             const data = snap.data();
 
-            // Get technician name from this single document
             techName = data.technicianName || data.reportedBy || "";
 
             setFarmerInfo({
-  farmerName: data.farmerName || "",
-  village: data.village || "",
-  mobile: data.mobile || "",
-  farmerId: data.farmerId || "",
-  sampleCollectionTime: data.sampleCollectionTime || "",
-  sampleType: data.sampleType || "",
-  noOfSamples: data.noOfSamples || "",
-  reportDate: data.reportDate || "",
-  docDifference: data.docDifference || "",
-});
-
+              farmerName: data.farmerName || "",
+              village: data.village || "",
+              mobile: data.mobile || "",
+              farmerId: data.farmerId || "",
+              sampleCollectionTime: data.sampleCollectionTime || "",
+              sampleType: data.sampleType || "",
+              noOfSamples: data.noOfSamples || "",
+              reportDate: data.reportDate || "",
+              docDifference: data.docDifference || "",
+            });
 
             setReports([
               {
@@ -160,12 +206,10 @@ export default function PCRReport({
         }
 
         setTechnicianName(techName);
-
       } catch (err) {
         console.error("Error fetching PCR report:", err);
         setReports([]);
         setFarmerInfo(null);
-        // On error, fallback to session name
         if (session?.technicianName) {
           setTechnicianName(session.technicianName);
         }
@@ -174,13 +218,15 @@ export default function PCRReport({
       }
     };
 
-    fetchPCRReport();
-  }, [invoiceId, locationId, sampleNumber, showAllSamples, allSampleCount, compact, session]);
+    if (realInvoiceDocId) {
+      fetchPCRReport();
+    }
+  }, [realInvoiceDocId, locationId, sampleNumber, showAllSamples, allSampleCount, compact, session]);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
       if (!locationId) return;
-  
+
       try {
         const locDoc = await getDoc(doc(db, "locations", locationId));
         if (locDoc.exists()) {
@@ -193,10 +239,9 @@ export default function PCRReport({
         }
       } catch (error) {
         console.error("Error fetching location details:", error);
-        
       }
     };
-  
+
     fetchLocationDetails();
   }, [locationId]);
 
@@ -220,11 +265,11 @@ export default function PCRReport({
 
   const ResultTable = () => (
     <div className="overflow-x-auto mb-4">
-       <div className="text-center">
+      <div className="text-center">
         <h2 className="text-2xl font-bold text-red-700 m-4">
-              RT-q PCR Analysis
-            </h2>
-       </div>
+          RT-qPCR Analysis
+        </h2>
+      </div>
       <table className="w-full border-2 border-gray-800 text-sm">
         <thead className="bg-blue-100">
           <tr>
@@ -294,9 +339,6 @@ export default function PCRReport({
     </div>
   );
 
-  /* =========================
-     GEL IMAGES SECTION (Reusable)
-  ========================= */
   const GelImagesSection = () => {
     if (!reports.some((r) => r.gelImageUrl)) return null;
 
@@ -339,58 +381,34 @@ export default function PCRReport({
 
   return (
     <>
-      {/* Print-specific styles: reduce sizes and spacing only when printing to help fit on one page */}
-      <style >{`
+      {/* Print-specific styles unchanged */}
+      <style>{`
         @media print {
           #report {
             padding: 4px !important;
             margin: 0 !important;
             box-shadow: none !important;
           }
-
-          /* Reduce font sizes */
           h1 { font-size: 1.8rem !important; }
           h2 { font-size: 1.3rem !important; }
           h3 { font-size: 1.4rem !important; }
-
-          /* Smaller text */
           p, td, th, span { font-size: 0.75rem !important; line-height: 1.3 !important; }
-
-          /* Reduce padding/margins */
           .px-8 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
           .py-4 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
-          .px-6 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-          .py-3 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
           .mb-8, .mb-10, .mt-12, .mt-16 { margin-bottom: 1rem !important; margin-top: 1rem !important; }
-
-          /* Logos smaller */
           img.h-28 { height: 3.5rem !important; }
-
-          /* Table tighter */
           table td, table th { padding: 0.25rem !important; }
-
-          /* Gel images smaller grid */
           .grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-3 {
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
             gap: 0.5rem !important;
           }
-          .grid div img {
-            max-height: 200px !important;
-            object-fit: contain !important;
-          }
-
-          /* Avoid unwanted breaks */
           table, div, section { page-break-inside: avoid !important; }
-
-          /* Page setup for A4 */
-          @page {
-            size: A4 portrait;
-            margin: 0.5cm;
-          }
+          @page { size: A4 portrait; margin: 0.5cm; }
+          .print\\:hidden { display: none !important; }
         }
       `}</style>
 
-      <div className=" p-8  rounded-lg" id="report">
+      <div className="p-8 rounded-lg" id="report">
         <div className="print:hidden mb-8 text-right">
           <button
             onClick={() => window.print()}
@@ -408,14 +426,13 @@ export default function PCRReport({
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
             <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
-            <p className="text-sm text-black">Contact No: {locationDetails.contactNumber || "Loading..."} | 
-  Mail Id: {locationDetails.email || "Loading..."}</p>
-           
+            <p className="text-sm text-black">
+              Contact No: {locationDetails.contactNumber || "Loading..."} | 
+              Mail Id: {locationDetails.email || "Loading..."}
+            </p>
           </div>
           <img src={AV} alt="AV Logo" className="h-28" />
         </div>
-
-        
 
         {farmerInfo && (
           <table className="w-full mb-10 border-2 border-gray-800 text-sm">
@@ -426,57 +443,32 @@ export default function PCRReport({
                 <td className="border px-6 py-3 font-bold bg-gray-100">Village</td>
                 <td className="border px-6 py-3">{farmerInfo.village || "-"}</td>
                 <td className="border px-6 py-3 font-bold bg-gray-100">Sample Collected</td>
-<td className="border px-6 py-3">{farmerInfo.sampleCollectionTime || "-"}</td>
-
+                <td className="border px-6 py-3">{farmerInfo.sampleCollectionTime || "-"}</td>
               </tr>
               <tr>
-  <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
-  <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
-
-  <td className="border px-6 py-3 font-bold bg-gray-100">Farmer ID</td>
-  <td className="border px-6 py-3">{farmerInfo.farmerId || "-"}</td>
-
-  <td className="border px-6 py-3 font-bold bg-gray-100">Report Date</td>
-  <td className="border px-6 py-3">{farmerInfo.reportDate || "-"}</td>
-</tr>
-
-<tr>
-  <td className="border px-6 py-3 font-bold bg-gray-100">Report Id</td>
-  <td className="border px-6 py-3">{invoiceId || '-'}</td>
-  <td className="border px-6 py-3 font-bold bg-gray-100">No of samples</td>
-  <td className="border px-6 py-3">{farmerInfo.noOfSamples || "-"}</td>
-  <td className="border px-6 py-3 font-bold bg-gray-100">DOC</td>
-  <td className="border px-6 py-3">{farmerInfo.docDifference || "-"}</td>
-</tr>
-
+                <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
+                <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Farmer ID</td>
+                <td className="border px-6 py-3">{farmerInfo.farmerId || "-"}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Report Date</td>
+                <td className="border px-6 py-3">{farmerInfo.reportDate || "-"}</td>
+              </tr>
+              <tr>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Report Id</td>
+                <td className="border px-6 py-3">{invoiceId || '-'}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">No of samples</td>
+                <td className="border px-6 py-3">{farmerInfo.noOfSamples || allSampleCount || "-"}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">DOC</td>
+                <td className="border px-6 py-3">{farmerInfo.docDifference || "-"}</td>
+              </tr>
             </tbody>
           </table>
         )}
-        
 
         <ResultTable />
         <GelImagesSection />
 
-        {/* Signature Section - Added exactly like other reports */}
-        {/* <div className="mt-16 mb-8 border-t-2 border-black pt-6">
-          <div className="flex justify-between text-sm px-10">
-            <div>
-              <p className="font-semibold">Reported by:</p>
-              <p className="mt-8 font-medium">{technicianName}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Checked by:</p>
-              <p className="mt-8">______________________</p>
-            </div>
-          </div>
-        </div> */}
-
-        {/* Note */}
-        {/* <div className="text-center text-xs text-gray-700 mt-10 mb-4">
-          <p>
-            <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
-          </p>
-        </div> */}
+        
       </div>
     </>
   );

@@ -1,7 +1,14 @@
 // src/components/reports/MicrobiologyReport.tsx
 
 import React, { useState, useEffect } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { 
+  doc, 
+  getDoc, 
+  collection, 
+  getDocs, 
+  query, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
@@ -13,7 +20,7 @@ interface FarmerInfo {
   village: string;
   mobile: string;
   date: string;
-  farmerId?: string;          // ← Added (optional for backward compatibility)
+  farmerId?: string;
 }
 
 interface MicrobiologyData {
@@ -50,9 +57,51 @@ export default function MicrobiologyReport({
     contactNumber: "",
   });
 
-  // Fetch microbiology report data
+  // NEW: Real invoice document ID
+  const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
+
+  // Step 1: Fetch real invoice docId using query
+  useEffect(() => {
+    const fetchRealDocId = async () => {
+      if (!invoiceId || !locationId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let snap = await getDocs(q);
+
+        if (snap.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          snap = await getDocs(q);
+        }
+
+        if (!snap.empty) {
+          const docSnap = snap.docs[0];
+          setRealInvoiceDocId(docSnap.id);
+          console.log("MicrobiologyReport - Found real docId:", docSnap.id);
+        } else {
+          console.error("MicrobiologyReport - Invoice document not found for:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice docId:", err);
+      }
+    };
+
+    fetchRealDocId();
+  }, [invoiceId, locationId]);
+
+  // Step 2: Fetch report data using real docId
   useEffect(() => {
     const fetchReport = async () => {
+      if (!realInvoiceDocId || !locationId) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
 
@@ -61,16 +110,17 @@ export default function MicrobiologyReport({
           "locations",
           locationId,
           "invoices",
-          invoiceId,
+          realInvoiceDocId,          // ← FIXED: Use real docId
           "microbiologyReports",
           "data"
         );
+
         const snap = await getDoc(reportRef);
 
         let techName = "";
 
         if (snap.exists()) {
-          const reportData = snap.data();
+          const reportData = snap.data() || {};
 
           techName = reportData.technicianName || reportData.reportedBy || "";
 
@@ -120,10 +170,12 @@ export default function MicrobiologyReport({
       }
     };
 
-    fetchReport();
-  }, [invoiceId, locationId, allSampleCount, session]);
+    if (realInvoiceDocId) {
+      fetchReport();
+    }
+  }, [realInvoiceDocId, locationId, allSampleCount, session]);
 
-  // Fetch location details (address, email, contact)
+  // Fetch location details (unchanged)
   useEffect(() => {
     const fetchLocationDetails = async () => {
       if (!locationId) return;
@@ -188,35 +240,35 @@ export default function MicrobiologyReport({
           <img src={AV} alt="AV Logo" className="w-32" />
         </div>
 
-       <div className="flex justify-center mb-10">
-  <table className="border-2 border-gray-800 text-sm w-full max-w-5xl">
-    <tbody>
-      {/* Row 1 - 8 columns */}
-      <tr>
-        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer Name</td>
-        <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerName || "-"}</td>
-        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Village</td>
-        <td className="border px-4 py-2 w-1/8">{farmerInfo?.village || "-"}</td>
-        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Report ID</td>
-        <td className="border px-4 py-2 w-1/8">{invoiceId || "-"}</td>
-        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">No. of Samples</td>
-        <td className="border px-4 py-2 w-1/8">{allSampleCount}</td>
-      </tr>
+        <div className="flex justify-center mb-10">
+          <table className="border-2 border-gray-800 text-sm w-full max-w-5xl">
+            <tbody>
+              {/* Row 1 - 8 columns */}
+              <tr>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer Name</td>
+                <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerName || "-"}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Village</td>
+                <td className="border px-4 py-2 w-1/8">{farmerInfo?.village || "-"}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Report ID</td>
+                <td className="border px-4 py-2 w-1/8">{invoiceId || "-"}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">No. of Samples</td>
+                <td className="border px-4 py-2 w-1/8">{allSampleCount}</td>
+              </tr>
 
-      {/* Row 2 - 8 columns */}
-      <tr>
-        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Mobile</td>
-        <td className="border px-4 py-2 w-1/8">{farmerInfo?.mobile || "-"}</td>
-        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer ID</td>
-        <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerId || "-"}</td>
-        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Sample Type</td>
-        <td className="border px-4 py-2 w-1/8" colSpan={1}>Microbiology</td>
-        <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Date</td>
-        <td className="border px-4 py-2 w-1/8">{farmerInfo?.date || "-"}</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+              {/* Row 2 - 8 columns */}
+              <tr>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Mobile</td>
+                <td className="border px-4 py-2 w-1/8">{farmerInfo?.mobile || "-"}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer ID</td>
+                <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerId || "-"}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Sample Type</td>
+                <td className="border px-4 py-2 w-1/8" colSpan={1}>Microbiology</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Date</td>
+                <td className="border px-4 py-2 w-1/8">{farmerInfo?.date || "-"}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <div className="text-center m-4">
           <h2 className="text-2xl font-bold text-red-600 mt-3">

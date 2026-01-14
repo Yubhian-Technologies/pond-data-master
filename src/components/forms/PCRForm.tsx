@@ -1,5 +1,13 @@
-import React, { useEffect, useState } from "react";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import React, { useEffect, useState,useMemo } from "react";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  setDoc, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
 interface FarmerInfo {
@@ -7,11 +15,11 @@ interface FarmerInfo {
   village: string;
   mobile: string;
   farmerId: string;
-  sampleCollectionTime: string; // ← Sample Collection Time (was Date of Culture)
+  sampleCollectionTime: string;
   sampleType: string;
   noOfSamples: number;
   reportDate: string;
-  docDifference: string; // ← Auto-calculated days difference
+  docDifference: string;
 }
 
 interface PathogenResult {
@@ -28,32 +36,50 @@ interface SamplePCRData {
 }
 
 interface PCRFormProps {
-  invoice: any;
   invoiceId: string;
   locationId: string;
   onSubmit: () => void;
 }
 
 export default function PCRForm({
-  invoice,
   invoiceId,
   locationId,
   onSubmit,
 }: PCRFormProps) {
   const today = new Date().toISOString().split("T")[0];
 
-  const totalSamples =
-    Number(
-      invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.count || 0
-    );
+  const [localInvoice, setLocalInvoice] = useState<any>(null);
+
+ // ... your existing code ...
+
+const totalSamples = useMemo(() => {
+  const count = Number(
+    localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.count || 0
+  );
+  console.log("PCR totalSamples calculated:", {
+    rawSampleType: localInvoice?.sampleType,
+    foundPCR: localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr"),
+    count
+  });
+  return count;
+}, [localInvoice]);
+
+useEffect(() => {
+  setFarmerInfo(prev => ({
+    ...prev,
+    noOfSamples: totalSamples
+  }));
+}, [totalSamples]);
+
+
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
-    farmerName: invoice?.farmerName || "",
-    village: invoice?.village || "",
-    mobile: invoice?.farmerPhone || invoice?.mobile || "",
-    farmerId: invoice?.farmerId || "—",
-    sampleCollectionTime: invoice?.dateOfCulture || today, // Sample Collection Time
-    sampleType: invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.type || "PL PCR",
+    farmerName: "",
+    village: "",
+    mobile: "",
+    farmerId: "—",
+    sampleCollectionTime: today,
+    sampleType: "PL PCR",
     noOfSamples: totalSamples,
     reportDate: today,
     docDifference: "0 days",
@@ -73,34 +99,76 @@ export default function PCRForm({
     pl_ihhnv: "IHHNV",
   };
 
-  const samplePathogens = invoice?.samplePathogens || {};
+  // Fetch invoice using query (matches LabResults and InvoicePage logic)
   useEffect(() => {
-  const loadFarmerFromMaster = async () => {
-    if (!invoice?.farmerId || !locationId) return;
-
-    try {
-      const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
-      const snap = await getDoc(farmerRef);
-
-      if (snap.exists()) {
-        const farmer = snap.data();
-
-        setFarmerInfo(prev => ({
-          ...prev,
-          farmerId: farmer.farmerId || "",   // ← Correct UID
-          farmerName: farmer.name || prev.farmerName,
-          mobile: farmer.phone || prev.mobile,
-          village: farmer.city || prev.village
-        }));
-      }
-    } catch (err) {
-      console.error("Failed to load farmer master data:", err);
+    if (!locationId || !invoiceId) {
+      console.warn("Missing locationId or invoiceId for PCRForm fetch");
+      return;
     }
-  };
 
-  loadFarmerFromMaster();
-}, [invoice?.farmerId, locationId]);
+    const fetchInvoice = async () => {
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
 
+        // Try by 'invoiceId' field first (new invoices)
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let querySnapshot = await getDocs(q);
+
+        // Fallback to old 'id' field (legacy invoices)
+        if (querySnapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          querySnapshot = await getDocs(q);
+        }
+
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const data = docSnap.data();
+          const docId = docSnap.id;
+
+          setLocalInvoice({ ...data, docId });
+          console.log("PCRForm - Invoice loaded OK:", { 
+            docId, 
+            invoiceId: data.invoiceId || data.id || "unknown" 
+          });
+        } else {
+          console.error("PCRForm - Invoice NOT FOUND for ID:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice in PCRForm:", err);
+      }
+    };
+
+    fetchInvoice();
+  }, [locationId, invoiceId]);
+
+  useEffect(() => {
+    const loadFarmerFromMaster = async () => {
+      if (!localInvoice?.farmerId || !locationId) return;
+
+      try {
+        const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
+        const snap = await getDoc(farmerRef);
+
+        if (snap.exists()) {
+          const farmer = snap.data();
+
+          setFarmerInfo(prev => ({
+            ...prev,
+            farmerId: farmer.farmerId || "",   // ← Correct UID
+            farmerName: farmer.name || prev.farmerName,
+            mobile: farmer.phone || prev.mobile,
+            village: farmer.city || prev.village
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to load farmer master data in PCRForm:", err);
+      }
+    };
+
+    if (localInvoice) {
+      loadFarmerFromMaster();
+    }
+  }, [localInvoice?.farmerId, locationId]);
 
   // Auto-calculate difference between sampleCollectionTime and reportDate
   useEffect(() => {
@@ -118,7 +186,7 @@ export default function PCRForm({
 
   useEffect(() => {
     const loadAllData = async () => {
-      if (!invoice || !invoiceId || !locationId || totalSamples === 0) {
+      if (!localInvoice || !invoiceId || !locationId || totalSamples === 0) {
         setLoading(false);
         return;
       }
@@ -134,7 +202,7 @@ export default function PCRForm({
             "locations",
             locationId,
             "invoices",
-            invoiceId,
+            localInvoice.docId,  // ← Use real docId here!
             "pcr_reports",
             `sample_${i}`
           );
@@ -154,7 +222,7 @@ export default function PCRForm({
               setGelImages((prev) => ({ ...prev, [i]: data.gelImageUrl }));
             }
           } else {
-            const selectedForThisSample = samplePathogens[i] || [];
+            const selectedForThisSample = localInvoice?.samplePathogens?.[i] || [];
 
             const initialPathogens = selectedForThisSample.map((testId: string) => ({
               name: PATHOGEN_NAME_MAP[testId] || testId,
@@ -179,8 +247,10 @@ export default function PCRForm({
       }
     };
 
-    loadAllData();
-  }, [invoice, invoiceId, locationId, totalSamples]);
+    if (localInvoice) {
+      loadAllData();
+    }
+  }, [localInvoice, invoiceId, locationId, totalSamples]);
 
   const handleBasicInput = (sampleIndex: number, field: keyof SamplePCRData, value: string) => {
     setSamplesData((prev) => {
@@ -243,8 +313,8 @@ export default function PCRForm({
   };
 
   const saveAllData = async () => {
-    if (!invoiceId || !locationId) {
-      alert("Missing invoice/location info");
+    if (!invoiceId || !locationId || !localInvoice?.docId) {
+      alert("Cannot save: Invoice not loaded or missing ID");
       return;
     }
 
@@ -256,14 +326,14 @@ export default function PCRForm({
           "locations",
           locationId,
           "invoices",
-          invoiceId,
+          localInvoice.docId,  // ← Use real docId!
           "pcr_reports",
           `sample_${sampleNum}`
         );
 
         await setDoc(ref, {
           sampleNumber: sampleNum,
-          ...farmerInfo, // Now includes all new fields
+          ...farmerInfo,
           sampleCode: sample.sampleCode,
           sampleType: sample.sampleType,
           pathogens: sample.pathogens,
@@ -364,7 +434,7 @@ export default function PCRForm({
       {samplesData.map((sample, sampleIndex) => {
         const sampleNum = sampleIndex + 1;
 
-        const selectedForThisSample = samplePathogens[sampleNum] || [];
+        const selectedForThisSample = localInvoice?.samplePathogens?.[sampleNum] || [];
         const selectedNames = selectedForThisSample.map(
           (id: string) => PATHOGEN_NAME_MAP[id] || id
         );

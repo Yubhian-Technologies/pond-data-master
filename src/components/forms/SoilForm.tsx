@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  setDoc, 
+  updateDoc, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
-import { Invoice } from "../../types";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../../contexts/UserSessionContext";
 
@@ -13,7 +21,7 @@ interface FormData {
   sourceOfSoil: string;
   noOfSamples: string;
   mobile: string;
-  sampleDate: string;           // ← added
+  sampleDate: string;
   reportDate: string;
   sampleCollectionTime: string;
   sampleTime: string;
@@ -37,14 +45,12 @@ interface Sample {
 }
 
 interface SoilFormProps {
-  invoice: any;
   invoiceId: string;
   locationId: string;
   onSubmit: () => void;
 }
 
 export default function SoilForm({
-  invoice,
   invoiceId,
   locationId,
   onSubmit,
@@ -64,7 +70,7 @@ export default function SoilForm({
     sourceOfSoil: '',
     noOfSamples: '1',
     mobile: '',
-    sampleDate: today,           // ← default to today
+    sampleDate: today,
     reportDate: today,
     sampleCollectionTime: '',
     sampleTime: '',
@@ -76,17 +82,57 @@ export default function SoilForm({
 
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
+  const [localInvoice, setLocalInvoice] = useState<any>(null);
+
+  // Fetch invoice using query (matches LabResults and InvoicePage logic)
+  useEffect(() => {
+    if (!locationId || !invoiceId) {
+      console.warn("Missing locationId or invoiceId for SoilForm fetch");
+      return;
+    }
+
+    const fetchInvoice = async () => {
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        // Try by 'invoiceId' field first (new invoices)
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let querySnapshot = await getDocs(q);
+
+        // Fallback to old 'id' field (legacy invoices)
+        if (querySnapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          querySnapshot = await getDocs(q);
+        }
+
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const data = docSnap.data();
+          const docId = docSnap.id;
+
+          setLocalInvoice({ ...data, docId });
+          console.log("SoilForm - Invoice loaded OK:", { 
+            docId, 
+            invoiceId: data.invoiceId || data.id || "unknown" 
+          });
+        } else {
+          console.error("SoilForm - Invoice NOT FOUND for ID:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice in SoilForm:", err);
+      }
+    };
+
+    fetchInvoice();
+  }, [locationId, invoiceId]);
 
   const totalSamples = Number(
-    invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")?.count || 1
+    localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")?.count || 1
   );
 
-  // ──────────────────────────────────────────────────────────────
-  // NEW: Per-sample selected soil tests from invoice
-  // ──────────────────────────────────────────────────────────────
-  const perSampleSelectedTests = invoice.perSampleSelectedTests?.soil || {};
+  // Per-sample selected soil tests from invoice
+  const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.soil || {};
 
-  // Mapping from test ID → display name (adjust keys to match your actual test IDs)
   const testNameMap: Record<string, string> = {
     pondNo: "Pond No.",
     pH: "pH",
@@ -98,9 +144,7 @@ export default function SoilForm({
     availablePhosphorus: "Available Phosphorus",
     redoxPotential: "Redox Potential",
     remarks: "Remarks",
-    // Add any other soil test IDs you use in availableTests
   };
-  // ──────────────────────────────────────────────────────────────
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -123,7 +167,7 @@ export default function SoilForm({
 
   useEffect(() => {
     const loadData = async () => {
-      if (!invoice || !locationId || !invoiceId) {
+      if (!localInvoice || !locationId || !invoiceId) {
         setLoading(false);
         return;
       }
@@ -132,8 +176,8 @@ export default function SoilForm({
         setLoading(true);
 
         // Pre-fill farmer info
-        if (invoice.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+        if (localInvoice.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
           const farmerSnap = await getDoc(farmerRef);
           if (farmerSnap.exists()) {
             const farmer = farmerSnap.data();
@@ -144,7 +188,7 @@ export default function SoilForm({
               farmerAddress: `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
               mobile: farmer.phone || "",
               noOfSamples: String(totalSamples),
-              sampleDate: invoice.dateOfCulture || today,           // ← use Date of Culture from invoice
+              sampleDate: localInvoice.dateOfCulture || today,
             }));
           }
         }
@@ -164,7 +208,7 @@ export default function SoilForm({
             reportedBy: headerData.technicianName || technicianName,
             checkedBy: headerData.technicianName || technicianName,
             cmisBy: headerData.technicianName || technicianName,
-            sampleDate: headerData.sampleDate || invoice.dateOfCulture || today,  // ← prefer saved, fallback to invoice
+            sampleDate: headerData.sampleDate || localInvoice.dateOfCulture || today,
           }));
         }
 
@@ -209,11 +253,16 @@ export default function SoilForm({
       }
     };
 
-    loadData();
-  }, [invoice, invoiceId, locationId, technicianName, currentTime, totalSamples]);
+    if (localInvoice) {
+      loadData();
+    }
+  }, [localInvoice, invoiceId, locationId, technicianName, totalSamples]);
 
   const saveAllData = async () => {
-    if (!locationId || !invoiceId) return;
+    if (!locationId || !invoiceId || !localInvoice?.docId) {
+      alert("Cannot save: Invoice not loaded or missing ID");
+      return;
+    }
 
     try {
       // Save shared header
@@ -225,7 +274,7 @@ export default function SoilForm({
         sampleTime: formData.sampleTime,
         reportTime: formData.reportTime,
         technicianName: technicianName,
-        sampleDate: formData.sampleDate,           // ← save it too
+        sampleDate: formData.sampleDate,
       }, { merge: true });
 
       // Save all samples
@@ -239,8 +288,8 @@ export default function SoilForm({
 
       await Promise.all(savePromises);
 
-      // Mark as completed
-      const invoiceRef = doc(db, "locations", locationId, "invoices", invoice.docId || invoiceId);
+      // Mark as completed – use real docId
+      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
       await updateDoc(invoiceRef, {
         "reportsProgress.soil": "completed",
       });
@@ -253,7 +302,7 @@ export default function SoilForm({
 
   const handleSubmit = async () => {
     await saveAllData();
-    onSubmit(); 
+    onSubmit();
   };
 
   if (loading) {
@@ -340,7 +389,6 @@ export default function SoilForm({
       {/* All Samples - One Section Per Sample */}
       {samples.map((sample, index) => {
         const sampleNumber = index + 1;
-        // Get selected tests only for this specific sample
         const sampleSelectedIds = perSampleSelectedTests[sampleNumber] || [];
         const sampleSelectedNames = sampleSelectedIds
           .map(id => testNameMap[id] || id)
@@ -348,7 +396,6 @@ export default function SoilForm({
 
         return (
           <div key={index} className="mb-10">
-            {/* NEW: Selected tests for this specific sample */}
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-sm font-medium text-blue-800 mb-1">
                 Tests selected for Sample #{sampleNumber}:

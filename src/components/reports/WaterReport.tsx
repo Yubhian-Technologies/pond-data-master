@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
-// All image imports (Logic & Content unchanged)
+// All image imports (unchanged)
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import corrella from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alge/1-CHORELLA.png";
@@ -131,61 +131,101 @@ const WaterReport: React.FC<WaterReportProps> = ({
     contactNumber: "",
   });
 
-  // NEW: State for shared Remarks & Recommendations
   const [remarksAndRecommendations, setRemarksAndRecommendations] = useState<string>("");
+
+  const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
 
   const handlePrint = () => window.print();
 
+  // Fetch real invoice docId
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInvoiceDocId = async () => {
       if (!invoiceId || !locationId) {
         setLoading(false);
         return;
       }
-      try {
-        setLoading(true);
-        const invoicesRef = collection(db, "locations", locationId, "invoices");
-        const q = query(invoicesRef, where("invoiceId", "==", invoiceId));
-        const invoiceSnap = await getDocs(q);
 
-        if (invoiceSnap.empty) {
-          setLoading(false);
-          return;
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let snap = await getDocs(q);
+
+        if (snap.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          snap = await getDocs(q);
         }
 
-        const invoiceDoc = invoiceSnap.docs[0];
-        const invoiceData = invoiceDoc.data();
-        const waterType = invoiceData.sampleType?.find((s: any) => s.type?.toLowerCase() === "water");
-        const waterCount = waterType?.count || allSampleCount || 1;
+        if (!snap.empty) {
+          const docSnap = snap.docs[0];
+          setRealInvoiceDocId(docSnap.id);
+          console.log("WaterReport - Found real docId:", docSnap.id);
+        } else {
+          console.error("WaterReport - Invoice not found for:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice docId:", err);
+      }
+    };
 
-        setFormData({
-          farmerName: invoiceData.farmerName || "-",
-          mobile: invoiceData.farmerPhone || "-",
-          sdDoc: invoiceData.dateOfCulture || invoiceData.sdDoc || "-",
-          sampleCollectionTime: invoiceData.sampleCollectionTime || "-",
-          sampleTime: invoiceData.sampleTime || "-",
-          reportTime: invoiceData.reportTime || new Date().toTimeString().slice(0, 5),
-          farmerUID: invoiceData.farmerUID || invoiceData.farmerId || "-",
-          sourceOfWater: invoiceData.sourceOfWater || "-",
-          sampleDate: invoiceData.sampleDate || "-",
-          farmerAddress: invoiceData.farmerAddress || "-",
-          noOfSamples: waterCount.toString(),
-          reportDate: invoiceData.reportDate || new Date().toISOString().split("T")[0],
-          technicianName: invoiceData.technicianName || "",
-        });
+    fetchInvoiceDocId();
+  }, [invoiceId, locationId]);
 
-        const samplesCollection = collection(db, "locations", locationId, "invoices", invoiceId, "water_reports");
+  // Fetch data using real docId
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!realInvoiceDocId || !locationId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Invoice header info
+        const invoiceDocRef = doc(db, "locations", locationId, "invoices", realInvoiceDocId);
+        const invoiceSnap = await getDoc(invoiceDocRef);
+
+        if (invoiceSnap.exists()) {
+          const invoiceData = invoiceSnap.data();
+          const waterType = invoiceData.sampleType?.find((s: any) => s.type?.toLowerCase() === "water");
+          const waterCount = waterType?.count || allSampleCount || 1;
+
+          setFormData({
+            farmerName: invoiceData.farmerName || "-",
+            mobile: invoiceData.farmerPhone || "-",
+            sdDoc: invoiceData.dateOfCulture || invoiceData.sdDoc || "-",
+            sampleCollectionTime: invoiceData.sampleCollectionTime || "-",
+            sampleTime: invoiceData.sampleTime || "-",
+            reportTime: invoiceData.reportTime || new Date().toTimeString().slice(0, 5),
+            farmerUID: invoiceData.farmerUID || invoiceData.farmerId || "-",
+            sourceOfWater: invoiceData.sourceOfWater || "-",
+            sampleDate: invoiceData.sampleDate || "-",
+            farmerAddress: invoiceData.farmerAddress || "-",
+            noOfSamples: waterCount.toString(),
+            reportDate: invoiceData.reportDate || new Date().toISOString().split("T")[0],
+            technicianName: invoiceData.technicianName || "",
+          });
+        }
+
+        // Water samples
+        const samplesCollection = collection(
+          db,
+          "locations",
+          locationId,
+          "invoices",
+          realInvoiceDocId,
+          "water_reports"
+        );
         const samplesSnap = await getDocs(samplesCollection);
         const pondList: Pond[] = [];
 
-        // Load remarks from the first sample that has it (since it's saved in all)
         let loadedRemarks = "";
 
-        for (let i = 1; i <= waterCount; i++) {
+        for (let i = 1; i <= (allSampleCount || 1); i++) {
           const sampleDoc = samplesSnap.docs.find(d => d.id === `sample_${i}`);
           const data = sampleDoc?.data() || {};
 
-          // Load remarks once (shared)
           if (data.remarksAndRecommendations && !loadedRemarks) {
             loadedRemarks = data.remarksAndRecommendations;
           }
@@ -222,7 +262,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
             copepod: data.copepod || "-",
             rotifer: data.rotifer || "-",
             nauplius: data.nauplius || "-",
-            brachionus: data.brachionus || "-",           // ← added missing field
+            brachionus: data.brachionus || "-",
             spirulina: data.spirulina || "-",
             chaetoceros: data.chaetoceros || "-",
             skeletonema: data.skeletonema || "-",
@@ -251,8 +291,11 @@ const WaterReport: React.FC<WaterReportProps> = ({
         setLoading(false);
       }
     };
-    fetchData();
-  }, [invoiceId, locationId, allSampleCount]);
+
+    if (realInvoiceDocId) {
+      fetchData();
+    }
+  }, [realInvoiceDocId, locationId, allSampleCount]);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -454,7 +497,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
           </div>
         </div>
 
-        {/* PLANKTON ANALYSIS */}
+        {/* PLANKTON ANALYSIS - YOUR ORIGINAL IMAGES & NAMES RESTORED */}
         <div className="border border-black mb-4">
           <h3 className="text-center font-bold bg-white text-red-500 py-1 text-xs border-b border-black uppercase">PLANKTON ANALYSIS</h3>
           <div className="overflow-hidden">
@@ -480,7 +523,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <th className="border-r border-b border-black"></th>
 
                   {[
-                    
                     { img: phacus, name: "Oosystis" },
                     { img: corrella, name: "Chlorella" },
                     { img: desmids, name: "Eudorina" },
@@ -488,7 +530,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                     { img: copepod, name: "Copepod" },
                     { img: rotifer, name: "Rotifer" },
                     { img: nauplius, name: "Nauplius" },
-                    { img: brachionus, name: "Brachionus" },           // ← fixed spelling
+                    { img: brachionus, name: "Brachionus" },
                     { img: spirulina, name: "Spirulina" },
                     { img: chaetoceros, name: "Chaetoceros" },
                     { img: skeletonema, name: "Skeletonema" },
@@ -522,7 +564,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <tr key={pond.id} className="border-b border-black last:border-b-0">
                     <td className="border-r border-black text-center font-bold bg-gray-50">{pond.pondNo}</td>
                     {[
-                     
                       pond.phacus,
                       pond.chlorella,
                       pond.desmids,
@@ -530,7 +571,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                       pond.copepod,
                       pond.rotifer,
                       pond.nauplius,
-                      pond.brachionus,           // ← added missing value
+                      pond.brachionus,
                       pond.spirulina,
                       pond.chaetoceros,
                       pond.skeletonema,
@@ -563,7 +604,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
           </div>
         </div>
 
-        {/* Remarks & Recommendations - NOW DISPLAYS THE SAVED VALUE */}
+        {/* Remarks & Recommendations */}
         <div className="mb-4 border border-black p-2">
           <h4 className="font-bold text-xs mb-1">Remarks & Recommendations:</h4>
           <div className="min-h-[60px] mt-1 text-[11px] whitespace-pre-wrap">
