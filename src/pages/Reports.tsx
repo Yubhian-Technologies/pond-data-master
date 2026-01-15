@@ -1,7 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileCheck2, Calendar, FileText, Users, UserCircle, IndianRupee, RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FileCheck2, Calendar, FileText, Users, UserCircle, IndianRupee, RotateCcw, Pencil, Search } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs, Timestamp, query, where, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
@@ -45,6 +45,9 @@ const Reports = () => {
   // Date filter states
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+
+  // Search state (new)
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const locationId = session.locationId;
 
@@ -163,19 +166,41 @@ const Reports = () => {
   };
 
   const openInvoice = (invoiceId: string) => {
-    // Fixed: Now using the same pattern as in Samples.tsx
     navigate(`/invoice/${invoiceId}/${session.locationId}`);
   };
 
-  const filteredReports = reports.filter((report) => {
-    if (selectedTechnicianId === "all") return true;
-    return report.technicianId === selectedTechnicianId;
-  });
+  const editReport = (invoiceId: string) => {
+    navigate(`/lab-results/${invoiceId}?mode=edit`);
+  };
+
+  // Filtered reports (technician + text search)
+  const filteredReports = useMemo(() => {
+    let result = reports;
+
+    // Technician filter
+    if (selectedTechnicianId !== "all") {
+      result = result.filter((report) => report.technicianId === selectedTechnicianId);
+    }
+
+    // Text search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((report) => {
+        return (
+          (report.farmerName || "").toLowerCase().includes(q) ||
+          (report.invoiceId || "").toLowerCase().includes(q)
+        );
+      });
+    }
+
+    return result;
+  }, [reports, selectedTechnicianId, searchQuery]);
 
   const handleResetFilters = () => {
     setStartDate("");
     setEndDate("");
     setSelectedTechnicianId("all");
+    setSearchQuery(""); // also reset search
   };
 
   return (
@@ -218,7 +243,7 @@ const Reports = () => {
                   </div>
 
                   {/* Reset Filters Button */}
-                  {(startDate || endDate || selectedTechnicianId !== "all") && (
+                  {(startDate || endDate || selectedTechnicianId !== "all" || searchQuery) && (
                     <Button
                       variant="outline"
                       size="icon"
@@ -231,10 +256,24 @@ const Reports = () => {
                 </div>
               </div>
 
-              {/* Date Range Filter */}
+              {/* Date Range Filter + Search Box */}
               <Card className="shadow-sm">
                 <CardContent className="pt-6">
                   <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex-1 min-w-[240px]">
+                      <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                        Search reports
+                      </label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Farmer name / Invoice ID..."
+                          className="pl-10 h-10"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </div>
+                    </div>
                     <div className="flex-1 min-w-[180px]">
                       <label className="text-sm font-medium text-gray-700 mb-1.5 block">
                         Start Date
@@ -255,12 +294,10 @@ const Reports = () => {
                         onChange={(e) => setEndDate(e.target.value)}
                       />
                     </div>
-                    <Button
-                      onClick={() => {} /* Empty - useEffect handles it */}
-                      className="h-10 bg-cyan-600 hover:bg-cyan-700"
-                    >
-                      Apply
-                    </Button>
+                   
+
+                    
+                    
                   </div>
                 </CardContent>
               </Card>
@@ -278,12 +315,12 @@ const Reports = () => {
                     <FileText className="w-10 h-10 text-gray-400" />
                   </div>
                   <h3 className="text-xl font-medium text-muted-foreground mb-2">
-                    {selectedTechnicianId !== "all" || startDate || endDate
+                    {selectedTechnicianId !== "all" || startDate || endDate || searchQuery
                       ? "No reports found for selected filters"
                       : "No completed reports yet"}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Try adjusting the technician or date range filters
+                    Try adjusting the filters or search term
                   </p>
                 </CardContent>
               </Card>
@@ -385,6 +422,16 @@ const Reports = () => {
                             className="border-cyan-600 text-cyan-700 hover:bg-cyan-50 px-5"
                           >
                             View Invoice
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => editReport(report.invoiceId)}
+                            className="border-amber-600 text-amber-700 hover:bg-amber-50 px-5 flex items-center gap-1"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
                           </Button>
                         </div>
                       </div>

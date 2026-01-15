@@ -683,13 +683,13 @@ const Dashboard = () => {
                       <SelectContent>
                         {allLocations.map((loc) => (
                           <SelectItem key={loc.id} value={loc.id}>
-                            {loc.name} ({loc.code})
+                            {loc.name} 
                           </SelectItem>
                         ))}
-                      </SelectContent>
+                      </SelectContent>  
                     </Select>
                   </div>
-
+{/* ({loc.code}) */}
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Users className="w-4 h-4 text-purple-600" />

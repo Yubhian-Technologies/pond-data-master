@@ -58,6 +58,7 @@ const Samples = () => {
 
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [farmerSearchQuery, setFarmerSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Payment Dialog State 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -228,16 +229,36 @@ const Samples = () => {
     return activeTypes.every((type: string) => sample.reportsProgress[type] === "completed");
   };
 
-  const filteredInvoices = invoices.filter((inv) => {
-    if (selectedTechnicianId === "all") return true;
-    return inv.technicianId === selectedTechnicianId;
-  });
+  const filteredInvoices = useMemo(() => {
+  let result = invoices;
 
-  const sortedInvoices = [...filteredInvoices].sort((a, b) => {
+  // Technician filter
+  if (selectedTechnicianId !== "all") {
+    result = result.filter((inv) => inv.technicianId === selectedTechnicianId);
+  }
+
+  // Text search filter
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase().trim();
+    result = result.filter((inv) => {
+      return (
+        (inv.farmerName || "").toLowerCase().includes(q) ||
+        (inv.farmerPhone || "").toLowerCase().includes(q) ||
+        (inv.invoiceId || inv.id || "").toLowerCase().includes(q)
+      );
+    });
+  }
+
+  return result;
+}, [invoices, selectedTechnicianId, searchQuery]);
+
+const sortedInvoices = useMemo(() => {
+  return [...filteredInvoices].sort((a, b) => {
     const timeA = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
     const timeB = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
     return timeB - timeA;
   });
+}, [filteredInvoices]);
 
   const filteredFarmerSelection = useMemo(() => {
     return farmers.filter(f => 
@@ -383,39 +404,58 @@ const Samples = () => {
               </Button>
             </div>
 
-            {/* Date Range Filter */}
             <Card className="shadow-sm mb-8">
-              <CardContent className="pt-6">
-                <div className="flex flex-wrap items-end gap-4">
-                  <div className="flex-1 min-w-[180px]">
-                    <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                      Start Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-[180px]">
-                    <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                      End Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    className="h-10 bg-cyan-600 hover:bg-cyan-700"
-                    onClick={() => {}}
-                  >
-                    Apply
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+  <CardContent className="pt-6">
+    
+    <div className="flex flex-wrap items-end gap-4">
+      <div className="flex-1 min-w-[240px]">
+        <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+          Search samples
+        </Label>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Farmer / Phone / Invoice ID..."
+            className="pl-10 h-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="flex-1 min-w-[180px]">
+        <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+          Start Date
+        </Label>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+      </div>
+      <div className="flex-1 min-w-[180px]">
+        <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+          End Date
+        </Label>
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+        />
+      </div>
+
+   
+      {/* <Button
+        className="h-10 bg-cyan-600 hover:bg-cyan-700"
+        onClick={() => {}} 
+      >
+        Search
+      </Button> */}
+
+      
+      
+    </div>
+  </CardContent>
+</Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 flex-wrap gap-4">
@@ -460,7 +500,7 @@ const Samples = () => {
                         <SelectItem value="none">Current technician (me)</SelectItem>
                         {allOtherTechnicians.map((tech) => (
                           <SelectItem key={tech.id} value={tech.id}>
-                            {tech.name} (other branch)
+                            {tech.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
