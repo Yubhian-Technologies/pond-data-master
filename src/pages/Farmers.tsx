@@ -64,14 +64,14 @@ interface Farmer {
   };
 }
 
-// Hardcoded mapping: location name → code
+
 const LOCATION_NAME_TO_CODE: Record<string, string> = {
-  nellore: "NCR",
+  nellore: "NLR",
   bhimavaram: "BVRM",
   tamarakollu: "TMRK",
   ganapavaram: "GVRM",
   juvvalapalem: "JP",
-  // Add more if needed
+ 
 };
 
 const Farmers = () => {
@@ -104,7 +104,7 @@ const Farmers = () => {
           let matchedCode = "XXX"; // fallback
 
           // Smart matching based on name
-          if (locationName.includes("nellore")) matchedCode = "NCR";
+          if (locationName.includes("nellore")) matchedCode = "NLR";
           else if (locationName.includes("bhimavaram")) matchedCode = "BVRM";
           else if (locationName.includes("tamarakollu")) matchedCode = "TMRK";
           else if (locationName.includes("ganapavaram")) matchedCode = "GVRM";

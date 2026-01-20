@@ -157,7 +157,7 @@ const InvoicePage = () => {
     let prefix = "XXX";
     if (locationName) {
       const lowerName = locationName.toLowerCase();
-      if (lowerName.includes("nellore")) prefix = "NCR";
+      if (lowerName.includes("nellore")) prefix = "NLR";
       else if (lowerName.includes("bhimavaram")) prefix = "BVRM";
       else if (lowerName.includes("tamarakollu")) prefix = "TMRK";
       else if (lowerName.includes("ganapavaram")) prefix = "GVRM";
