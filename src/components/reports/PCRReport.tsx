@@ -47,10 +47,8 @@ export default function PCRReport({
     contactNumber: "",
   });
 
-  // NEW: Real invoice document ID
   const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
 
-  // Step 1: Fetch real invoice docId using query
   useEffect(() => {
     const fetchRealDocId = async () => {
       if (!invoiceId || !locationId) {
@@ -84,7 +82,6 @@ export default function PCRReport({
     fetchRealDocId();
   }, [invoiceId, locationId]);
 
-  // Step 2: Fetch report data using real docId
   useEffect(() => {
     const fetchPCRReport = async () => {
       if (!realInvoiceDocId || !locationId) {
@@ -105,7 +102,7 @@ export default function PCRReport({
             "locations",
             locationId,
             "invoices",
-            realInvoiceDocId,          // ← FIXED: Use real docId
+            realInvoiceDocId,
             "pcr_reports"
           );
 
@@ -121,7 +118,6 @@ export default function PCRReport({
             const data = d.data();
             const sampleId = d.id.replace(/^sample_/, "");
 
-            // Try to get technician name from any of the PCR documents
             if (!techName && (data.technicianName || data.reportedBy)) {
               techName = data.technicianName || data.reportedBy || "";
             }
@@ -162,7 +158,7 @@ export default function PCRReport({
             "locations",
             locationId,
             "invoices",
-            realInvoiceDocId,          // ← FIXED: Use real docId
+            realInvoiceDocId,
             "pcr_reports",
             `sample_${sampleNumber}`
           );
@@ -200,7 +196,6 @@ export default function PCRReport({
           }
         }
 
-        // Fallback to current logged-in technician if nothing found in documents
         if (!techName && session?.technicianName) {
           techName = session.technicianName;
         }
@@ -262,8 +257,12 @@ export default function PCRReport({
     new Set(reports.flatMap((r) => (r.pathogens || []).map((p: any) => p.name)))
   );
   const singlePathogen = allPathogens.length === 1;
+  const isSingleSample = reports.length === 1;
 
-  const ResultTable = () => (
+  const ResultTable = () => {
+  const isSingleSample = reports.length === 1;
+
+  return (
     <div className="overflow-x-auto mb-4">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-red-700 m-4">
@@ -276,10 +275,13 @@ export default function PCRReport({
             <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Code</th>
             <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Type</th>
 
-            {singlePathogen ? (
+            {isSingleSample ? (
               <>
-                <th className="border px-4 py-2">{allPathogens[0]} Result</th>
-                <th className="border px-4 py-2">{allPathogens[0]} C.T</th>
+                <th rowSpan={2} className="border px-4 py-2 align-middle font-bold">
+                  {"Pathogen"}
+                </th>
+                <th className="border px-4 py-2">Result</th>
+                <th className="border px-4 py-2">C.T</th>
               </>
             ) : (
               allPathogens.map((p) => (
@@ -290,7 +292,7 @@ export default function PCRReport({
             )}
           </tr>
 
-          {!singlePathogen && (
+          {!isSingleSample && (
             <tr>
               {allPathogens.map((p) => (
                 <React.Fragment key={p}>
@@ -308,8 +310,11 @@ export default function PCRReport({
               <td className="border px-4 py-2 text-center font-semibold">{r.sampleCode}</td>
               <td className="border px-4 py-2 text-center">{r.sampleType}</td>
 
-              {singlePathogen ? (
+              {isSingleSample ? (
                 <>
+                  <td className="border px-4 py-2 text-center font-medium">
+                    {allPathogens[0]}
+                  </td>
                   <td className="border px-4 py-2 text-center font-bold text-red-600">
                     {r.pathogens[0]?.result || "-"}
                   </td>
@@ -338,6 +343,7 @@ export default function PCRReport({
       </table>
     </div>
   );
+};
 
   const GelImagesSection = () => {
     if (!reports.some((r) => r.gelImageUrl)) return null;
@@ -381,7 +387,6 @@ export default function PCRReport({
 
   return (
     <>
-      {/* Print-specific styles unchanged */}
       <style>{`
         @media print {
           #report {
@@ -425,10 +430,13 @@ export default function PCRReport({
             <h1 className="text-4xl font-bold text-blue-800">
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
-            <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
+            <p className="text-sm text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
             <p className="text-sm text-black">
               Contact No: {locationDetails.contactNumber || "Loading..."} | 
               Mail Id: {locationDetails.email || "Loading..."}
+            </p>
+            <p className="text-sm text-black">
+              GSTIN: - 37AABCT0601L1ZJ
             </p>
           </div>
           <img src={AV} alt="AV Logo" className="h-28" />
@@ -467,8 +475,6 @@ export default function PCRReport({
 
         <ResultTable />
         <GelImagesSection />
-
-        
       </div>
     </>
   );

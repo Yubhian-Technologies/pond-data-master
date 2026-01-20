@@ -256,7 +256,7 @@ const Reports = () => {
                 </div>
               </div>
 
-              {/* Date Range Filter + Search Box */}
+              
               <Card className="shadow-sm">
                 <CardContent className="pt-6">
                   <div className="flex flex-wrap items-end gap-4">

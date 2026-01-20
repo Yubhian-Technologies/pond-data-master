@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Search, Download, Eye, X,Upload } from "lucide-react";
+import { Plus, Edit, Search, Download, Eye, X, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { db } from "./firebase";
@@ -92,6 +92,7 @@ const CMIS = () => {
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
   const [existingPublicId, setExistingPublicId] = useState<string | null>(null);
+  const [totalPayments, setTotalPayments] = useState<number>(0);
 
   // Assets state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -108,6 +109,7 @@ const CMIS = () => {
     acquiredDate: "",
     workingCondition: "Working",
   });
+  const [totalAssetsValue, setTotalAssetsValue] = useState<number>(0);
 
   // Cloudinary Config from .env
   const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -150,6 +152,7 @@ const CMIS = () => {
     const ref = collection(db, "locations", session.locationId, "payments");
     const q = query(ref, orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
+    
     const list: Payment[] = snap.docs.map((d) => ({
       id: d.id,
       date: d.data().date || "",
@@ -162,6 +165,9 @@ const CMIS = () => {
       fileName: d.data().fileName || "",
       createdAt: d.data().createdAt,
     })) as Payment[];
+
+    const total = list.reduce((sum, p) => sum + (p.amount || 0), 0);
+    setTotalPayments(total);
     setPayments(list);
   };
 
@@ -171,11 +177,15 @@ const CMIS = () => {
     const ref = collection(db, "locations", session.locationId, "assets");
     const q = query(ref, orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
+    
     const list: Asset[] = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
       workingCondition: d.data().workingCondition || "Working",
     })) as Asset[];
+
+    const totalValue = list.reduce((sum, a) => sum + (a.value || 0), 0);
+    setTotalAssetsValue(totalValue);
     setAssets(list);
   };
 
@@ -194,11 +204,11 @@ const CMIS = () => {
     let fileName = paymentFile?.name || (existingFileUrl ? "Previous file" : "");
 
     if (paymentFile) {
-  if (paymentFile.size > 2 * 1024 * 1024) { // 2 MB limit example
-    toast.error("File too large! Please upload files under 2 MB.");
-    return;
-  }
-}
+      if (paymentFile.size > 2 * 1024 * 1024) {
+        toast.error("File too large! Please upload files under 2 MB.");
+        return;
+      }
+    }
 
     if (paymentFile) {
       const uploadResult = await uploadToCloudinary(paymentFile);
@@ -238,7 +248,7 @@ const CMIS = () => {
     }
   };
 
-  // Handle asset submit (unchanged)
+  // Handle asset submit
   const handleAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session.locationId) return;
@@ -327,7 +337,7 @@ const CMIS = () => {
     setOpenAssetDialog(true);
   };
 
-  // Delete file reference from Firestore (Cloudinary file remains unless you add backend deletion)
+  // Delete file reference from Firestore
   const handleDeleteFile = async (paymentId: string) => {
     try {
       const docRef = doc(db, "locations", session.locationId!, "payments", paymentId);
@@ -339,7 +349,7 @@ const CMIS = () => {
     }
   };
 
-  // Filtered payments with search + date filters
+  // Filtered payments
   const filteredPayments = payments.filter((p) => {
     const matchesSearch =
       p.particulars.toLowerCase().includes(paymentSearch.toLowerCase()) ||
@@ -366,7 +376,7 @@ const CMIS = () => {
     return matchesSearch && matchesDate;
   });
 
-  // Excel Export with filters applied
+  // Excel Export - Payments
   const exportPaymentsToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Payments");
@@ -381,7 +391,6 @@ const CMIS = () => {
         payment.toPay,
         payment.amount,
         payment.invoiceId,
-        
       ]);
     });
 
@@ -393,7 +402,6 @@ const CMIS = () => {
       { width: 25 },
       { width: 15 },
       { width: 20 },
-      { width: 30 },
     ];
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -401,6 +409,7 @@ const CMIS = () => {
     saveAs(blob, `Lab_Payments_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
+  // Excel Export - Assets
   const exportAssetsToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Assets");
@@ -445,77 +454,86 @@ const CMIS = () => {
 
             <Card className="mb-12 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-3">
                     <div>
                       <CardTitle className="text-2xl">Payments</CardTitle>
                       <CardDescription>Track and manage lab payments</CardDescription>
                     </div>
                   </div>
-                  
-<Dialog open={openPaymentDialog} onOpenChange={setOpenPaymentDialog}>
-  <DialogTrigger asChild>
-    <Button className="gap-2 bg-cyan-500 hover:bg-cyan-600">
-      <Plus className="w-4 h-4" />
-      Add Payment
-    </Button>
-  </DialogTrigger>
-  <DialogContent className="max-w-lg"> {/* ← Reduced from max-w-xl */}
-    <DialogHeader>
-      <DialogTitle>{editPaymentMode ? "Edit Payment" : "Add New Payment"}</DialogTitle>
-      <DialogDescription>
-        {editPaymentMode ? "Update payment details." : "Enter payment details below."}
-      </DialogDescription>
-    </DialogHeader>
-    <form onSubmit={handlePaymentSubmit} className="space-y-4 mt-4"> {/* ← Reduced spacing */}
-      <div className="grid grid-cols-2 gap-3"> {/* ← Tighter grid gap */}
-        <div className="space-y-1.5">
-          <Label className="text-sm">Date *</Label>
-          <Input type="date" value={paymentFormData.date} onChange={(e) => setPaymentFormData({ ...paymentFormData, date: e.target.value })} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-sm">Amount *</Label>
-          <Input type="number" placeholder="Enter amount" value={paymentFormData.amount} onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: e.target.value })} required />
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-sm">Particulars *</Label>
-        <Input placeholder="Enter particulars" value={paymentFormData.particulars} onChange={(e) => setPaymentFormData({ ...paymentFormData, particulars: e.target.value })} required />
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-sm">To Pay *</Label>
-        <Input placeholder="Enter payee" value={paymentFormData.toPay} onChange={(e) => setPaymentFormData({ ...paymentFormData, toPay: e.target.value })} required />
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-sm">Invoice ID *</Label>
-        <Input placeholder="Enter invoice ID" value={paymentFormData.invoiceId} onChange={(e) => setPaymentFormData({ ...paymentFormData, invoiceId: e.target.value })} required />
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-sm">Attachment (Any File - Max 2 MB)</Label>
-        <Input
-          type="file"
-          onChange={(e) => setPaymentFile(e.target.files?.[0] || null)}
-        />
-        {existingFileUrl && !paymentFile && (
-          <p className="text-xs text-green-600 mt-1">
-            Current file attached
-          </p>
-        )}
-        {paymentFile && (
-          <p className="text-xs text-blue-600 mt-1">
-            Selected: {paymentFile.name} ({(paymentFile.size / 1024).toFixed(1)} KB)
-          </p>
-        )}
-      </div>
-      <DialogFooter className="mt-4">
-        <Button type="button" variant="outline" onClick={() => { setOpenPaymentDialog(false); resetPaymentForm(); }}>
-          Cancel
-        </Button>
-        <Button type="submit">{editPaymentMode ? "Update" : "Add"} Payment</Button>
-      </DialogFooter>
-    </form>
-  </DialogContent>
-</Dialog>
+
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Total Amount</p>
+                      <p className="text-xl font-bold text-emerald-700">
+                        ₹{totalPayments.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+
+                    <Dialog open={openPaymentDialog} onOpenChange={setOpenPaymentDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="gap-2 bg-cyan-500 hover:bg-cyan-600 whitespace-nowrap">
+                          <Plus className="w-4 h-4" />
+                          Add Payment
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle>{editPaymentMode ? "Edit Payment" : "Add New Payment"}</DialogTitle>
+                          <DialogDescription>
+                            {editPaymentMode ? "Update payment details." : "Enter payment details below."}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handlePaymentSubmit} className="space-y-4 mt-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-sm">Date *</Label>
+                              <Input type="date" value={paymentFormData.date} onChange={(e) => setPaymentFormData({ ...paymentFormData, date: e.target.value })} required />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-sm">Amount *</Label>
+                              <Input type="number" placeholder="Enter amount" value={paymentFormData.amount} onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: e.target.value })} required />
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Particulars *</Label>
+                            <Input placeholder="Enter particulars" value={paymentFormData.particulars} onChange={(e) => setPaymentFormData({ ...paymentFormData, particulars: e.target.value })} required />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">To Pay *</Label>
+                            <Input placeholder="Enter payee" value={paymentFormData.toPay} onChange={(e) => setPaymentFormData({ ...paymentFormData, toPay: e.target.value })} required />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Invoice ID *</Label>
+                            <Input placeholder="Enter invoice ID" value={paymentFormData.invoiceId} onChange={(e) => setPaymentFormData({ ...paymentFormData, invoiceId: e.target.value })} required />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Attachment (Any File - Max 2 MB)</Label>
+                            <Input
+                              type="file"
+                              onChange={(e) => setPaymentFile(e.target.files?.[0] || null)}
+                            />
+                            {existingFileUrl && !paymentFile && (
+                              <p className="text-xs text-green-600 mt-1">
+                                Current file attached
+                              </p>
+                            )}
+                            {paymentFile && (
+                              <p className="text-xs text-blue-600 mt-1">
+                                Selected: {paymentFile.name} ({(paymentFile.size / 1024).toFixed(1)} KB)
+                              </p>
+                            )}
+                          </div>
+                          <DialogFooter className="mt-4">
+                            <Button type="button" variant="outline" onClick={() => { setOpenPaymentDialog(false); resetPaymentForm(); }}>
+                              Cancel
+                            </Button>
+                            <Button type="submit">{editPaymentMode ? "Update" : "Add"} Payment</Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -570,38 +588,37 @@ const CMIS = () => {
                             <TableCell className="font-medium">₹{payment.amount.toLocaleString()}</TableCell>
                             <TableCell>{payment.invoiceId}</TableCell>
                             <TableCell>
-  {payment.fileUrl ? (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => window.open(payment.fileUrl!, "_blank")}
-        className="gap-1"
-      >
-        <Eye className="w-3 h-3" />
-        View File
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-white hover:bg-white"
-        onClick={() => handleDeleteFile(payment.id)}
-      >
-        <X className="w-4 h-4 text-red-600" />
-      </Button>
-    </div>
-  ) : (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => handleEditPayment(payment)}
-      className="gap-1 text-black "
-    >
-     
-      Upload File
-    </Button>
-  )}
-</TableCell>
+                              {payment.fileUrl ? (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(payment.fileUrl!, "_blank")}
+                                    className="gap-1"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    View File
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-white hover:bg-white"
+                                    onClick={() => handleDeleteFile(payment.id)}
+                                  >
+                                    <X className="w-4 h-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditPayment(payment)}
+                                  className="gap-1 text-black "
+                                >
+                                  Upload File
+                                </Button>
+                              )}
+                            </TableCell>
                             <TableCell>
                               <Button variant="ghost" size="sm" onClick={() => handleEditPayment(payment)}>
                                 <Edit className="w-4 h-4" />
@@ -616,71 +633,81 @@ const CMIS = () => {
               </CardContent>
             </Card>
 
-            {/* Assets Section (unchanged from your original) */}
+            {/* Assets Section */}
             <Card className="shadow-lg">
               <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-3">
                     <div>
                       <CardTitle className="text-2xl">Lab Equipment & Inventory</CardTitle>
                       <CardDescription>Manage lab assets and particulars</CardDescription>
                     </div>
                   </div>
-                  <Dialog open={openAssetDialog} onOpenChange={setOpenAssetDialog}>
-                    <DialogTrigger asChild>
-                      <Button className="gap-2 bg-cyan-600 hover:bg-cyan-700">
-                        <Plus className="w-4 h-4" />
-                        Add Asset
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-xl">
-                      <DialogHeader>
-                        <DialogTitle>{editAssetMode ? "Edit Asset" : "Add New Asset"}</DialogTitle>
-                        <DialogDescription>
-                          {editAssetMode ? "Update asset details." : "Enter asset details below."}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleAssetSubmit} className="space-y-6 mt-6">
-                        <div className="space-y-2">
-                          <Label>Name *</Label>
-                          <Input placeholder="Enter asset name" value={assetFormData.name} onChange={(e) => setAssetFormData({ ...assetFormData, name: e.target.value })} required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Description</Label>
-                          <Input placeholder="Enter description" value={assetFormData.description} onChange={(e) => setAssetFormData({ ...assetFormData, description: e.target.value })} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
+
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Total Asset Value</p>
+                      <p className="text-xl font-bold text-indigo-700">
+                        ₹{totalAssetsValue.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+
+                    <Dialog open={openAssetDialog} onOpenChange={setOpenAssetDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="gap-2 bg-cyan-600 hover:bg-cyan-700 whitespace-nowrap">
+                          <Plus className="w-4 h-4" />
+                          Add Asset
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-xl">
+                        <DialogHeader>
+                          <DialogTitle>{editAssetMode ? "Edit Asset" : "Add New Asset"}</DialogTitle>
+                          <DialogDescription>
+                            {editAssetMode ? "Update asset details." : "Enter asset details below."}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleAssetSubmit} className="space-y-6 mt-6">
                           <div className="space-y-2">
-                            <Label>Value *</Label>
-                            <Input type="number" placeholder="Enter value" value={assetFormData.value} onChange={(e) => setAssetFormData({ ...assetFormData, value: e.target.value })} required />
+                            <Label>Name *</Label>
+                            <Input placeholder="Enter asset name" value={assetFormData.name} onChange={(e) => setAssetFormData({ ...assetFormData, name: e.target.value })} required />
                           </div>
                           <div className="space-y-2">
-                            <Label>Acquired Date *</Label>
-                            <Input type="date" value={assetFormData.acquiredDate} onChange={(e) => setAssetFormData({ ...assetFormData, acquiredDate: e.target.value })} required />
+                            <Label>Description</Label>
+                            <Input placeholder="Enter description" value={assetFormData.description} onChange={(e) => setAssetFormData({ ...assetFormData, description: e.target.value })} />
                           </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Working Condition *</Label>
-                          <select
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                            value={assetFormData.workingCondition}
-                            onChange={(e) => setAssetFormData({ ...assetFormData, workingCondition: e.target.value })}
-                            required
-                          >
-                            <option value="Working">Working</option>
-                            <option value="Under Maintenance">Under Maintenance</option>
-                            <option value="Not Working">Not Working</option>
-                          </select>
-                        </div>
-                        <DialogFooter>
-                          <Button type="button" variant="outline" onClick={() => { setOpenAssetDialog(false); resetAssetForm(); }}>
-                            Cancel
-                          </Button>
-                          <Button type="submit">{editAssetMode ? "Update" : "Add"} Asset</Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Value *</Label>
+                              <Input type="number" placeholder="Enter value" value={assetFormData.value} onChange={(e) => setAssetFormData({ ...assetFormData, value: e.target.value })} required />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Acquired Date *</Label>
+                              <Input type="date" value={assetFormData.acquiredDate} onChange={(e) => setAssetFormData({ ...assetFormData, acquiredDate: e.target.value })} required />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Working Condition *</Label>
+                            <select
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                              value={assetFormData.workingCondition}
+                              onChange={(e) => setAssetFormData({ ...assetFormData, workingCondition: e.target.value })}
+                              required
+                            >
+                              <option value="Working">Working</option>
+                              <option value="Under Maintenance">Under Maintenance</option>
+                              <option value="Not Working">Not Working</option>
+                            </select>
+                          </div>
+                          <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => { setOpenAssetDialog(false); resetAssetForm(); }}>
+                              Cancel
+                            </Button>
+                            <Button type="submit">{editAssetMode ? "Update" : "Add"} Asset</Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

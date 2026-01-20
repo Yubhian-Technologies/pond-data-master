@@ -140,6 +140,10 @@ const Dashboard = () => {
   const [modalData, setModalData] = useState<ModalData>({ type: null, title: "" });
   const [modalContent, setModalContent] = useState<any[]>([]);
 
+
+const [selectedSampleType, setSelectedSampleType] = useState<string>("all");
+const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
+
   const handleExit = () => {
     clearTechnician();
     window.location.href = `/technicians/${session.locationId}`;
@@ -440,6 +444,28 @@ const Dashboard = () => {
   const handleApply = () => {
     fetchDashboardData();
   };
+
+  useEffect(() => {
+  if (invoices.length === 0) {
+    setAvailableSampleTypes([]);
+    return;
+  }
+
+  const typesSet = new Set<string>();
+
+  invoices.forEach((inv) => {
+    if (inv.typeDisplay && inv.typeDisplay.trim()) {
+      // Split if multiple types are joined with "/"
+      inv.typeDisplay.split("/").forEach(t => {
+        const clean = t.trim();
+        if (clean) typesSet.add(clean);
+      });
+    }
+  });
+
+  const sortedTypes = Array.from(typesSet).sort();
+  setAvailableSampleTypes(["all", ...sortedTypes]);
+}, [invoices]);
 
   const fetchRealFarmers = async () => {
     if (!selectedLocationId) return [];
@@ -908,37 +934,90 @@ const Dashboard = () => {
                   </Table>
                 </div>
               )}
-              {modalData.type === "samples" && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Sample Submissions</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow><TableHead>Invoice ID</TableHead><TableHead>Farmer</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Count</TableHead><TableHead>Status</TableHead></TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {modalContent.map((s, i) => (
-                        <TableRow key={i}><TableCell>{s.invoiceId}</TableCell><TableCell>{s.farmerName}</TableCell><TableCell>{s.date}</TableCell><TableCell>{s.types}</TableCell><TableCell>{s.count}</TableCell><TableCell>{s.status}</TableCell></TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              { (modalData.type === "samples" || modalData.type === "reports") && (
+  <div className="space-y-6">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <h3 className="text-lg font-semibold">
+        {modalData.type === "samples" ? "Sample Submissions" : "Completed Reports"}
+      </h3>
 
-              {modalData.type === "reports" && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Completed Reports</h3>
-                  <Table>
-                    <TableHeader>
-                      <TableRow><TableHead>Invoice ID</TableHead><TableHead>Farmer</TableHead><TableHead>Date</TableHead><TableHead>Type</TableHead></TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {modalContent.map((r, i) => (
-                        <TableRow key={i}><TableCell>{r.invoiceId}</TableCell><TableCell>{r.farmerName}</TableCell><TableCell>{r.date}</TableCell><TableCell>{r.types}</TableCell></TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+      {availableSampleTypes.length > 1 && (
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-600 whitespace-nowrap">Filter by type:</span>
+          <Select 
+            value={selectedSampleType} 
+            onValueChange={setSelectedSampleType}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableSampleTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type === "all" ? "All Types" : type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </div>
+
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Invoice ID</TableHead>
+          <TableHead>Farmer</TableHead>
+          <TableHead>Date</TableHead>
+          <TableHead>Type</TableHead>
+          {modalData.type === "samples" && <TableHead>Count</TableHead>}
+          {modalData.type === "samples" && <TableHead>Status</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {(() => {
+          let filteredContent = modalContent;
+
+          if (selectedSampleType !== "all") {
+            filteredContent = modalContent.filter((item: any) =>
+              item.types?.includes(selectedSampleType)
+            );
+          }
+
+          // For reports → only already filtered ones, but we can still apply type filter
+          if (modalData.type === "reports") {
+            filteredContent = filteredContent.filter((item: any) =>
+              selectedSampleType === "all" || item.types?.includes(selectedSampleType)
+            );
+          }
+
+          return filteredContent.length === 0 ? (
+            <TableRow>
+              <TableCell 
+                colSpan={modalData.type === "samples" ? 6 : 4} 
+                className="text-center py-8 text-muted-foreground"
+              >
+                No {modalData.type === "samples" ? "samples" : "reports"} found
+                {selectedSampleType !== "all" ? ` matching type "${selectedSampleType}"` : ""}
+              </TableCell>
+            </TableRow>
+          ) : (
+            filteredContent.map((item: any, i: number) => (
+              <TableRow key={i}>
+                <TableCell>{item.invoiceId}</TableCell>
+                <TableCell>{item.farmerName}</TableCell>
+                <TableCell>{item.date}</TableCell>
+                <TableCell>{item.types}</TableCell>
+                {modalData.type === "samples" && <TableCell>{item.count}</TableCell>}
+                {modalData.type === "samples" && <TableCell>{item.status}</TableCell>}
+              </TableRow>
+            ))
+          );
+        })()}
+      </TableBody>
+    </Table>
+  </div>
+)}
 
               {modalData.type === "revenue" && (
                 <div className="space-y-6">

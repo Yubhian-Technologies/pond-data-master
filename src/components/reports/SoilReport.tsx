@@ -266,11 +266,14 @@ const SoilReport: React.FC<SoilReportProps> = ({
             <h1 className="text-3xl font-bold text-blue-700">
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
-            <p className="text-xs text-black font-semibold">
+            <p className="text-sm text-black font-semibold">
               {locationDetails.address || "Loading lab address..."}
             </p>
             <p className="text-sm text-black">
               Contact No: {locationDetails.contactNumber || "Loading..."} | Mail Id: {locationDetails.email || "Loading..."}
+            </p>
+            <p className="text-sm text-black">
+              GSTIN: - 37AABCT0601L1ZJ
             </p>
             
           </div>

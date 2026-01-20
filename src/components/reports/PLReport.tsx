@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from "react";
 import { 
   doc, 
@@ -73,10 +75,8 @@ export default function PLReport({
     contactNumber: "",
   });
 
-  // NEW: Real invoice document ID
   const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
 
-  // Step 1: Fetch real invoice docId
   useEffect(() => {
     const fetchRealDocId = async () => {
       if (!invoiceId || !locationId) {
@@ -110,7 +110,6 @@ export default function PLReport({
     fetchRealDocId();
   }, [invoiceId, locationId]);
 
-  // Step 2: Fetch report data using real docId
   useEffect(() => {
     const fetchPLReport = async () => {
       if (!realInvoiceDocId || !locationId) {
@@ -126,7 +125,7 @@ export default function PLReport({
           "locations",
           locationId,
           "invoices",
-          realInvoiceDocId,          // ← FIXED: Use real docId!
+          realInvoiceDocId,
           "plReports",
           "data"
         );
@@ -176,7 +175,6 @@ export default function PLReport({
 
           setPlData(normalized);
         } else {
-          // Empty fallback
           const empty = {
             testCode: Array.from({ length: allSampleCount }, (_, i) => `Sample ${i + 1}`),
             rostralSpines: Array.from({ length: allSampleCount }, () => "-"),
@@ -265,8 +263,10 @@ export default function PLReport({
     { label: "Fouling - Appendages", key: "foulAppend" },
     { label: "Fouling - Gill", key: "foulGill" },
     { label: "Fouling - Abdomen", key: "foulAbdomen" },
+    // Stress Test items grouped under blue header
     { label: "Stress Tank Salinity", key: "stressTankSalinity" },
     { label: "Salinity Test %", key: "salinityPercent" },
+    // Total Score with blue background
     { label: "Total Score", key: "totalScore" },
   ];
 
@@ -315,10 +315,13 @@ export default function PLReport({
             <h1 className="text-3xl font-bold text-blue-700">
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
-            <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
+            <p className="text-sm text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
             <p className="text-sm text-black">
               Contact No: {locationDetails.contactNumber || "Loading..."} | 
               Mail Id: {locationDetails.email || "Loading..."}
+            </p>
+            <p className="text-sm text-black">
+              GSTIN: - 37AABCT0601L1ZJ
             </p>
           </div>
           <img src={AV} alt="AV Logo" className="w-40 object-contain" />
@@ -374,42 +377,57 @@ export default function PLReport({
               </tr>
             </thead>
             <tbody>
-              {plRows.map((row) => (
-                <React.Fragment key={row.key}>
-                  <tr>
-                    <td className="border px-4 py-2 font-semibold bg-gray-50">
-                      {row.label}
-                    </td>
-                    {plData[row.key].map((val, i) => (
-                      <td key={i} className="border px-4 py-2 text-center">
-                        {val || "-"}
-                      </td>
-                    ))}
-                  </tr>
-                  {row.key === "shg" && (
-                    <tr className="bg-blue-200">
-                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                        Necrosis
-                      </td>
-                    </tr>
-                  )}
-                  {row.key === "necMuscle" && (
-                    <tr className="bg-blue-200">
-                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                        Fouling
-                      </td>
-                    </tr>
-                  )}
-                  {row.key === "stressTankSalinity" && (
-                    <tr className="bg-blue-200">
-                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                        Stress Test
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
+  {plRows.map((row) => (
+    <React.Fragment key={row.key}>
+      <tr
+        className={row.key === "totalScore" ? "bg-blue-100" : ""}
+      >
+        <td 
+          className={`border px-4 py-2 font-semibold ${
+            row.key === "totalScore" 
+              ? "bg-blue-100" 
+              : "bg-gray-50"
+          }`}
+        >
+          {row.label}
+        </td>
+        {plData[row.key].map((val, i) => (
+          <td 
+            key={i} 
+            className={`border px-4 py-2 text-center ${
+              row.key === "totalScore" ? "bg-blue-100" : ""  
+            }`}
+          >
+            {val || "-"}
+          </td>
+        ))}
+      </tr>
+
+      {/* Blue section headers */}
+      {row.key === "shg" && (
+        <tr className="bg-blue-200">
+          <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+            Necrosis
+          </td>
+        </tr>
+      )}
+      {row.key === "necMuscle" && (
+        <tr className="bg-blue-200">
+          <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+            Fouling
+          </td>
+        </tr>
+      )}
+      {row.key === "foulAbdomen" && (
+        <tr className="bg-blue-200">
+          <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+            Stress Test
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
+  ))}
+</tbody>
           </table>
         </div>
 

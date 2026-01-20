@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
-// All image imports (unchanged)
+
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import corrella from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alge/1-CHORELLA.png";
@@ -30,7 +30,7 @@ import anabaena from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green al
 import oscillatoria from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green alge/3-Oscillatoria.jpg";
 import microcystis from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green alge/1-Microcystis.png";
 import coscinodiscus from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/1-coscinodiscus.jpg";
-import nitzchia from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/2-Navicula.jpg";
+import nitzchia from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/3-Nitzschia.jpg";
 import navicula from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/2-Navicula.jpg";
 import noctiluca from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Dainoflagellates/1-NOCTILUCA.jpg";
 import ceratium from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Dainoflagellates/3-CERATIUM.jpg";
@@ -338,8 +338,11 @@ const WaterReport: React.FC<WaterReportProps> = ({
           </div>
           <div className="text-center flex-1">
             <h1 className="text-2xl font-bold text-blue-700">WATERBASE AQUA DIAGNOSTIC CENTER</h1>
-            <p className="text-[10px] text-black font-semibold">{locationDetails.address}</p>
-            <p className="text-xs text-black">Contact No: {locationDetails.contactNumber} | Mail Id: {locationDetails.email}</p>
+            <p className="text-sm text-black font-semibold">{locationDetails.address}</p>
+            <p className="text-sm text-black">Contact No: {locationDetails.contactNumber} | Mail Id: {locationDetails.email}</p>
+            <p className="text-sm text-black">
+              GSTIN: - 37AABCT0601L1ZJ
+            </p>
           </div>
           <div className="w-32 h-24 flex items-center justify-center">
             <img src={AV} alt="AV" className="max-w-full max-h-full object-contain" />
@@ -396,9 +399,10 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/><span className="text-[9px]">PPM as Caco3</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/><span className="text-[9px]">అమ్మోనియా</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Unionized NH₃<br/><span className="text-[9px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/><span className="text-[9px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
+                  
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₂<br/><span className="text-[9px]">నైట్రైట్</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₃<br/><span className="text-[9px]">నైట్రేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/><span className="text-[9px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Fe<br/><span className="text-[9px]">ఇనుము</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Cl<br/><span className="text-[9px]">క్లోరిన్</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>DO<br/><span className="text-[9px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
@@ -410,8 +414,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center font-bold">Total <br/><span className="text-[9px]">మొత్తం</span></td>
                   <td className="border-r border-black p-0.5 text-center font-bold">Ca<br/><span className="text-[9px]">కాల్షియం</span></td>
                   <td className="border-r border-black p-0.5 text-center font-bold">Mg<br/><span className="text-[9px]">మెగ్నీషియం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Na<br/><span className="text-[9px]">సోడియం</span></td>
+                  
                   <td className="border-r border-black p-0.5 text-center font-bold">K<br/><span className="text-[9px]">పొటాషియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Na<br/><span className="text-[9px]">సోడియం</span></td>
                 </tr>
               </thead>
               <tbody>
@@ -426,13 +431,15 @@ const WaterReport: React.FC<WaterReportProps> = ({
                     <td className="border-r border-black p-0.5 text-center">{p.hardness}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.ca}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.mg}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.na}</td>
+                    
                     <td className="border-r border-black p-0.5 text-center">{p.k}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.na}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.totalAmmonia}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.unionizedAmmonia}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.h2s}</td>
+                    
                     <td className="border-r border-black p-0.5 text-center">{p.nitrite}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.nitrate}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.h2s}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.iron}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.chlorine}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.dissolvedOxygen}</td>
@@ -449,13 +456,15 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center">3000-5000</td>
                   <td className="border-r border-black p-0.5 text-center">&gt;100</td>
                   <td className="border-r border-black p-0.5 text-center">&gt;300</td>
-                  <td className="border-r border-black p-0.5 text-center">&gt;40</td>
+                  
                   <td className="border-r border-black p-0.5 text-center">&gt;10</td>
+                  <td className="border-r border-black p-0.5 text-center">&gt;40</td>
                   <td className="border-r border-black p-0.5 text-center">0.1-1.0</td>
                   <td className="border-r border-black p-0.5 text-center">0-0.1</td>
-                  <td className="border-r border-black p-0.5 text-center">0-0.4</td>
+                  
                   <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;0.50</td>
+                  <td className="border-r border-black p-0.5 text-center">0-0.4</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
                   <td className="border-r border-black p-0.5 text-center">0-0.02</td>
                   <td className="border-r border-black p-0.5 text-center">&gt;4</td>
@@ -523,8 +532,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <th className="border-r border-b border-black"></th>
 
                   {[
-                    { img: phacus, name: "Oosystis" },
+                    
                     { img: corrella, name: "Chlorella" },
+                    { img: phacus, name: "Oosystis" },
                     { img: desmids, name: "Eudorina" },
                     { img: scenedesmus, name: "Scenedesmus" },
                     { img: copepod, name: "Copepod" },
@@ -564,8 +574,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <tr key={pond.id} className="border-b border-black last:border-b-0">
                     <td className="border-r border-black text-center font-bold bg-gray-50">{pond.pondNo}</td>
                     {[
-                      pond.phacus,
+                      
                       pond.chlorella,
+                      pond.phacus,
                       pond.desmids,
                       pond.scenedesmus,
                       pond.copepod,

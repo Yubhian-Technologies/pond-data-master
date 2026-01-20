@@ -20,14 +20,15 @@ interface InvoiceState {
     [type: string]: TestItem[];
   };
   subtotal: number;
-  gstAmount: number;
-  total: number;          // grand total
+  discountPercent?: number;     // ← from previous page (optional)
+  discountAmount?: number;      // ← from previous page (optional)
+  total: number;                // grand total after discount
   paymentMode: "cash" | "qr" | "neft" | "rtgs" | "pending";
   transactionRef?: string | null;
   isPartialPayment?: boolean;
   paidAmount?: number | null;
   balanceAmount?: number;
-  isZeroInvoice?: boolean;   // ← Add this optional field
+  isZeroInvoice?: boolean;
 }
 
 interface InvoiceTemplateProps {
@@ -64,9 +65,9 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
   const financialYear = getFinancialYear();
 
   const subtotal = state.subtotal;
-  const gstAmount = state.gstAmount;
+  const discountPercent = state.discountPercent || 0;
+  const discountAmount = state.discountAmount || 0;
   const grandTotal = state.total;
-  const halfGst = gstAmount / 2;
 
   // For zero invoice → always show paid = 0, balance = 0
   const paidAmount = isZeroInvoice ? 0 : (state.paymentMode === "pending" ? 0 : grandTotal);
@@ -266,21 +267,22 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                   Subtotal (₹)
                 </td>
                 <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                  ₹{subtotal}
+                  ₹{subtotal.toFixed(2)}
                 </td>
               </tr>
-              <tr>
-                <td style={{ border: "1px solid #000", padding: "6px" }}>CGST @ 9% (₹)</td>
-                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                  ₹{halfGst}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ border: "1px solid #000", padding: "6px" }}>SGST @ 9% (₹)</td>
-                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                  ₹{halfGst}
-                </td>
-              </tr>
+
+              {/* Discount row - only show if discount exists */}
+              {discountAmount > 0 && (
+                <tr>
+                  <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                    Discount ({discountPercent}%)
+                  </td>
+                  <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right", color: "#dc2626" }}>
+                    -₹{discountAmount.toFixed(2)}
+                  </td>
+                </tr>
+              )}
+
               <tr>
                 <td
                   style={{
@@ -290,7 +292,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                     background: "#f0f0f0",
                   }}
                 >
-                  GRAND TOTAL (₹)
+                  TOTAL AMOUNT (₹)
                 </td>
                 <td
                   style={{
@@ -301,7 +303,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                     background: "#f0f0f0",
                   }}
                 >
-                  ₹{grandTotal}
+                  ₹{grandTotal.toFixed(2)}
                 </td>
               </tr>
 

@@ -1,4 +1,4 @@
-// src/components/reports/MicrobiologyReport.tsx
+
 
 import React, { useState, useEffect } from "react";
 import { 
@@ -57,10 +57,8 @@ export default function MicrobiologyReport({
     contactNumber: "",
   });
 
-  // NEW: Real invoice document ID
   const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
 
-  // Step 1: Fetch real invoice docId using query
   useEffect(() => {
     const fetchRealDocId = async () => {
       if (!invoiceId || !locationId) {
@@ -94,7 +92,6 @@ export default function MicrobiologyReport({
     fetchRealDocId();
   }, [invoiceId, locationId]);
 
-  // Step 2: Fetch report data using real docId
   useEffect(() => {
     const fetchReport = async () => {
       if (!realInvoiceDocId || !locationId) {
@@ -110,7 +107,7 @@ export default function MicrobiologyReport({
           "locations",
           locationId,
           "invoices",
-          realInvoiceDocId,          // ← FIXED: Use real docId
+          realInvoiceDocId,
           "microbiologyReports",
           "data"
         );
@@ -175,7 +172,6 @@ export default function MicrobiologyReport({
     }
   }, [realInvoiceDocId, locationId, allSampleCount, session]);
 
-  // Fetch location details (unchanged)
   useEffect(() => {
     const fetchLocationDetails = async () => {
       if (!locationId) return;
@@ -221,7 +217,10 @@ export default function MicrobiologyReport({
       </div>
 
       {/* Main report container */}
-      <div className="bg-white" id="report">
+      <div 
+        className="bg-white print:flex print:flex-col print:min-h-[297mm]"
+        id="report"
+      >
         {/* Header */}
         <div className="flex justify-between items-start mb-8 border-b-4 border-black pb-6">
           <img src={ADC} alt="ADC Logo" className="w-32" />
@@ -229,12 +228,15 @@ export default function MicrobiologyReport({
             <h1 className="text-2xl font-bold text-blue-700">
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
-            <p className="text-xs text-black font-semibold">
+            <p className="text-sm text-black font-semibold">
               {locationDetails.address || "Loading lab address..."}
             </p>
             <p className="text-sm text-black">
               Contact No: {locationDetails.contactNumber || "Loading..."} | 
               Mail Id: {locationDetails.email || "Loading..."}
+            </p>
+            <p className="text-sm text-black">
+              GSTIN: - 37AABCT0601L1ZJ
             </p>
           </div>
           <img src={AV} alt="AV Logo" className="w-32" />
@@ -243,7 +245,6 @@ export default function MicrobiologyReport({
         <div className="flex justify-center mb-10">
           <table className="border-2 border-gray-800 text-sm w-full max-w-5xl">
             <tbody>
-              {/* Row 1 - 8 columns */}
               <tr>
                 <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer Name</td>
                 <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerName || "-"}</td>
@@ -255,7 +256,6 @@ export default function MicrobiologyReport({
                 <td className="border px-4 py-2 w-1/8">{allSampleCount}</td>
               </tr>
 
-              {/* Row 2 - 8 columns */}
               <tr>
                 <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Mobile</td>
                 <td className="border px-4 py-2 w-1/8">{farmerInfo?.mobile || "-"}</td>
@@ -278,43 +278,46 @@ export default function MicrobiologyReport({
 
         {/* Vibrio Table */}
         <div className="flex justify-center overflow-x-auto mb-12">
-          <table className="border-2 border-gray-800 text-sm min-w-full">
+          <table className="border-2 border-gray-800 text-sm w-full max-w-2xl">
             <thead>
               <tr className="bg-blue-100">
-                <th colSpan={4} className="border px-6 py-3 text-center font-bold text-lg">
+                <th colSpan={4} className="border px-5 py-2.5 text-center font-bold text-lg">
                   VIBRIO CFU/ml
                 </th>
               </tr>
               <tr className="bg-gray-200">
-                <th className="border px-6 py-3 font-bold">Test Code</th>
-                <th className="border px-6 py-3 font-bold bg-yellow-200">Yellow Colonies</th>
-                <th className="border px-6 py-3 font-bold bg-green-300">Green Colonies</th>
-                <th className="border px-6 py-3 font-bold">TPC</th>
+                <th className="border px-5 py-2.5 font-bold">Test Code</th>
+                <th className="border px-5 py-2.5 font-bold bg-yellow-200">Yellow Colonies</th>
+                <th className="border px-5 py-2.5 font-bold bg-green-300">Green Colonies</th>
+                <th className="border px-5 py-2.5 font-bold">TPC</th>
               </tr>
             </thead>
             <tbody>
               {Array.from({ length: allSampleCount }, (_, i) => (
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="border px-6 py-3 text-center font-medium">
+                  <td className="border px-5 py-2 text-center font-medium">
                     {data.testCode[i] || `Sample ${i + 1}`}
                   </td>
-                  <td className="border px-6 py-3 text-center">{data.yellowColonies[i] || "-"}</td>
-                  <td className="border px-6 py-3 text-center">{data.greenColonies[i] || "-"}</td>
-                  <td className="border px-6 py-3 text-center">{data.tpc[i] || "-"}</td>
+                  <td className="border px-5 py-2 text-center">{data.yellowColonies[i] || "-"}</td>
+                  <td className="border px-5 py-2 text-center">{data.greenColonies[i] || "-"}</td>
+                  <td className="border px-5 py-2 text-center">{data.tpc[i] || "-"}</td>
                 </tr>
               ))}
               <tr className="bg-red-50 font-bold">
-                <td className="border px-6 py-3 text-center text-red-700">Optimum Values</td>
-                <td className="border px-6 py-3 text-center text-red-700">&lt; 300</td>
-                <td className="border px-6 py-3 text-center text-red-700">&lt; 50</td>
-                <td className="border px-6 py-3 text-center text-red-700">&lt; 1000</td>
+                <td className="border px-5 py-2 text-center text-red-700">Optimum Values</td>
+                <td className="border px-5 py-2 text-center text-red-700">&lt; 300</td>
+                <td className="border px-5 py-2 text-center text-red-700">&lt; 50</td>
+                <td className="border px-5 py-2 text-center text-red-700">&lt; 1000</td>
               </tr>
             </tbody>
           </table>
         </div>
 
+        {/* Main content wrapper - grows to push footer down in print */}
+        <div className="flex-grow " />
+
         {/* Signature Section */}
-        <div className="mt-16 mb-8 border-t-2 border-black pt-6">
+        <div className="mt-16 mb-6 border-t-2 border-black pt-6 print:flex-grow">
           <div className="flex justify-between text-sm px-10">
             <div>
               <p className="font-semibold">Reported by:</p>
@@ -328,11 +331,11 @@ export default function MicrobiologyReport({
         </div>
 
         {/* Note */}
-        <div className="text-center text-sm text-gray-700 mt-10 mb-4">
+        <div className="text-center text-sm text-gray-700 mt-8 mb-6 print:flex-grow">
           <p><strong className="text-red-600">Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.</p>
         </div>
 
-        <div className="mt-20 font-bold text-center text-sm text-red-600 ">
+        <div className="mt-12 font-bold text-center text-sm text-red-600 mb-4 print:flex-grow">
           TWL ADC Committed to Complete farming Solutions
         </div>
       </div>
@@ -342,7 +345,7 @@ export default function MicrobiologyReport({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 0.4cm;
+            margin: 0.2cm;
           }
 
           html, body {
@@ -370,16 +373,18 @@ export default function MicrobiologyReport({
             top: 0 !important;
             width: 210mm !important;
             height: 297mm !important;
-            padding: 0 !important;
+            padding: 8mm 10mm !important;
             box-sizing: border-box !important;
             margin: 0 !important;
             background: white !important;
+            display: flex !important;
+            flex-direction: column !important;
           }
 
           #report > div, table {
             width: 100% !important;
             max-width: none !important;
-            margin: 0 0 12px 0 !important;
+            margin: 0 0 10px 0 !important;
             padding: 0 !important;
           }
 
@@ -389,6 +394,11 @@ export default function MicrobiologyReport({
 
           .print\\:hidden {
             display: none !important;
+          }
+
+          /* The flex-grow div pushes everything below it to the bottom */
+          .print\\:flex-grow {
+            flex-grow: 1 !important;
           }
         }
       `}</style>

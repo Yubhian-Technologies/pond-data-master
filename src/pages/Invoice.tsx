@@ -23,7 +23,7 @@ interface LocationState {
   sampleSummary: SampleSummaryItem[];
   dateOfCulture: string;
   farmer: { name: string; address: string; phone: string; id: string };
-  technician?: { technicianId: string; technicianName: string }; // ← Added optional type
+  technician?: { technicianId: string; technicianName: string };
 }
 
 const PCR_PATHOGEN_MAP: Record<string, string> = {
@@ -35,8 +35,6 @@ const PCR_PATHOGEN_MAP: Record<string, string> = {
   pl_ihhnv: "IHHNV",
 };
 
-const GST_RATE = 18;
-
 const InvoicePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -45,7 +43,6 @@ const InvoicePage = () => {
   const location = useLocation();
   const state = location.state as LocationState | undefined;
 
-  // Get technician from Samples page (passed via navigate state)
   const passedTechnician = state?.technician || null;
 
   const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft" | "rtgs" | "pending">("");
@@ -56,6 +53,9 @@ const InvoicePage = () => {
   const locationId = session.locationId;
 
   const [locationName, setLocationName] = useState<string>("");
+
+  const [applyDiscount, setApplyDiscount] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState<string>("");
 
   useEffect(() => {
     const fetchLocationName = async () => {
@@ -200,20 +200,13 @@ const InvoicePage = () => {
   };
 
   const calculateTotals = () => {
-    if (isZeroInvoice) {
-      return {
-        subtotal: 0,
-        gstAmount: 0,
-        grandTotal: 0,
-        groupedItems: {},
-      };
-    }
-
+    // We always calculate the real test grouping (so we can save which tests were selected)
     const groupedItems: {
       [type: string]: { name: string; quantity: number; total: number; price: number }[];
     } = {};
     let subtotal = 0;
 
+    // PCR tests
     if (actualPcrCount > 0) {
       const pcrTestCount: { [testId: string]: number } = {};
       perSampleTests.pcr.forEach((set) => {
@@ -234,6 +227,7 @@ const InvoicePage = () => {
         .filter(Boolean) as any;
     }
 
+    // PL tests
     if (actualPlCount > 0) {
       const plTestCount: { [testId: string]: number } = {};
       perSampleTests.pl.forEach((set) => {
@@ -254,6 +248,7 @@ const InvoicePage = () => {
         .filter(Boolean) as any;
     }
 
+    // Other sample types
     sampleSummary.forEach((s) => {
       if (s.type === "pl" || s.type === "pcr") return;
       const testCount: { [testId: string]: number } = {};
@@ -273,16 +268,34 @@ const InvoicePage = () => {
         .filter(Boolean) as any;
     });
 
-    const gstAmount = Math.round(subtotal * (GST_RATE / 100));
-    const grandTotal = subtotal + gstAmount;
+    // Apply zero invoice logic only to amounts
+    const finalSubtotal = isZeroInvoice ? 0 : subtotal;
+    let discountAmount = 0;
+    let grandTotal = finalSubtotal;
 
-    return { subtotal, gstAmount, grandTotal, groupedItems };
+    // Discount only applies in normal mode
+    if (!isZeroInvoice && applyDiscount && discountPercent) {
+      const percent = parseFloat(discountPercent);
+      if (!isNaN(percent) && percent >= 0 && percent <= 100) {
+        discountAmount = (finalSubtotal * percent) / 100;
+        grandTotal = finalSubtotal - discountAmount;
+      }
+    }
+
+    return {
+      subtotal: finalSubtotal,
+      discountAmount,
+      grandTotal,
+      groupedItems,           // ← always contains selected tests
+    };
   };
 
-  const { subtotal, gstAmount, grandTotal, groupedItems } = calculateTotals();
+  const { subtotal, discountAmount, grandTotal, groupedItems } = calculateTotals();
 
   const handleGenerateInvoice = async () => {
-    if (!isZeroInvoice && grandTotal === 0) {
+    // In zero mode we allow generation even if no tests are selected
+    // (but usually user will select some tests for record)
+    if (!isZeroInvoice && grandTotal === 0 && Object.keys(groupedItems).length === 0) {
       toast({
         title: "Error",
         description: "Please select at least one test",
@@ -316,7 +329,6 @@ const InvoicePage = () => {
 
     const invoiceId = generateInvoiceId();
 
-    // ── per-sample selected tests logic remains the same ──
     const perSampleSelectedTests: Record<string, Record<number, string[]>> = {};
 
     sampleSummary.forEach((s) => {
@@ -350,7 +362,6 @@ const InvoicePage = () => {
       }
     });
 
-    // ── FIXED PAYMENT LOGIC ───────────────────────────────────────────────
     let paidAmount = 0;
     let balanceAmount = grandTotal;
     let isPartialPayment = false;
@@ -368,7 +379,6 @@ const InvoicePage = () => {
       isPartialPayment = true;
     }
 
-    // ── Use passed technician from Samples (if any), else current session ──
     const technicianId = passedTechnician?.technicianId || session.technicianId || "unknown";
     const technicianName = passedTechnician?.technicianName || session.technicianName || "Unknown Technician";
 
@@ -378,12 +388,13 @@ const InvoicePage = () => {
       farmerId,
       farmerPhone: mobile,
       locationId,
-      technicianName,                      // ← Now correctly uses passed or session
-      technicianId,                        // ← Now correctly uses passed or session
+      technicianName,
+      technicianId,
       dateOfCulture,
-      tests: groupedItems,
+      tests: groupedItems,                    // ← now always contains selected tests
       subtotal: isZeroInvoice ? 0 : subtotal,
-      gstAmount: isZeroInvoice ? 0 : gstAmount,
+      discountPercent: applyDiscount && discountPercent ? parseFloat(discountPercent) : 0,
+      discountAmount: isZeroInvoice ? 0 : discountAmount,
       total: isZeroInvoice ? 0 : grandTotal,
       village,
       mobile,
@@ -610,16 +621,54 @@ const InvoicePage = () => {
                         <div className="space-y-2">
                           <div className="flex justify-between text-base">
                             <span>Subtotal</span>
-                            <span>₹{subtotal}</span>
+                            <span>₹{subtotal.toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between text-base">
-                            <span>GST (18%)</span>
-                            <span>₹{gstAmount}</span>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="apply-discount"
+                              checked={applyDiscount}
+                              onCheckedChange={(checked) => {
+                                setApplyDiscount(!!checked);
+                                if (!checked) setDiscountPercent("");
+                              }}
+                            />
+                            <Label htmlFor="apply-discount" className="text-sm font-medium leading-none cursor-pointer">
+                              Apply Discount
+                            </Label>
                           </div>
+
+                          {applyDiscount && (
+                            <div className="flex items-center gap-3 pl-6">
+                              <Input
+                                type="number"
+                                placeholder="Discount %"
+                                value={discountPercent}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "" || (/^\d+$/.test(val) && parseInt(val) <= 100)) {
+                                    setDiscountPercent(val);
+                                  }
+                                }}
+                                className="w-28 h-9"
+                                min={0}
+                                max={100}
+                              />
+                              <span className="text-sm text-muted-foreground">%</span>
+                            </div>
+                          )}
+
+                          {discountAmount > 0 && (
+                            <div className="flex justify-between text-base text-green-700">
+                              <span>Discount ({discountPercent}%)</span>
+                              <span>-₹{discountAmount.toFixed(2)}</span>
+                            </div>
+                          )}
+
                           <Separator className="my-3" />
                           <div className="flex justify-between font-bold text-lg">
-                            <span>Total Amount</span>
-                            <span>₹{grandTotal}</span>
+                            <span>Final Total Amount</span>
+                            <span>₹{grandTotal.toFixed(2)}</span>
                           </div>
                         </div>
                       </>
@@ -645,6 +694,8 @@ const InvoicePage = () => {
                           if (checked) {
                             setPaymentMode("pending");
                             setTransactionRef("");
+                            setApplyDiscount(false);
+                            setDiscountPercent("");
                           }
                         }}
                       />
@@ -699,7 +750,7 @@ const InvoicePage = () => {
                       className="w-full"
                       size="lg"
                       disabled={
-                        (!isZeroInvoice && grandTotal === 0) ||
+                        (!isZeroInvoice && grandTotal === 0 && Object.keys(groupedItems).length === 0) ||
                         !paymentMode ||
                         (!isZeroInvoice && ["qr", "neft", "rtgs"].includes(paymentMode) && !transactionRef.trim())
                       }
