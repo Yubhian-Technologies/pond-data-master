@@ -337,7 +337,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
             <img src={ADC} alt="ADC" className="max-w-full max-h-full object-contain" />
           </div>
           <div className="text-center flex-1">
-            <h1 className="text-2xl font-bold text-blue-700">WATERBASE AQUA DIAGNOSTIC CENTER</h1>
+            <h1 className="text-xl font-bold text-blue-700">WATERBASE AQUA DIAGNOSTIC CENTER</h1>
             <p className="text-sm text-black font-semibold">{locationDetails.address}</p>
             <p className="text-sm text-black">Contact No: {locationDetails.contactNumber} | Mail Id: {locationDetails.email}</p>
             <p className="text-sm text-black">
@@ -392,7 +392,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
               <thead>
                 <tr className="bg-gray-100 font-bold">
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[9px]"></span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>pH<br/><span className="text-[9px]">pH</span></td>
+                  <td className="border-r border-black p-0.5 text-center w-12" rowSpan={3}>pH<br/><span className="text-[9px]">pH</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Salinity<br/><span className="text-[9px]">సాలినిటీ</span></td>
                   <td className="border-r border-black p-0.5 text-center" colSpan={3}>Alkalinity(PPM as Caco3)<br/><span className="text-[9px]">ఆల్కలినిటీ</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[9px]">మొత్తం కఠినత</span></td>
@@ -451,22 +451,22 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center">7.5-8.5</td>
                   <td className="border-r border-black p-0.5 text-center">15-20</td>
                   <td className="border-r border-black p-0.5 text-center">20-40</td>
-                  <td className="border-r border-black p-0.5 text-center">30-150</td>
+                  <td className="border-r border-black p-0.5 text-center">130-150</td>
                   <td className="border-r border-black p-0.5 text-center">175-200</td>
-                  <td className="border-r border-black p-0.5 text-center">3000-5000</td>
+                  <td className="border-r border-black p-0.5 text-center">300-3000</td>
                   <td className="border-r border-black p-0.5 text-center">&gt;100</td>
                   <td className="border-r border-black p-0.5 text-center">&gt;300</td>
                   
                   <td className="border-r border-black p-0.5 text-center">&gt;10</td>
-                  <td className="border-r border-black p-0.5 text-center">&gt;40</td>
-                  <td className="border-r border-black p-0.5 text-center">0.1-1.0</td>
+                  <td className="border-r border-black p-0.5 text-center">300</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;1.0</td>
                   <td className="border-r border-black p-0.5 text-center">0-0.1</td>
                   
                   <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;0.50</td>
-                  <td className="border-r border-black p-0.5 text-center">0-0.4</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;0.02</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
-                  <td className="border-r border-black p-0.5 text-center">0-0.02</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
                   <td className="border-r border-black p-0.5 text-center">&gt;4</td>
                   <td className="p-0.5 text-center">40-70</td>
                 </tr>
@@ -498,7 +498,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                 ))}
                 <tr className="border-t border-black font-bold text-[10px] text-red-600 bg-gray-50">
                   <td className="border-r border-black p-0.5 text-center">&lt;300</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;10</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;50</td>
                   <td className="p-0.5 text-center">&lt;300</td>
                 </tr>
               </tbody>
@@ -514,7 +514,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border-r border-b border-black p-1 w-10">Pond</th>
-                  <th className="border-r border-b border-black p-0.5 text-green-700 text-[11px]" colSpan={11}>USEFUL PLANKTON - ఉపయోగకరమైన ప్లవకములు</th>
+                  <th className="border-r border-b border-black p-0.5 text-green-700 text-[11px]" colSpan={12}>USEFUL PLANKTON - ఉపయోగకరమైన ప్లవకములు</th>
                   <th className="border-b border-black p-0.5 text-red-700 text-[11px]" colSpan={14}>HARMFUL PLANKTON - హానికరమైన ప్లవకములు</th>
                 </tr>
                 <tr className="bg-gray-50 text-[10px] border-b border-black">
@@ -616,9 +616,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
         </div>
 
         {/* Remarks & Recommendations */}
-        <div className="mb-4 border border-black p-2">
+        <div className="mb-1 border border-black p-1">
           <h4 className="font-bold text-xs mb-1">Remarks & Recommendations:</h4>
-          <div className="min-h-[60px] mt-1 text-[11px] whitespace-pre-wrap">
+          <div className="min-h-[40px] mt-1 text-[10px] whitespace-pre-wrap">
             {remarksAndRecommendations || "No remarks provided."}
           </div>
         </div>
