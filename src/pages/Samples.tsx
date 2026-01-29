@@ -47,7 +47,7 @@ const Samples = () => {
   const [endDate, setEndDate] = useState<string>("");
 
   type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology";
-  const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology"];
+  const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology","wssv"];
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);

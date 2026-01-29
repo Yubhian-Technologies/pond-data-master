@@ -47,4 +47,11 @@ export const availableTests = [
     sampleType: "microbiology" as const,
     category: "MICROBIOLOGY",
   },
+  {
+    id:"wssv",
+    name:"WSSV Rapid Test analysis",
+    price:1200.00,
+    sampleType:"wssv" as const,
+    category:"WSSV"
+  }
 ] as const; 
