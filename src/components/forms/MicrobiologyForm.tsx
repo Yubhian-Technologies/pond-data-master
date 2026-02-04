@@ -1,5 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  setDoc, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
 interface FarmerInfo {
@@ -7,27 +15,27 @@ interface FarmerInfo {
   village: string;
   mobile: string;
   date: string;
+  farmerId: string;
 }
 
 interface MicrobiologyFormProps {
-  invoice: any;
   invoiceId: string;
   locationId: string;
   onSubmit: () => void;
 }
 
 export default function MicrobiologyForm({
-  invoice,
   invoiceId,
   locationId,
   onSubmit,
 }: MicrobiologyFormProps) {
   const today = new Date().toISOString().split("T")[0];
 
-  // Get total microbiology samples from invoice
+  const [localInvoice, setLocalInvoice] = useState<any>(null);
+
   const totalSamples =
     Number(
-      invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "microbiology")?.count || 0
+      localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "microbiology")?.count || 0
     );
 
   const createEmptyArray = (length: number) =>
@@ -44,18 +52,73 @@ export default function MicrobiologyForm({
   };
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
-    farmerName: invoice?.farmerName ?? "",
-    village: invoice?.village ?? "",
-    mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
+    farmerName: "",
+    village: "",
+    mobile: "",
     date: today,
+    farmerId: "",
   });
 
   const [microbiologyData, setMicrobiologyData] = useState<any>(emptyMicrobiologyData);
   const [loading, setLoading] = useState(true);
 
+  const [farmerUID, setFarmerUID] = useState<string>("");
+
+  const [sampleType, setSampleType] = useState<string>("Microbiology");
+
+  const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.microbiology || {};
+
+  const testNameMap: Record<string, string> = {
+    yellowColonies: "Yellow Colonies",
+    greenColonies: "Green Colonies",
+    tpc: "Total Plate Count (TPC)",
+    testCode: "Test Code",
+  };
+
+  // Fetch invoice
+  useEffect(() => {
+    if (!locationId || !invoiceId) {
+      console.warn("Missing locationId or invoiceId for invoice fetch");
+      return;
+    }
+
+    const fetchInvoice = async () => {
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          querySnapshot = await getDocs(q);
+        }
+
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const data = docSnap.data();
+          const docId = docSnap.id;
+
+          setLocalInvoice({ ...data, docId });
+          console.log("Invoice loaded OK:", { 
+            docId, 
+            invoiceId: data.invoiceId || data.id || "unknown" 
+          });
+        } else {
+          console.error("Invoice NOT FOUND for ID:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice in form:", err);
+      }
+    };
+
+    fetchInvoice();
+  }, [locationId, invoiceId]);
+
+  // Pre-fill farmer data + load saved report
   useEffect(() => {
     const loadData = async () => {
-      if (!invoiceId || !locationId || totalSamples === 0) {
+      if (!localInvoice) {
         setLoading(false);
         return;
       }
@@ -63,12 +126,35 @@ export default function MicrobiologyForm({
       try {
         setLoading(true);
 
+        // ALWAYS pre-fill from farmer master (runs on first load)
+        let loadedFarmerId = "";
+        if (localInvoice?.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
+          const farmerSnap = await getDoc(farmerRef);
+          if (farmerSnap.exists()) {
+            const farmerData = farmerSnap.data();
+            loadedFarmerId = farmerData.farmerId || "";
+            setFarmerUID(loadedFarmerId);
+
+            // Pre-fill name, village, mobile, date
+            setFarmerInfo(prev => ({
+              ...prev,
+              farmerName: farmerData.name || prev.farmerName || "",
+              village: farmerData.city || prev.village || "",
+              mobile: farmerData.phone || prev.mobile || "",
+              date: localInvoice.dateOfCulture || today,
+              farmerId: loadedFarmerId,
+            }));
+          }
+        }
+
+        // Load saved microbiology report (overrides pre-fill if exists)
         const reportRef = doc(
           db,
           "locations",
           locationId,
           "invoices",
-          invoiceId,
+          localInvoice.docId,  // ← Fixed: use real docId
           "microbiologyReports",
           "data"
         );
@@ -76,19 +162,22 @@ export default function MicrobiologyForm({
         const snap = await getDoc(reportRef);
 
         if (snap.exists()) {
-          const data = snap.data();
+          const data = snap.data() || {};
 
-          // Restore farmer info
           if (data.farmerInfo) {
             setFarmerInfo({
-              farmerName: data.farmerInfo.farmerName || invoice?.farmerName || "",
-              village: data.farmerInfo.village || invoice?.village || "",
-              mobile: data.farmerInfo.mobile || invoice?.farmerPhone || invoice?.mobile || "",
-              date: data.farmerInfo.date || today,
+              farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
+              village: data.farmerInfo.village || farmerInfo.village,
+              mobile: data.farmerInfo.mobile || farmerInfo.mobile,
+              date: data.farmerInfo.date || localInvoice?.dateOfCulture || today,
+              farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",
             });
           }
 
-          // Restore microbiology data
+          if (data.sampleType) {
+            setSampleType(data.sampleType);
+          }
+
           const savedData = data.microbiologyData || {};
           const normalized: any = {};
 
@@ -98,13 +187,7 @@ export default function MicrobiologyForm({
 
           setMicrobiologyData(normalized);
         } else {
-          // First time load
-          setFarmerInfo({
-            farmerName: invoice?.farmerName ?? "",
-            village: invoice?.village ?? "",
-            mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
-            date: today,
-          });
+          // First time - keep pre-filled values
           setMicrobiologyData(emptyMicrobiologyData);
         }
       } catch (error) {
@@ -116,7 +199,7 @@ export default function MicrobiologyForm({
     };
 
     loadData();
-  }, [invoice, invoiceId, locationId, totalSamples, today]);
+  }, [localInvoice, locationId, today]);
 
   const updateColumn = (field: keyof typeof emptyMicrobiologyData, index: number, value: string) => {
     setMicrobiologyData((prev: any) => ({
@@ -126,7 +209,10 @@ export default function MicrobiologyForm({
   };
 
   const handleSave = async () => {
-    if (!invoiceId || !locationId) return;
+    if (!invoiceId || !locationId || !localInvoice?.docId) {
+      alert("Cannot save: Invoice not loaded or missing ID");
+      return;
+    }
 
     try {
       const reportRef = doc(
@@ -134,7 +220,7 @@ export default function MicrobiologyForm({
         "locations",
         locationId,
         "invoices",
-        invoiceId,
+        localInvoice.docId,
         "microbiologyReports",
         "data"
       );
@@ -145,6 +231,7 @@ export default function MicrobiologyForm({
           farmerInfo,
           microbiologyData,
           totalSamples,
+          sampleType,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -215,12 +302,40 @@ export default function MicrobiologyForm({
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Farmer ID</label>
+            <input
+              className="w-full border border-gray-300 p-3 rounded-lg bg-gray-100 focus:ring-2 focus:ring-blue-500"
+              value={farmerUID}
+              readOnly
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
             <input
               type="date"
               className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500"
               value={farmerInfo.date}
               onChange={(e) => setFarmerInfo({ ...farmerInfo, date: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">No. of Samples</label>
+            <input
+              className="w-full border border-gray-300 p-3 rounded-lg bg-gray-100 focus:ring-2 focus:ring-blue-500"
+              value={totalSamples}
+              readOnly
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Sample Type</label>
+            <input
+              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500"
+              value={sampleType}
+              onChange={(e) => setSampleType(e.target.value)}
+              placeholder="e.g. Microbiology"
             />
           </div>
         </div>
@@ -237,11 +352,24 @@ export default function MicrobiologyForm({
             <thead>
               <tr className="bg-blue-500 text-white">
                 <th className="border border-blue-400 px-4 py-3 text-left font-bold text-md">Parameter</th>
-                {Array.from({ length: totalSamples }, (_, i) => (
-                  <th key={i} className="border border-blue-400 px-4 py-3 text-center font-bold text-md">
-                    Sample {i + 1}
-                  </th>
-                ))}
+                {Array.from({ length: totalSamples }, (_, i) => {
+                  const sampleNumber = i + 1;
+                  const sampleSelectedIds = perSampleSelectedTests[sampleNumber] || [];
+                  const sampleSelectedNames = sampleSelectedIds
+                    .map((id: string) => testNameMap[id] || id)
+                    .filter(Boolean);
+
+                  return (
+                    <th key={i} className="border border-blue-400 px-4 py-3 text-center font-bold text-md">
+                      <div>Sample {sampleNumber}</div>
+                      {sampleSelectedNames.length > 0 && (
+                        <div className="mt-1 text-xs text-blue-100 font-normal">
+                          {sampleSelectedNames.join(" • ")}
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -268,7 +396,6 @@ export default function MicrobiologyForm({
         </div>
       </section>
 
-      
       <div className="text-center">
         <button
           onClick={handleSave}

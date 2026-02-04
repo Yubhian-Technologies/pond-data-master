@@ -1,25 +1,37 @@
-// src/pages/InvoicePreview.tsx
+
 import React from "react";
 import { useLocation } from "react-router-dom";
 import InvoiceTemplate from "@/data/template";
 
-// Same interface as in InvoiceTemplate
+
 interface InvoiceState {
   invoiceId: string;
   farmerName: string;
   formattedDate: string;
   village: string;
   mobile: string;
-  tests: { [type: string]: any[] };
+  tests: {
+    [type: string]: {
+      name: string;
+      quantity: number;
+      price: number;
+      total: number;
+    }[];
+  };
+  subtotal: number;
+  gstAmount: number;
   total: number;
-  paymentMode: "cash" | "qr" | "neft";
+  paymentMode: "cash" | "qr" | "neft" | "rtgs";
+  isPartialPayment?: boolean;
+  paidAmount?: number | null;
+  balanceAmount?: number;
 }
 
 const InvoicePreview: React.FC = () => {
   const location = useLocation();
   const state = location.state as InvoiceState | null;
 
-  // Optional: fallback if someone directly visits the URL without state
+  // Fallback if accessed directly without state
   if (!state) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">

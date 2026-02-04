@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 
 import SoilForm from "../components/forms/SoilForm";
 import WaterForm from "../components/forms/WaterForm";
@@ -23,12 +23,12 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { useUserSession } from "../contexts/UserSessionContext";
-import { useSearchParams } from "react-router-dom";
 
 export default function LabResults() {
   const [invoice, setInvoice] = useState<any>(null);
   const { session } = useUserSession();
   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const navigate = useNavigate();
 
   const [currentType, setCurrentType] = useState<string | null>(null);
   const [step, setStep] = useState("loading");
@@ -44,19 +44,32 @@ export default function LabResults() {
 
   const fetchInvoice = async () => {
     const ref = collection(db, "locations", session.locationId, "invoices");
-    const q = query(ref, where("id", "==", invoiceId));
-    const snap = await getDocs(q);
+
+    // Try querying by 'invoiceId' first (new invoices)
+    let q = query(ref, where("invoiceId", "==", invoiceId));
+    let snap = await getDocs(q);
+
+    // If not found, fall back to old 'id' field (for old invoices)
+    if (snap.empty) {
+      q = query(ref, where("id", "==", invoiceId));
+      snap = await getDocs(q);
+    }
 
     if (!snap.empty) {
       const docSnap = snap.docs[0];
       const docData = docSnap.data();
       const docId = docSnap.id;
 
+      // Clean up any conflicting 'id' field
+      if ('id' in docData) {
+        delete (docData as any).id;
+      }
+
       const fullData = { ...docData, docId };
       setInvoice(fullData);
       startFlow(fullData);
     } else {
-      console.error("Invoice not found");
+      console.error("Invoice not found even in fallback query");
       setStep("error");
     }
   };
@@ -195,11 +208,9 @@ export default function LabResults() {
       page-break-inside: avoid !important;
     }
 
-    /* REMOVE BROWSER HEADER/FOOTER (TITLE, URL, DATE, PAGE NO) */
     @page {
       size: A4 portrait;
       margin: 1cm;
-      /* These rules remove the default header/footer */
       @top-left { content: none; }
       @top-center { content: none; }
       @top-right { content: none; }
@@ -212,47 +223,71 @@ export default function LabResults() {
       page-break-inside: avoid !important; 
     }
 
-    /* Hide any accidental headers */
     .print\\:hidden { display: none !important; }
   }
 `;
 
   const renderSignatureAndNote = () => (
-    <div className="mt-20 border-t-2 border-black pt-8 signature-section">
-      <div className="flex justify-between text-sm px-10 mb-10">
-        <div>
-          <p className="font-semibold">Reported by:</p>
-          <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
-        </div>
-        <div>
-          <p className="font-semibold">Checked by:</p>
-          <p className="mt-8">______________________</p>
+    <>
+      <div className="mt-20 border-t-2 border-black pt-8 signature-section">
+        <div className="flex justify-between text-sm px-10 mb-10">
+          <div>
+            <p className="font-semibold">Reported by:</p>
+            <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
+          </div>
+          <div>
+            <p className="font-semibold">Checked by:</p>
+            <p className="mt-8">______________________</p>
+          </div>
         </div>
       </div>
-      <div className="text-center text-xs text-gray-700">
-        <p>
-          <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
+
+      <div className="text-sm text-gray-800 mt-8">
+        {(hasPCR || (hasPL && hasPCR)) && (
+          <p className="font-bold">
+            <strong className="text-red-600 font-bold mt-6">Important Note :</strong> EHP - Enterocytozoon hepatopanaei, WSSV - White spot syndrome virus, 
+            IHHNV - Infectious hypodermal and hematopoietic necrosis virus, VIBRIO - Vibrio parahaemolyticus 
+            and Vibrio harveyi
+          </p>
+        )}
+        <p className="font-bold mb-2 text-red-600">Note:</p>
+        <p className="mb-4">
+          PL: Post Larve, MGR: Muscle Gut Ratio, SHG: Swollen Hind Gut, HP: Hepatopancreas, F: Full, S: Shrunken,
+          FBI: Filamentous Bacterial Infection, PZ: Protozoal Infection, Infection Level: Light: &lt;10%, Moderate: 10 to 30%, Heavy:40%
+        </p>
+
+        <p className="font-bold mb-2 text-red-600">PL Quality Selection - Scoring</p>
+        <p className="mb-4">
+          <span className="text-red-600 font-bold">Rostral Spines:</span> 15 Points (&gt;4 Spines), Average Length: 10 points(&gt;11mm), Size Variation: 10 points (&lt;10%), Muscle Gut Ratio: 15 points (&gt;4:1
+          Spine), Hepatopancreas: 15 points (Full), Necrosis: 10 points (Absent) Fouling: 10 points (Absent), Swollen Hind Gut: 15 points (Absent)
+        </p>
+
+        <p className="mt-6">
+          <span className="text-red-600 font-bold">Note:</span> The samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose. Not
         </p>
       </div>
-    </div>
+
+      <div className="text-center mt-20">
+        <p className="text-red-600 font-bold">TWL ADC committed for Complete farming Solutions</p>
+      </div>
+    </>
   );
 
   const renderPathologyReport = () => (
     <>
       <style>{combinedPrintStyles}</style>
-{hasPL && (
-  <div className={hasPL && hasPCR ? "pl-page" : ""}>
-    <div className={hasPL && hasPCR ? "pl-tight-bottom" : ""}>
-      {/* Hide signature in PLReport when combined with PCR */}
-      <PLReport 
-        invoiceId={invoiceId!} 
-        locationId={session.locationId} 
-        allSampleCount={plCount}
-        showSignature={!hasPCR}
-      />
-    </div>
-  </div>
-)}
+      {hasPL && (
+        <div className={hasPL && hasPCR ? "pl-page" : ""}>
+          <div className={hasPL && hasPCR ? "pl-tight-bottom" : ""}>
+            <PLReport 
+              invoiceId={invoiceId!} 
+              locationId={session.locationId} 
+              allSampleCount={plCount}
+              showSignature={!hasPCR}
+            />
+          </div>
+        </div>
+      )}
 
       {hasPCR && (
         <div className={hasPL && hasPCR ? "pcr-page" : ""}>
@@ -262,8 +297,6 @@ export default function LabResults() {
             allSampleCount={pcrCount}
             compact={hasPL && hasPCR}
           />
-
-          {/* Single signature — always shown after PCR */}
           {renderSignatureAndNote()}
         </div>
       )}
@@ -272,10 +305,21 @@ export default function LabResults() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto relative pb-24">
+      {/* Styles for printing */}
+      <style>{combinedPrintStyles}</style>
+
       {showTopButtons && (
         <>
-          <div className="overflow-x-auto pb-4 mb-8">
+          <div className="overflow-x-auto pb-4 mb-8 print:hidden">
             <div className="flex gap-4 justify-center min-w-max px-4">
+              {/* Back Button for Entry/Edit Mode */}
+              <button
+                onClick={() => navigate("/samples")}
+                className="px-3 py-2 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                BACK TO SAMPLES
+              </button>
+
               {invoice.sampleType?.map((s: any) => {
                 const type = s.type.toLowerCase();
                 const completed = invoice?.reportsProgress?.[type] === "completed";
@@ -301,18 +345,48 @@ export default function LabResults() {
             </div>
           </div>
 
-          <p className="text-center text-gray-600 mb-8 text-lg">
+          <p className="text-center text-gray-600 mb-8 text-lg print:hidden">
             Click a button to enter results for <strong>all samples</strong> of that type on one page.
           </p>
         </>
       )}
 
-      {/* Forms */}
-      {step === "soilForm" && hasSoil && <SoilForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("soil"); setStep("soilReport"); }} />}
-      {step === "waterForm" && hasWater && <WaterForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("water"); setStep("waterReport"); }} />}
-      {step === "plForm" && hasPL && <PLForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pl"); checkPathologyCompletion("pl"); }} />}
-      {step === "pcrForm" && hasPCR && <PCRForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pcr"); checkPathologyCompletion("pcr"); }} />}
-      {step === "microbiologyForm" && hasMicro && <MicrobiologyForm invoice={invoice} invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("microbiology"); setStep("microbiologyReport"); }} />}
+      {/* Forms – no invoice prop passed to any form */}
+      {step === "soilForm" && hasSoil && (
+        <SoilForm 
+          invoiceId={invoiceId!} 
+          locationId={session.locationId} 
+          onSubmit={() => { updateProgress("soil"); setStep("soilReport"); }}
+        />
+      )}
+      {step === "waterForm" && hasWater && (
+        <WaterForm 
+          invoiceId={invoiceId!} 
+          locationId={session.locationId} 
+          onSubmit={() => { updateProgress("water"); setStep("waterReport"); }}
+        />
+      )}
+      {step === "plForm" && hasPL && (
+        <PLForm 
+          invoiceId={invoiceId!} 
+          locationId={session.locationId} 
+          onSubmit={() => { updateProgress("pl"); checkPathologyCompletion("pl"); }}
+        />
+      )}
+      {step === "pcrForm" && hasPCR && (
+        <PCRForm 
+          invoiceId={invoiceId!} 
+          locationId={session.locationId} 
+          onSubmit={() => { updateProgress("pcr"); checkPathologyCompletion("pcr"); }}
+        />
+      )}
+      {step === "microbiologyForm" && hasMicro && (
+        <MicrobiologyForm 
+          invoiceId={invoiceId!} 
+          locationId={session.locationId} 
+          onSubmit={() => { updateProgress("microbiology"); setStep("microbiologyReport"); }}
+        />
+      )}
 
       {/* Individual Previews */}
       {step === "soilReport" && <div id="printable-report"><SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} /></div>}
@@ -325,8 +399,16 @@ export default function LabResults() {
       {/* Final Reports View */}
       {isViewingReports && (
         <div>
-          <div className="overflow-x-auto pb-4 mb-10">
+          <div className="overflow-x-auto pb-4 mb-10 print:hidden">
             <div className="flex gap-4 justify-center min-w-max px-4">
+              {/* Back Button for Viewing Mode */}
+              <button
+                onClick={() => navigate("/samples")}
+                className="px-5 py-1.5 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                BACK
+              </button>
+
               {hasSoil && <button onClick={() => setActiveEnvReport("soil")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "soil" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>SOIL REPORT</button>}
               {hasWater && <button onClick={() => setActiveEnvReport("water")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "water" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>WATER REPORT</button>}
               {hasMicro && <button onClick={() => setActiveEnvReport("microbiology")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "microbiology" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>MICROBIOLOGY REPORT</button>}

@@ -9,6 +9,7 @@ import { availableTests } from "@/data/tests";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
@@ -22,6 +23,7 @@ interface LocationState {
   sampleSummary: SampleSummaryItem[];
   dateOfCulture: string;
   farmer: { name: string; address: string; phone: string; id: string };
+  technician?: { technicianId: string; technicianName: string };
 }
 
 const PCR_PATHOGEN_MAP: Record<string, string> = {
@@ -40,19 +42,24 @@ const InvoicePage = () => {
 
   const location = useLocation();
   const state = location.state as LocationState | undefined;
-  const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft">("");
+
+  const passedTechnician = state?.technician || null;
+
+  const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft" | "rtgs" | "pending">("");
+  const [transactionRef, setTransactionRef] = useState<string>("");
+
+  const [isZeroInvoice, setIsZeroInvoice] = useState(false);
 
   const locationId = session.locationId;
-  const technicianId = session.technicianId;
-  const technicianName = session.technicianName;
 
   const [locationName, setLocationName] = useState<string>("");
 
-  // Fetch location name for prefix
+  const [applyDiscount, setApplyDiscount] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState<string>("");
+
   useEffect(() => {
     const fetchLocationName = async () => {
       if (!locationId) return;
-
       try {
         const locDoc = await getDoc(doc(db, "locations", locationId));
         if (locDoc.exists()) {
@@ -68,7 +75,6 @@ const InvoicePage = () => {
         setLocationName("");
       }
     };
-
     fetchLocationName();
   }, [locationId]);
 
@@ -101,12 +107,10 @@ const InvoicePage = () => {
     [other: string]: Set<string>[];
   }>(() => {
     const init: any = { pl: [], pcr: [] };
-
     for (let i = 0; i < plPcrSampleCount; i++) {
       init.pl.push(new Set<string>());
       init.pcr.push(new Set<string>());
     }
-
     sampleSummary.forEach((s) => {
       if (s.type !== "pl" && s.type !== "pcr") {
         init[s.type] = [];
@@ -115,7 +119,6 @@ const InvoicePage = () => {
         }
       }
     });
-
     return init;
   });
 
@@ -150,25 +153,21 @@ const InvoicePage = () => {
     return result;
   }, [perSampleTests.pcr]);
 
-  // Improved invoice ID generation with better fallback
   const generateInvoiceId = (): string => {
     let prefix = "XXX";
-
     if (locationName) {
       const lowerName = locationName.toLowerCase();
-      if (lowerName.includes("nellore")) prefix = "NCR";
+      if (lowerName.includes("nellore")) prefix = "NLR";
       else if (lowerName.includes("bhimavaram")) prefix = "BVRM";
       else if (lowerName.includes("tamarakollu")) prefix = "TMRK";
       else if (lowerName.includes("ganapavaram")) prefix = "GVRM";
       else if (lowerName.includes("juvvalapalem")) prefix = "JP";
     }
-
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let randomPart = "";
     for (let i = 0; i < 4; i++) {
       randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
     return `ADC ${prefix}${randomPart}`;
   };
 
@@ -200,13 +199,14 @@ const InvoicePage = () => {
     return perSampleTests[sampleType].every((set) => set.has(testId));
   };
 
-  const calculateTotal = () => {
+  const calculateTotals = () => {
+    // We always calculate the real test grouping (so we can save which tests were selected)
     const groupedItems: {
       [type: string]: { name: string; quantity: number; total: number; price: number }[];
     } = {};
-    let total = 0;
+    let subtotal = 0;
 
-    // PCR Tests
+    // PCR tests
     if (actualPcrCount > 0) {
       const pcrTestCount: { [testId: string]: number } = {};
       perSampleTests.pcr.forEach((set) => {
@@ -216,19 +216,18 @@ const InvoicePage = () => {
           });
         }
       });
-
       groupedItems["pcr"] = Object.entries(pcrTestCount)
         .map(([testId, qty]) => {
           const test = availableTests.find((t) => t.id === testId && t.sampleType === "pcr");
           if (!test) return null;
           const itemTotal = qty * test.price;
-          total += itemTotal;
+          subtotal += itemTotal;
           return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
         })
         .filter(Boolean) as any;
     }
 
-    // PL Tests
+    // PL tests
     if (actualPlCount > 0) {
       const plTestCount: { [testId: string]: number } = {};
       perSampleTests.pl.forEach((set) => {
@@ -238,19 +237,18 @@ const InvoicePage = () => {
           });
         }
       });
-
       groupedItems["pl"] = Object.entries(plTestCount)
         .map(([testId, qty]) => {
           const test = availableTests.find((t) => t.id === testId && t.sampleType === "pl");
           if (!test) return null;
           const itemTotal = qty * test.price;
-          total += itemTotal;
+          subtotal += itemTotal;
           return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
         })
         .filter(Boolean) as any;
     }
 
-    // Other sample types (soil, water, etc.)
+    // Other sample types
     sampleSummary.forEach((s) => {
       if (s.type === "pl" || s.type === "pcr") return;
       const testCount: { [testId: string]: number } = {};
@@ -264,19 +262,40 @@ const InvoicePage = () => {
           const test = availableTests.find((t) => t.id === testId);
           if (!test) return null;
           const itemTotal = qty * test.price;
-          total += itemTotal;
+          subtotal += itemTotal;
           return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
         })
         .filter(Boolean) as any;
     });
 
-    return { total, groupedItems };
+    // Apply zero invoice logic only to amounts
+    const finalSubtotal = isZeroInvoice ? 0 : subtotal;
+    let discountAmount = 0;
+    let grandTotal = finalSubtotal;
+
+    // Discount only applies in normal mode
+    if (!isZeroInvoice && applyDiscount && discountPercent) {
+      const percent = parseFloat(discountPercent);
+      if (!isNaN(percent) && percent >= 0 && percent <= 100) {
+        discountAmount = (finalSubtotal * percent) / 100;
+        grandTotal = finalSubtotal - discountAmount;
+      }
+    }
+
+    return {
+      subtotal: finalSubtotal,
+      discountAmount,
+      grandTotal,
+      groupedItems,           // ← always contains selected tests
+    };
   };
 
-  const { total, groupedItems } = calculateTotal();
+  const { subtotal, discountAmount, grandTotal, groupedItems } = calculateTotals();
 
   const handleGenerateInvoice = async () => {
-    if (total === 0) {
+    // In zero mode we allow generation even if no tests are selected
+    // (but usually user will select some tests for record)
+    if (!isZeroInvoice && grandTotal === 0 && Object.keys(groupedItems).length === 0) {
       toast({
         title: "Error",
         description: "Please select at least one test",
@@ -294,28 +313,46 @@ const InvoicePage = () => {
       return;
     }
 
-    // Generate formatted date (current date: Jan 03, 2026)
+    if (!isZeroInvoice && paymentMode !== "pending" && paymentMode !== "cash" && !transactionRef.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter transaction/reference number",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const today = new Date();
     const formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(
       today.getMonth() + 1
-    )
-      .toString()
-      .padStart(2, "0")}-${today.getFullYear()}`; // e.g., 03-01-2026
+    ).toString().padStart(2, "0")}-${today.getFullYear()}`;
 
-    const invoiceId = generateInvoiceId(); // e.g., ADC NCRAB12
+    const invoiceId = generateInvoiceId();
+
+    const perSampleSelectedTests: Record<string, Record<number, string[]>> = {};
+
+    sampleSummary.forEach((s) => {
+      const type = s.type.toLowerCase();
+      if (type === "pl" || type === "pcr") return;
+
+      if (perSampleTests[type]?.length) {
+        perSampleSelectedTests[type] = {};
+        perSampleTests[type].forEach((selectedSet, sampleIndex) => {
+          if (selectedSet.size > 0) {
+            perSampleSelectedTests[type][sampleIndex + 1] = Array.from(selectedSet);
+          }
+        });
+      }
+    });
 
     const sampleType = sampleSummary.map((s) => ({
       type: s.type.toLowerCase(),
-      count:
-        s.type === "pl" ? actualPlCount :
-        s.type === "pcr" ? actualPcrCount :
-        s.count,
+      count: s.type === "pl" ? actualPlCount : s.type === "pcr" ? actualPcrCount : s.count,
     }));
 
     const reportsProgress: { [key: string]: string } = {};
     if (actualPlCount > 0) reportsProgress["pl"] = "pending";
     if (actualPcrCount > 0) reportsProgress["pcr"] = "pending";
-
     sampleSummary.forEach((s) => {
       if (s.type !== "pl" && s.type !== "pcr") {
         const hasTests = perSampleTests[s.type]?.some((set) => set.size > 0);
@@ -325,10 +362,28 @@ const InvoicePage = () => {
       }
     });
 
-    // Final data to save and pass
+    let paidAmount = 0;
+    let balanceAmount = grandTotal;
+    let isPartialPayment = false;
+
+    if (isZeroInvoice) {
+      paidAmount = 0;
+      balanceAmount = 0;
+    } else if (paymentMode !== "pending") {
+      paidAmount = grandTotal;
+      balanceAmount = 0;
+      isPartialPayment = false;
+    } else {
+      paidAmount = 0;
+      balanceAmount = grandTotal;
+      isPartialPayment = true;
+    }
+
+    const technicianId = passedTechnician?.technicianId || session.technicianId || "unknown";
+    const technicianName = passedTechnician?.technicianName || session.technicianName || "Unknown Technician";
+
     const invoiceData = {
-      id: invoiceId,
-      invoiceId,                    // Critical: for querying later
+      invoiceId,
       farmerName,
       farmerId,
       farmerPhone: mobile,
@@ -336,34 +391,45 @@ const InvoicePage = () => {
       technicianName,
       technicianId,
       dateOfCulture,
-      tests: groupedItems,
-      total,
+      tests: groupedItems,                    // ← now always contains selected tests
+      subtotal: isZeroInvoice ? 0 : subtotal,
+      discountPercent: applyDiscount && discountPercent ? parseFloat(discountPercent) : 0,
+      discountAmount: isZeroInvoice ? 0 : discountAmount,
+      total: isZeroInvoice ? 0 : grandTotal,
       village,
       mobile,
-      paymentMode,
+      paymentMode: isZeroInvoice ? "pending" : paymentMode,
+      transactionRef: paymentMode !== "cash" && paymentMode !== "pending" ? transactionRef.trim() : null,
+      isPartialPayment,
+      paidAmount,
+      balanceAmount,
       sampleType,
       reportsProgress,
       samplePathogens,
-      formattedDate,                // Critical: for display
+      formattedDate,
       createdAt: serverTimestamp(),
+      isZeroInvoice: isZeroInvoice,
+      note: isZeroInvoice ? "Lab Equipment Testing - Zero Charge" : null,
+      perSampleSelectedTests,
     };
 
     try {
-      // Save to Firestore
       await addDoc(collection(db, "locations", locationId, "invoices"), invoiceData);
 
-      // Navigate to template with full data including invoiceId
       navigate("/invoice-template", {
         state: {
           ...invoiceData,
-          invoiceId,                 // Ensure it's in state
+          invoiceId,
           formattedDate,
+          total: isZeroInvoice ? 0 : grandTotal,
         },
       });
 
       toast({
         title: "Success",
-        description: "Invoice generated successfully!",
+        description: isZeroInvoice
+          ? "Zero invoice generated successfully for lab testing!"
+          : "Invoice generated successfully!",
       });
     } catch (error) {
       console.error("Error generating invoice:", error);
@@ -389,7 +455,6 @@ const InvoicePage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-8">
-                    {/* Other sample types */}
                     {sampleSummary
                       .filter((s) => s.type !== "pl" && s.type !== "pcr")
                       .map((s) => (
@@ -453,7 +518,6 @@ const InvoicePage = () => {
                         </div>
                       ))}
 
-                    {/* PL / PCR Section */}
                     {plPcrSampleCount > 0 && (
                       <div>
                         <h4 className="font-semibold mb-3">
@@ -523,14 +587,22 @@ const InvoicePage = () => {
                 </Card>
               </div>
 
-              {/* Summary & Payment */}
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Invoice Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {Object.keys(groupedItems).length > 0 ? (
+                    {isZeroInvoice ? (
+                      <div className="text-center py-8">
+                        <p className="font-medium text-lg text-muted-foreground">
+                          Zero Invoice Mode (Lab Equipment Testing)
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          All charges set to ₹0
+                        </p>
+                      </div>
+                    ) : Object.keys(groupedItems).length > 0 ? (
                       <>
                         {Object.entries(groupedItems).map(([type, items]) => (
                           <div key={type} className="mb-4">
@@ -539,18 +611,65 @@ const InvoicePage = () => {
                             </h5>
                             {items.map((item: any, idx: number) => (
                               <div key={idx} className="flex justify-between text-sm">
-                                <span>
-                                  {item.name} × {item.quantity}
-                                </span>
+                                <span>{item.name} × {item.quantity}</span>
                                 <span>₹{item.total}</span>
                               </div>
                             ))}
                             <Separator className="my-3" />
                           </div>
                         ))}
-                        <div className="flex justify-between font-bold text-lg pt-2">
-                          <span>Total Amount</span>
-                          <span>₹{total}</span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-base">
+                            <span>Subtotal</span>
+                            <span>₹{subtotal.toFixed(2)}</span>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="apply-discount"
+                              checked={applyDiscount}
+                              onCheckedChange={(checked) => {
+                                setApplyDiscount(!!checked);
+                                if (!checked) setDiscountPercent("");
+                              }}
+                            />
+                            <Label htmlFor="apply-discount" className="text-sm font-medium leading-none cursor-pointer">
+                              Apply Discount
+                            </Label>
+                          </div>
+
+                          {applyDiscount && (
+                            <div className="flex items-center gap-3 pl-6">
+                              <Input
+                                type="number"
+                                placeholder="Discount %"
+                                value={discountPercent}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === "" || (/^\d+$/.test(val) && parseInt(val) <= 100)) {
+                                    setDiscountPercent(val);
+                                  }
+                                }}
+                                className="w-28 h-9"
+                                min={0}
+                                max={100}
+                              />
+                              <span className="text-sm text-muted-foreground">%</span>
+                            </div>
+                          )}
+
+                          {discountAmount > 0 && (
+                            <div className="flex justify-between text-base text-green-700">
+                              <span>Discount ({discountPercent}%)</span>
+                              <span>-₹{discountAmount.toFixed(2)}</span>
+                            </div>
+                          )}
+
+                          <Separator className="my-3" />
+                          <div className="flex justify-between font-bold text-lg">
+                            <span>Final Total Amount</span>
+                            <span>₹{grandTotal.toFixed(2)}</span>
+                          </div>
                         </div>
                       </>
                     ) : (
@@ -566,30 +685,75 @@ const InvoicePage = () => {
                     <CardTitle>Payment Details</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <Label>Payment Mode</Label>
-                      <Select
-                        value={paymentMode}
-                        onValueChange={(value: "cash" | "qr" | "neft" | "") =>
-                          setPaymentMode(value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment mode" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="qr">QR Code / UPI</SelectItem>
-                          <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="zero-invoice"
+                        checked={isZeroInvoice}
+                        onCheckedChange={(checked) => {
+                          setIsZeroInvoice(!!checked);
+                          if (checked) {
+                            setPaymentMode("pending");
+                            setTransactionRef("");
+                            setApplyDiscount(false);
+                            setDiscountPercent("");
+                          }
+                        }}
+                      />
+                      <Label htmlFor="zero-invoice" className="text-sm font-medium leading-none cursor-pointer">
+                        Zero Invoice (Lab Equipment Testing)
+                      </Label>
                     </div>
+
+                    {!isZeroInvoice && (
+                      <>
+                        <div>
+                          <Label>Payment Mode</Label>
+                          <Select
+                            value={paymentMode}
+                            onValueChange={(value: "cash" | "qr" | "neft" | "rtgs" | "pending" | "") => {
+                              setPaymentMode(value);
+                              if (value === "cash" || value === "pending") {
+                                setTransactionRef("");
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select payment mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="qr">QR Code / UPI</SelectItem>
+                              <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
+                              <SelectItem value="rtgs">RTGS / Bank Transfer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {(paymentMode === "qr" || paymentMode === "neft" || paymentMode === "rtgs") && (
+                          <div>
+                            <Label htmlFor="transactionRef">Transaction ID / Reference No.</Label>
+                            <Input
+                              id="transactionRef"
+                              type="text"
+                              value={transactionRef}
+                              onChange={(e) => setTransactionRef(e.target.value)}
+                              placeholder="Enter transaction reference"
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
 
                     <Button
                       onClick={handleGenerateInvoice}
                       className="w-full"
                       size="lg"
-                      disabled={total === 0 || !paymentMode}
+                      disabled={
+                        (!isZeroInvoice && grandTotal === 0 && Object.keys(groupedItems).length === 0) ||
+                        !paymentMode ||
+                        (!isZeroInvoice && ["qr", "neft", "rtgs"].includes(paymentMode) && !transactionRef.trim())
+                      }
                     >
                       Generate Invoice & Proceed
                     </Button>

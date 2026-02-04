@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import ADC from "@/assets/ADC.jpg"
 import { 
   LayoutDashboard, 
   Users, 
@@ -41,9 +42,10 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     <aside className="w-64 bg-card border-r border-border flex flex-col h-screen">
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+          {/* <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Beaker className="w-6 h-6 text-primary-foreground" />
-          </div>
+          </div> */}
+          <img src={ADC} className="w-24 h-16" alt="" />
           <div>
             <h2 className="font-bold text-lg text-foreground">Aqua Lab</h2>
             <p className="text-xs text-muted-foreground">Management System</p>

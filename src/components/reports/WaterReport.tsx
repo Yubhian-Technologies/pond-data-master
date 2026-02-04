@@ -1,5 +1,3 @@
-// src/components/reports/WaterReport.tsx
-
 import React, { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { useParams } from "react-router-dom";
@@ -13,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
-// All image imports (unchanged)
+
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import corrella from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alge/1-CHORELLA.png";
@@ -23,6 +21,7 @@ import scenedesmus from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/1.Green alg
 import copepod from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/1-Copepods.webp";
 import rotifer from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/3-ROTIFERS.jpg";
 import nauplius from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/2-Nauplius.jpg";
+import brachionus from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/4.ZOOPLANKTON/4-Brachionus.jpg";
 import spirulina from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/2.BLUE GREEN ALGE/SPIRULINA.jpg";
 import chaetoceros from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/3.DIATAM/2-Chaetoceros.jpg";
 import skeletonema from "@/assets/PLANKTON ANALYSIS IMAGES/1. Useful/3.DIATAM/1-SKELETOEMA.jpg";
@@ -31,7 +30,7 @@ import anabaena from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green al
 import oscillatoria from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green alge/3-Oscillatoria.jpg";
 import microcystis from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Blue green alge/1-Microcystis.png";
 import coscinodiscus from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/1-coscinodiscus.jpg";
-import nitzchia from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/2-Navicula.jpg";
+import nitzchia from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/3-Nitzschia.jpg";
 import navicula from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Diatoms/2-Navicula.jpg";
 import noctiluca from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Dainoflagellates/1-NOCTILUCA.jpg";
 import ceratium from "@/assets/PLANKTON ANALYSIS IMAGES/2. Harmful/Dainoflagellates/3-CERATIUM.jpg";
@@ -63,11 +62,9 @@ interface Pond {
   chlorine: string;
   dissolvedOxygen: string;
   totalDissolvedMatter: string;
-
   yellowColonies: string;
   greenColonies: string;
   tpc: string;
-
   phacus: string;
   chlorella: string;
   desmids: string;
@@ -75,11 +72,11 @@ interface Pond {
   copepod: string;
   rotifer: string;
   nauplius: string;
+  brachionus: string;
   spirulina: string;
   chaetoceros: string;
   skeletonema: string;
   rhizosolenia: string;
-
   anabaena: string;
   oscillatoria: string;
   microcystis: string;
@@ -128,21 +125,56 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
   const [ponds, setPonds] = useState<Pond[]>([]);
   const [loading, setLoading] = useState(true);
-  const [locationDetails, setLocationDetails] = useState<{
-  address: string;
-  email: string;
-  contactNumber: string;
-}>({
-  address: "",
-  email: "",
-  contactNumber: "",
-});
+  const [locationDetails, setLocationDetails] = useState({
+    address: "",
+    email: "",
+    contactNumber: "",
+  });
+
+  const [remarksAndRecommendations, setRemarksAndRecommendations] = useState<string>("");
+
+  const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
 
   const handlePrint = () => window.print();
 
+  // Fetch real invoice docId
+  useEffect(() => {
+    const fetchInvoiceDocId = async () => {
+      if (!invoiceId || !locationId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let snap = await getDocs(q);
+
+        if (snap.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          snap = await getDocs(q);
+        }
+
+        if (!snap.empty) {
+          const docSnap = snap.docs[0];
+          setRealInvoiceDocId(docSnap.id);
+          console.log("WaterReport - Found real docId:", docSnap.id);
+        } else {
+          console.error("WaterReport - Invoice not found for:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice docId:", err);
+      }
+    };
+
+    fetchInvoiceDocId();
+  }, [invoiceId, locationId]);
+
+  // Fetch data using real docId
   useEffect(() => {
     const fetchData = async () => {
-      if (!invoiceId || !locationId) {
+      if (!realInvoiceDocId || !locationId) {
         setLoading(false);
         return;
       }
@@ -150,143 +182,109 @@ const WaterReport: React.FC<WaterReportProps> = ({
       try {
         setLoading(true);
 
-        const invoicesRef = collection(db, "locations", locationId, "invoices");
-        const q = query(invoicesRef, where("id", "==", invoiceId));
-        const invoiceSnap = await getDocs(q);
+        // Invoice header info
+        const invoiceDocRef = doc(db, "locations", locationId, "invoices", realInvoiceDocId);
+        const invoiceSnap = await getDoc(invoiceDocRef);
 
-        if (invoiceSnap.empty) {
-          console.error("Invoice not found for invoiceId:", invoiceId);
-          setLoading(false);
-          return;
+        if (invoiceSnap.exists()) {
+          const invoiceData = invoiceSnap.data();
+          const waterType = invoiceData.sampleType?.find((s: any) => s.type?.toLowerCase() === "water");
+          const waterCount = waterType?.count || allSampleCount || 1;
+
+          setFormData({
+            farmerName: invoiceData.farmerName || "-",
+            mobile: invoiceData.farmerPhone || "-",
+            sdDoc: invoiceData.dateOfCulture || invoiceData.sdDoc || "-",
+            sampleCollectionTime: invoiceData.sampleCollectionTime || "-",
+            sampleTime: invoiceData.sampleTime || "-",
+            reportTime: invoiceData.reportTime || new Date().toTimeString().slice(0, 5),
+            farmerUID: invoiceData.farmerUID || invoiceData.farmerId || "-",
+            sourceOfWater: invoiceData.sourceOfWater || "-",
+            sampleDate: invoiceData.sampleDate || "-",
+            farmerAddress: invoiceData.farmerAddress || "-",
+            noOfSamples: waterCount.toString(),
+            reportDate: invoiceData.reportDate || new Date().toISOString().split("T")[0],
+            technicianName: invoiceData.technicianName || "",
+          });
         }
 
-        const invoiceDoc = invoiceSnap.docs[0];
-        const invoiceData = invoiceDoc.data();
-
-        const waterType = invoiceData.sampleType?.find((s: any) => s.type?.toLowerCase() === "water");
-        const waterCount = waterType?.count || allSampleCount || 1;
-
-        let farmerName = invoiceData.farmerName || "";
-        let mobile = invoiceData.farmerPhone || "";
-        let farmerUID = invoiceData.farmerUID || invoiceData.farmerId || "";
-        let farmerAddress = invoiceData.farmerAddress || "";
-        let sourceOfWater = invoiceData.sourceOfWater || "";
-        let sdDoc = invoiceData.dateOfCulture || invoiceData.sdDoc || "";
-
-        if (invoiceData.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", invoiceData.farmerId);
-          const farmerSnap = await getDoc(farmerRef);
-          if (farmerSnap.exists()) {
-            const farmer = farmerSnap.data();
-            farmerName = farmer.name || farmerName;
-            mobile = farmer.phone || mobile;
-            farmerAddress = [farmer.address, farmer.city, farmer.state]
-              .filter(Boolean)
-              .join(", ") || farmerAddress;
-            sourceOfWater = farmer.waterSource || sourceOfWater;
-          }
-        }
-
-        setFormData({
-          farmerName,
-          mobile,
-          sdDoc,
-          sampleCollectionTime: invoiceData.sampleCollectionTime || "-",
-          sampleTime: invoiceData.sampleTime || "-",
-          reportTime: invoiceData.reportTime || new Date().toTimeString().slice(0, 5),
-          farmerUID,
-          sourceOfWater,
-          sampleDate: invoiceData.sampleDate || invoiceData.createdAt?.toDate?.()?.toISOString().split("T")[0] || "-",
-          farmerAddress,
-          noOfSamples: waterCount.toString(),
-          reportDate: invoiceData.reportDate || new Date().toISOString().split("T")[0],
-          technicianName: invoiceData.technicianName || "",
-        });
-
+        // Water samples
         const samplesCollection = collection(
           db,
           "locations",
           locationId,
           "invoices",
-          invoiceId,
+          realInvoiceDocId,
           "water_reports"
         );
-
         const samplesSnap = await getDocs(samplesCollection);
-
         const pondList: Pond[] = [];
 
-        for (let i = 1; i <= waterCount; i++) {
+        let loadedRemarks = "";
+
+        for (let i = 1; i <= (allSampleCount || 1); i++) {
           const sampleDoc = samplesSnap.docs.find(d => d.id === `sample_${i}`);
-          if (sampleDoc) {
-            const data = sampleDoc.data();
-            pondList.push({
-              id: i,
-              pondNo: data.pondNo || `Pond ${i}`,
-              pH: data.pH || "",
-              salinity: data.salinity || "",
-              co3: data.co3 || "",
-              hco3: data.hco3 || "",
-              alkalinity: data.alkalinity || "",
-              hardness: data.hardness || "",
-              ca: data.ca || "",
-              mg: data.mg || "",
-              na: data.na || "",
-              k: data.k || "",
-              totalAmmonia: data.totalAmmonia || "",
-              unionizedAmmonia: data.unionizedAmmonia || "",
-              h2s: data.h2s || "",
-              nitrite: data.nitrite || "",
-              nitrate: data.nitrate || "",
-              iron: data.iron || "",
-              chlorine: data.chlorine || "",
-              dissolvedOxygen: data.dissolvedOxygen || "",
-              totalDissolvedMatter: data.totalDissolvedMatter || "",
-              yellowColonies: data.yellowColonies || "",
-              greenColonies: data.greenColonies || "",
-              tpc: data.tpc || "",
-              phacus: data.phacus || "",
-              chlorella: data.chlorella || "",
-              desmids: data.desmids || "",
-              scenedesmus: data.scenedesmus || "",
-              copepod: data.copepod || "",
-              rotifer: data.rotifer || "",
-              nauplius: data.nauplius || "",
-              spirulina: data.spirulina || "",
-              chaetoceros: data.chaetoceros || "",
-              skeletonema: data.skeletonema || "",
-              rhizosolenia: data.rhizosolenia || "",
-              anabaena: data.anabaena || "",
-              oscillatoria: data.oscillatoria || "",
-              microcystis: data.microcystis || "",
-              coscinodiscus: data.coscinodiscus || "",
-              nitzchia: data.nitzchia || "",
-              navicula: data.navicula || "",
-              noctiluca: data.noctiluca || "",
-              ceratium: data.ceratium || "",
-              dinophysis: data.dinophysis || "",
-              gymnodinium: data.gymnodinium || "",
-              zoothamnium: data.zoothamnium || "",
-              tintinnopsis: data.tintinnopsis || "",
-              favella: data.favella || "",
-            });
-          } else {
-            pondList.push({
-              id: i,
-              pondNo: `Pond ${i}`,
-              pH: "-", salinity: "-", co3: "-", hco3: "-", alkalinity: "-", hardness: "-", ca: "-", mg: "-", na: "-", k: "-",
-              totalAmmonia: "-", unionizedAmmonia: "-", h2s: "-", nitrite: "-", nitrate: "-", iron: "-", chlorine: "-",
-              dissolvedOxygen: "-", totalDissolvedMatter: "-",
-              yellowColonies: "-", greenColonies: "-", tpc: "-",
-              phacus: "-", chlorella: "-", desmids: "-", scenedesmus: "-", copepod: "-", rotifer: "-", nauplius: "-",
-              spirulina: "-", chaetoceros: "-", skeletonema: "-", rhizosolenia: "-",
-              anabaena: "-", oscillatoria: "-", microcystis: "-", coscinodiscus: "-", nitzchia: "-", navicula: "-",
-              noctiluca: "-", ceratium: "-", dinophysis: "-", gymnodinium: "-", zoothamnium: "-", tintinnopsis: "-", favella: "-",
-            });
+          const data = sampleDoc?.data() || {};
+
+          if (data.remarksAndRecommendations && !loadedRemarks) {
+            loadedRemarks = data.remarksAndRecommendations;
           }
+
+          pondList.push({
+            id: i,
+            pondNo: data.pondNo || `Pond ${i}`,
+            pH: data.pH || "-",
+            salinity: data.salinity || "-",
+            co3: data.co3 || "-",
+            hco3: data.hco3 || "-",
+            alkalinity: data.alkalinity || "-",
+            hardness: data.hardness || "-",
+            ca: data.ca || "-",
+            mg: data.mg || "-",
+            na: data.na || "-",
+            k: data.k || "-",
+            totalAmmonia: data.totalAmmonia || "-",
+            unionizedAmmonia: data.unionizedAmmonia || "-",
+            h2s: data.h2s || "-",
+            nitrite: data.nitrite || "-",
+            nitrate: data.nitrate || "-",
+            iron: data.iron || "-",
+            chlorine: data.chlorine || "-",
+            dissolvedOxygen: data.dissolvedOxygen || "-",
+            totalDissolvedMatter: data.totalDissolvedMatter || "-",
+            yellowColonies: data.yellowColonies || "-",
+            greenColonies: data.greenColonies || "-",
+            tpc: data.tpc || "-",
+            phacus: data.phacus || "-",
+            chlorella: data.chlorella || "-",
+            desmids: data.desmids || "-",
+            scenedesmus: data.scenedesmus || "-",
+            copepod: data.copepod || "-",
+            rotifer: data.rotifer || "-",
+            nauplius: data.nauplius || "-",
+            brachionus: data.brachionus || "-",
+            spirulina: data.spirulina || "-",
+            chaetoceros: data.chaetoceros || "-",
+            skeletonema: data.skeletonema || "-",
+            rhizosolenia: data.rhizosolenia || "-",
+            anabaena: data.anabaena || "-",
+            oscillatoria: data.oscillatoria || "-",
+            microcystis: data.microcystis || "-",
+            coscinodiscus: data.coscinodiscus || "-",
+            nitzchia: data.nitzchia || "-",
+            navicula: data.navicula || "-",
+            noctiluca: data.noctiluca || "-",
+            ceratium: data.ceratium || "-",
+            dinophysis: data.dinophysis || "-",
+            gymnodinium: data.gymnodinium || "-",
+            zoothamnium: data.zoothamnium || "-",
+            tintinnopsis: data.tintinnopsis || "-",
+            favella: data.favella || "-",
+          });
         }
 
         setPonds(pondList);
+        setRemarksAndRecommendations(loadedRemarks);
       } catch (error) {
         console.error("Error loading water report:", error);
       } finally {
@@ -294,32 +292,30 @@ const WaterReport: React.FC<WaterReportProps> = ({
       }
     };
 
-    fetchData();
-  }, [invoiceId, locationId, allSampleCount]);
-
-  // Fetch location details (address, email, contact)
-useEffect(() => {
-  const fetchLocationDetails = async () => {
-    if (!locationId) return;
-
-    try {
-      const locDoc = await getDoc(doc(db, "locations", locationId));
-      if (locDoc.exists()) {
-        const data = locDoc.data();
-        setLocationDetails({
-          address: data.address || "Not available",
-          email: data.email || "Not available",
-          contactNumber: data.contactNumber || "Not available",
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching location details:", error);
-      
+    if (realInvoiceDocId) {
+      fetchData();
     }
-  };
+  }, [realInvoiceDocId, locationId, allSampleCount]);
 
-  fetchLocationDetails();
-}, [locationId]);
+  useEffect(() => {
+    const fetchLocationDetails = async () => {
+      if (!locationId) return;
+      try {
+        const locDoc = await getDoc(doc(db, "locations", locationId));
+        if (locDoc.exists()) {
+          const data = locDoc.data();
+          setLocationDetails({
+            address: data.address || "Not available",
+            email: data.email || "Not available",
+            contactNumber: data.contactNumber || "Not available",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching location details:", error);
+      }
+    };
+    fetchLocationDetails();
+  }, [locationId]);
 
   if (loading) return <p className="text-center py-12 text-xl">Loading Water Report...</p>;
 
@@ -327,270 +323,291 @@ useEffect(() => {
     <>
       <div className="mb-6 print:hidden text-center">
         <button
-          onClick={handlePrint}
+          onClick={() => window.print()}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 mx-auto"
         >
           <Printer size={20} /> Print Report
         </button>
       </div>
 
-      <div id="report" className="bg-white p-8 max-w-[1400px] mx-auto print:p-4">
+      <div id="report" className="bg-white p-4 max-w-[1200px] mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-start mb-4 border-b-2 border-black pb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-40 h-32 flex items-center justify-center">
-              <img src={ADC} alt="ADC" className="max-w-full max-h-full object-contain" />
-            </div>
+        <div className="flex justify-between items-start mb-2 border-b-2 border-black pb-2">
+          <div className="w-32 h-24 flex items-center justify-center">
+            <img src={ADC} alt="ADC" className="max-w-full max-h-full object-contain" />
           </div>
           <div className="text-center flex-1">
-            <h1 className="text-3xl font-bold mb-2 text-blue-700">వాటర్‌బేస్ ఆక్వా డయాగ్నోస్టిక్ సెంటర్</h1>
-            <p className="text-xs text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
-            <p className="text-sm text-black">Contact No: {locationDetails.contactNumber || "Loading..."} | 
-  Mail Id: {locationDetails.email || "Loading..."}</p>
-            <h2 className="text-2xl font-bold mt-2 text-red-600">Water Quality Report</h2>
+            <h1 className="text-xl font-bold text-blue-700">WATERBASE AQUA DIAGNOSTIC CENTER</h1>
+            <p className="text-sm text-black font-semibold">{locationDetails.address}</p>
+            <p className="text-sm text-black">Contact No: {locationDetails.contactNumber} | Mail Id: {locationDetails.email}</p>
+            <p className="text-sm text-black">
+              GSTIN: - 37AABCT0601L1ZJ
+            </p>
           </div>
-          <div className="w-48 h-32 flex items-center justify-center">
+          <div className="w-32 h-24 flex items-center justify-center">
             <img src={AV} alt="AV" className="max-w-full max-h-full object-contain" />
           </div>
         </div>
 
-        <div className="text-right mb-2">
-          <span className="font-bold">Report Id:- {invoiceId || "-"}</span>
+        <div className="text-center flex-1 m-5">
+          <h2 className="text-xl font-bold mt-1 text-red-600 uppercase">Water Quality Report</h2>
         </div>
 
-        {/* Farmer Info Grid - YOUR ORIGINAL FORMAT - UNCHANGED */}
-        <div className="grid grid-cols-10 gap-0 text-sm mb-4 border border-black">
-          <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Name</div>
-          <div className="col-span-2 border-r border-black p-0.5">{formData.farmerName || "-"}</div>
-          <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">Mobile</div>
-          <div className="col-span-1 border-r border-black p-0.5">{formData.mobile || "-"}</div>
-          <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">S.D/D.O.C:</div>
-          <div className="col-span-1 border-r border-black p-0.5">{formData.sdDoc || "-"}</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Sample Collection Time</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sampleCollectionTime || "-"}</div>
+        {/* Farmer Info Grid */}
+        <div className="grid grid-cols-10 text-[11px] mb-3 border border-black border-collapse">
+          <div className="col-span-1 border-r border-black p-1 font-bold bg-gray-100">Farmer Name</div>
+          <div className="col-span-2 border-r border-black p-1">{formData.farmerName}</div>
+          <div className="col-span-1 border-r border-black p-1 font-bold bg-gray-100">Mobile</div>
+          <div className="col-span-1 border-r border-black p-1">{formData.mobile}</div>
+          <div className="col-span-1 border-r border-black p-1 font-bold bg-gray-100">S.D/D.O.C:</div>
+          <div className="col-span-1 border-r border-black p-1">{formData.sdDoc}</div>
+          <div className="col-span-2 border-r border-black p-1 font-bold bg-gray-100">Sample Collection Time</div>
+          <div className="col-span-1 p-1">{formData.sampleCollectionTime}</div>
 
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Farmer UID</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5">{formData.farmerUID || "-"}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Source of Water</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sourceOfWater || "-"}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Sample Date:</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sampleDate || "-"}</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Sample Time</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sampleTime || "-"}</div>
+          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Farmer UID</div>
+          <div className="col-span-2 border-t border-r border-black p-1">{formData.farmerUID}</div>
+          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Address</div>
+          <div className="col-span-1 border-t border-r border-black p-1">{formData.farmerAddress}</div>
+          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Sample Date</div>
+          <div className="col-span-1 border-t border-r border-black p-1">{formData.sampleDate}</div>
+          <div className="col-span-2 border-t border-r border-black p-1 font-bold bg-gray-100">Source</div>
+          <div className="col-span-1 border-t border-black p-1">{formData.sourceOfWater}</div>
 
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Address</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5">{formData.farmerAddress || "-"}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">No.of Samples</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.noOfSamples}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Report Date:</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.reportDate}</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Report Time</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.reportTime}</div>
+          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Report Id</div>
+          <div className="col-span-2 border-t border-r border-black p-1">{invoiceId || "-"}</div>
+          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">No. of Samples</div>
+          <div className="col-span-1 border-t border-r border-black p-1">{formData.noOfSamples}</div>
+          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Report Date</div>
+          <div className="col-span-1 border-t border-r border-black p-1">{formData.reportDate}</div>
+          <div className="col-span-2 border-t border-r border-black p-1 font-bold bg-gray-100">Report Time</div>
+          <div className="col-span-1 border-t border-black p-1">{formData.reportTime}</div>
         </div>
 
-        {/* Water Analysis + Bacteriology */}
-        <div className="mb-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 mt-3">
-            <div className="lg:col-span-10">
-              <h4 className="text-center font-bold text-xs bg-gray-200 border-t border-black py-1 text-red-600">
-                WATER ANALYSIS
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-black text-xs">
-                  <thead>
-                    <tr className="bg-gray-200">
-                      <th className="border border-black p-1" rowSpan={2}>Pond No.</th>
-                      <th className="border border-black p-1" rowSpan={2}>pH</th>
-                      <th className="border border-black p-1" rowSpan={2}>Salinity (PPT)</th>
-                      <th className="border border-black p-1" colSpan={2}>Alkalinity (PPM as CaCO₃)</th>
-                      <th className="border border-black p-1" rowSpan={2}>Total Alkalinity</th>
-                      <th className="border border-black p-1" rowSpan={2}>Hardness (ppm as CaCO₃)</th>
-                      <th className="border border-black p-1" colSpan={4}>Minerals (ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>Total Ammonia NH₃(ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>Unionized Ammonia NH3(ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>H₂S(ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>Nitrite NO₂ (ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>Nitrate NO₃ (ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>Iron (Fe) (ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>Chlorine (ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>DO (ppm)</th>
-                      <th className="border border-black p-1" rowSpan={2}>TDM (ppm)</th>
-                    </tr>
-                    <tr className="bg-gray-200">
-                      <th className="border border-black p-1">CO₃</th>
-                      <th className="border border-black p-1">HCO₃</th>
-                      <th className="border border-black p-1">Ca⁺⁺</th>
-                      <th className="border border-black p-1">Mg⁺⁺</th>
-                      <th className="border border-black p-1">Na⁺</th>
-                      <th className="border border-black p-1">K⁺</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ponds.map((pond) => (
-                      <tr key={pond.id}>
-                        <td className="border border-black p-1 text-center font-medium">{pond.pondNo}</td>
-                        <td className="border border-black p-1 text-center">{pond.pH || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.salinity || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.co3 || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.hco3 || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.alkalinity || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.hardness || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.ca || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.mg || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.na || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.k || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.totalAmmonia || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.unionizedAmmonia || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.h2s || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.nitrite || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.nitrate || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.iron || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.chlorine || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.dissolvedOxygen || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.totalDissolvedMatter || "-"}</td>
-                      </tr>
-                    ))}
-                    <tr className="font-bold">
-                      <td className="border border-black p-1 text-red-600">Optimum</td>
-                      <td className="border border-black p-1 text-center text-red-500">7.5-8.5</td>
-                      <td className="border border-black p-1 text-center text-red-500">15-20</td>
-                      <td className="border border-black p-1 text-center text-red-500">20-40</td>
-                      <td className="border border-black p-1 text-center text-red-500">30-150</td>
-                      <td className="border border-black p-1 text-center text-red-500">175-200</td>
-                      <td className="border border-black p-1 text-center text-red-500">3000-5000</td>
-                      <td className="border border-black p-1 text-center text-red-500">&gt;100</td>
-                      <td className="border border-black p-1 text-center text-red-500">&gt;300</td>
-                      <td className="border border-black p-1 text-center text-red-500">&gt;40</td>
-                      <td className="border border-black p-1 text-center text-red-500">&gt;10</td>
-                      <td className="border border-black p-1 text-center text-red-500">&lt;0.1-1.0</td>
-                      <td className="border border-black p-1 text-center text-red-500">0-0.1</td>
-                      <td className="border border-black p-1 text-center text-red-500">0-0.4</td>
-                      <td className="border border-black p-1 text-center text-red-500">&lt;0.25</td>
-                      <td className="border border-black p-1 text-center text-red-500">&lt;0.50</td>
-                      <td className="border border-black p-1 text-center text-red-500">&lt;0.1</td>
-                      <td className="border border-black p-1 text-center text-red-500">0-0.02</td>
-                      <td className="border border-black p-1 text-center text-red-500">&gt;4</td>
-                      <td className="border border-black p-1 text-center text-red-500">40-70</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        {/* ANALYSIS SECTION - PERFECTLY JOINED SIDE BY SIDE */}
+        <div className="flex flex-row w-full mb-4 border border-black overflow-hidden">
+          {/* WATER ANALYSIS */}
+          <div className="flex-[8.5] border-r border-black">
+            <h4 className="text-center font-bold text-[12px] bg-gray-200 border-b border-black py-1 text-red-600">WATER ANALYSIS</h4>
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr className="bg-gray-100 font-bold">
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[9px]"></span></td>
+                  <td className="border-r border-black p-0.5 text-center w-12" rowSpan={3}>pH<br/><span className="text-[9px]">pH</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Salinity<br/><span className="text-[9px]">సాలినిటీ</span></td>
+                  <td className="border-r border-black p-0.5 text-center" colSpan={3}>Alkalinity(PPM as Caco3)<br/><span className="text-[9px]">ఆల్కలినిటీ</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[9px]">మొత్తం కఠినత</span></td>
+                  <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/><span className="text-[9px]">PPM as Caco3</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/><span className="text-[9px]">అమ్మోనియా</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Unionized NH₃<br/><span className="text-[9px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
+                  
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₂<br/><span className="text-[9px]">నైట్రైట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₃<br/><span className="text-[9px]">నైట్రేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/><span className="text-[9px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Fe<br/><span className="text-[9px]">ఇనుము</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Cl<br/><span className="text-[9px]">క్లోరిన్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>DO<br/><span className="text-[9px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
+                  <td className="p-0.5 text-center" rowSpan={3}>TOM<br/><span className="text-[9px]">Total Organic Matter</span></td>
+                </tr>
+                <tr className="bg-gray-100 border-t border-black text-[10px]">
+                  <td className="border-r border-black p-0.5 text-center font-bold">CO₃<br/><span className="text-[9px]">కార్బొనేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">HCO₃<br/><span className="text-[9px]">బైకార్బొనేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Total <br/><span className="text-[9px]">మొత్తం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Ca<br/><span className="text-[9px]">కాల్షియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Mg<br/><span className="text-[9px]">మెగ్నీషియం</span></td>
+                  
+                  <td className="border-r border-black p-0.5 text-center font-bold">K<br/><span className="text-[9px]">పొటాషియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Na<br/><span className="text-[9px]">సోడియం</span></td>
+                </tr>
+              </thead>
+              <tbody>
+                {ponds.map(p => (
+                  <tr key={p.id} className="border-t border-black">
+                    <td className="border-r border-black p-0.5 text-center font-bold bg-gray-50">{p.pondNo}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.pH}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.salinity}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.co3}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.hco3}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.alkalinity}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.hardness}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.ca}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.mg}</td>
+                    
+                    <td className="border-r border-black p-0.5 text-center">{p.k}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.na}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.totalAmmonia}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.unionizedAmmonia}</td>
+                    
+                    <td className="border-r border-black p-0.5 text-center">{p.nitrite}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.nitrate}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.h2s}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.iron}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.chlorine}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.dissolvedOxygen}</td>
+                    <td className="p-0.5 text-center">{p.totalDissolvedMatter}</td>
+                  </tr>
+                ))}
+                <tr className="border-t border-black font-bold bg-gray-50 text-[11px] text-red-600">
+                  <td className="border-r border-black p-0.5">Optimum</td>
+                  <td className="border-r border-black p-0.5 text-center">7.5-8.5</td>
+                  <td className="border-r border-black p-0.5 text-center">15-20</td>
+                  <td className="border-r border-black p-0.5 text-center">20-40</td>
+                  <td className="border-r border-black p-0.5 text-center">130-150</td>
+                  <td className="border-r border-black p-0.5 text-center">175-200</td>
+                  <td className="border-r border-black p-0.5 text-center">300-3000</td>
+                  <td className="border-r border-black p-0.5 text-center">&gt;100</td>
+                  <td className="border-r border-black p-0.5 text-center">&gt;300</td>
+                  
+                  <td className="border-r border-black p-0.5 text-center">&gt;10</td>
+                  <td className="border-r border-black p-0.5 text-center">300</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;1.0</td>
+                  <td className="border-r border-black p-0.5 text-center">0-0.1</td>
+                  
+                  <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;0.02</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
+                  <td className="border-r border-black p-0.5 text-center">&gt;4</td>
+                  <td className="p-0.5 text-center">40-70</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-            <div className="lg:col-span-2">
-              <h4 className="text-center font-bold text-xs bg-gray-200 border border-black py-1 text-red-600">
-                BACTERIOLOGY
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-black text-xs font-medium">
-                  <thead>
-                    <tr className="bg-gray-200">
-                      <th className="h-[39px] border border-black" colSpan={4}>Vibrio CFU /ml</th>
-                    </tr>
-                    <tr className="bg-gray-200">
-                      <th className="border border-black p-1">Yellow Colonies</th>
-                      <th className="border border-black p-1">Green Colonies</th>
-                      <th className="border border-black p-1">TPC</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ponds.map((pond) => (
-                      <tr key={pond.id}>
-                        <td className="border border-black p-1 text-center">{pond.yellowColonies || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.greenColonies || "-"}</td>
-                        <td className="border border-black p-1 text-center">{pond.tpc || "-"}</td>
-                      </tr>
-                    ))}
-                    <tr className="font-bold h-[40px]">
-                      <td className="border border-black p-1 text-center text-red-500">&lt;300</td>
-                      <td className="border border-black p-1 text-center text-red-500">&lt;10</td>
-                      <td className="border border-black p-1 text-center text-red-500">&lt;300</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          {/* BACTERIOLOGY - FULLY BORDERED & ALIGNED */}
+          <div className="flex-[1.5]">
+            <h4 className="text-center font-bold text-[10px] bg-gray-200 border-b border-black py-1 text-red-600">BACTERIOLOGY</h4>
+            <table className="w-full text-[10px] border-collapse">
+              <thead>
+                <tr className="bg-gray-100 font-bold">
+                  <td className="border-b border-black text-center py-[6px]" colSpan={3}>Vibrio CFU /ml</td>
+                </tr>
+                <tr className="bg-gray-100 text-[11px] font-bold">
+                  <td className="border-r border-black p-0.5 text-center">Yellow <br />Colonies <br /> <span className="text-[9px]">పసుపు కాలనీలు</span></td>
+                  <td className="border-r border-black p-0.5 text-center">Green <br />Colonies <br /><span className="text-[9px]">పచ్చ కాలనీలు</span></td>
+                  <td className="p-0.5 text-center">TPC <br /><span className="text-[8px]">Total Plate Count</span></td>
+                </tr>
+              </thead>
+              <tbody>
+                {ponds.map(p => (
+                  <tr key={p.id} className="border-t border-black">
+                    <td className="border-r border-black p-0.5 text-center">{p.yellowColonies}</td>
+                    <td className="border-r border-black p-0.5 text-center">{p.greenColonies}</td>
+                    <td className="p-0.5 text-center">{p.tpc}</td>
+                  </tr>
+                ))}
+                <tr className="border-t border-black font-bold text-[10px] text-red-600 bg-gray-50">
+                  <td className="border-r border-black p-0.5 text-center">&lt;300</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;50</td>
+                  <td className="p-0.5 text-center">&lt;300</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* PLANKTON ANALYSIS */}
+        {/* PLANKTON ANALYSIS - YOUR ORIGINAL IMAGES & NAMES RESTORED */}
         <div className="border border-black mb-4">
-          <h3 className="text-center font-bold bg-white text-red-500 py-1 text-sm border-b border-black">PLANKTON ANALYSIS</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
+          <h3 className="text-center font-bold bg-white text-red-500 py-1 text-xs border-b border-black uppercase">PLANKTON ANALYSIS</h3>
+          <div className="overflow-hidden">
+            <table className="w-full border-collapse text-[10px]">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border border-black p-1">Pond No.</th>
-                  <th className="border border-black p-0.5 text-green-700 text-sm" colSpan={11}>USEFUL PLANKTON - ఉపయోగకరమైన పలాంక్టన్లు</th>
-                  <th className="border border-black p-0.5 text-red-700 text-sm" colSpan={14}>HARMFUL PLANKTON - హానికరమైన పలాంక్టన్లు</th>
+                  <th className="border-r border-b border-black p-1 w-10">Pond</th>
+                  <th className="border-r border-b border-black p-0.5 text-green-700 text-[11px]" colSpan={12}>USEFUL PLANKTON - ఉపయోగకరమైన ప్లవకములు</th>
+                  <th className="border-b border-black p-0.5 text-red-700 text-[11px]" colSpan={14}>HARMFUL PLANKTON - హానికరమైన ప్లవకములు</th>
                 </tr>
-                <tr className="bg-gray-100">
-                  <th className="border border-black p-1"></th>
-                  <th className="border border-black p-1 text-center" colSpan={4}>Phyto Plankton</th>
-                  <th className="border border-black p-1 text-center" colSpan={3}>Zooplankton</th>
-                  <th className="border border-black p-1 text-center" colSpan={1}>B.G Algae</th>
-                  <th className="border border-black p-1 text-center" colSpan={3}>Diatom</th>
-                  <th className="border border-black p-1 text-center" colSpan={3}>Blue Green Algae</th>
-                  <th className="border border-black p-1 text-center" colSpan={3}>Diatom</th>
-                  <th className="border border-black p-1 text-center" colSpan={4}>Dinoflagellate</th>
-                  <th className="border border-black p-1 text-center" colSpan={3}>Protozoa</th>
+                <tr className="bg-gray-50 text-[10px] border-b border-black">
+                  <th className="border-r border-black"></th>
+                  <th className="border-r border-black" colSpan={4}>Green alge</th>
+                  <th className="border-r border-black" colSpan={4}>Zooplankton</th>
+                  <th className="border-r border-black">B.G Algae</th>
+                  <th className="border-r border-black" colSpan={3}>Diatom</th>
+                  <th className="border-r border-black" colSpan={3}>Blue Green Algae</th>
+                  <th className="border-r border-black" colSpan={3}>Diatom</th>
+                  <th className="border-r border-black" colSpan={4}>Dinoflagellate</th>
+                  <th className="" colSpan={3}>Protozoa</th>
                 </tr>
-                <tr className="bg-gray-50">
-                  <th className="border border-black p-1"></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={phacus} alt="Phacus" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={corrella} alt="Chlorella" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={desmids} alt="Desmids" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={scenedesmus} alt="Scenedesmus" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={copepod} alt="Copepod" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={rotifer} alt="Rotifer" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={nauplius} alt="Nauplius" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={spirulina} alt="Spirulina" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={chaetoceros} alt="Chaetoceros" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={skeletonema} alt="Skeletonema" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={rhizosolenia} alt="Rhizosolenia" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={anabaena} alt="Anabaena" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={oscillatoria} alt="Oscillatoria" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={microcystis} alt="Microcystis" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={coscinodiscus} alt="Coscinodiscus" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={nitzchia} alt="Nitzchia" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={navicula} alt="Navicula" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={noctiluca} alt="Noctiluca" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={ceratium} alt="Ceratium" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={dinophysis} alt="Dinophysis" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={gymnodinium} alt="Gymnodinium" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={zoothamnium} alt="Zoothamnium" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={tintinnopsis} alt="Tintinnopsis" /></th>
-                  <th className="border border-black p-0.5"><img className="w-12 h-12 mx-auto" src={favella} alt="Favella" /></th>
+                <tr className="bg-white">
+                  <th className="border-r border-b border-black"></th>
+
+                  {[
+                    
+                    { img: corrella, name: "Chlorella" },
+                    { img: phacus, name: "Oosystis" },
+                    { img: desmids, name: "Eudorina" },
+                    { img: scenedesmus, name: "Scenedesmus" },
+                    { img: copepod, name: "Copepod" },
+                    { img: rotifer, name: "Rotifer" },
+                    { img: nauplius, name: "Nauplius" },
+                    { img: brachionus, name: "Brachionus" },
+                    { img: spirulina, name: "Spirulina" },
+                    { img: chaetoceros, name: "Chaetoceros" },
+                    { img: skeletonema, name: "Skeletonema" },
+                    { img: rhizosolenia, name: "Rhizosolenia" },
+                    { img: anabaena, name: "Anabaena" },
+                    { img: oscillatoria, name: "Oscillatoria" },
+                    { img: microcystis, name: "Microcystis" },
+                    { img: coscinodiscus, name: "Coscinodiscus" },
+                    { img: nitzchia, name: "Nitzschia" },
+                    { img: navicula, name: "Navicula" },
+                    { img: noctiluca, name: "Noctiluca" },
+                    { img: ceratium, name: "Ceratium" },
+                    { img: dinophysis, name: "Dinophysis" },
+                    { img: gymnodinium, name: "Gymnodinium" },
+                    { img: zoothamnium, name: "Zoothamnium" },
+                    { img: tintinnopsis, name: "Vorticella" },
+                    { img: favella, name: "Favella" },
+                  ].map((item, idx) => (
+                    <th
+                      key={idx}
+                      className={`border-b border-black ${idx === 24 ? "" : "border-r"} p-1 text-center`}
+                    >
+                      <img className="w-6 h-6 mx-auto" src={item.img} alt={item.name} />
+                      <div className="text-[7px] mt-1 leading-tight">{item.name}</div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {ponds.map((pond) => (
-                  <tr key={pond.id}>
-                    <td className="border border-black p-2 text-center font-semibold">{pond.pondNo}</td>
-                    <td className="border border-black p-2 text-center">{pond.phacus || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.chlorella || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.desmids || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.scenedesmus || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.copepod || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.rotifer || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.nauplius || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.spirulina || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.chaetoceros || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.skeletonema || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.rhizosolenia || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.anabaena || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.oscillatoria || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.microcystis || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.coscinodiscus || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.nitzchia || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.navicula || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.noctiluca || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.ceratium || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.dinophysis || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.gymnodinium || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.zoothamnium || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.tintinnopsis || "-"}</td>
-                    <td className="border border-black p-2 text-center">{pond.favella || "-"}</td>
+                  <tr key={pond.id} className="border-b border-black last:border-b-0">
+                    <td className="border-r border-black text-center font-bold bg-gray-50">{pond.pondNo}</td>
+                    {[
+                      
+                      pond.chlorella,
+                      pond.phacus,
+                      pond.desmids,
+                      pond.scenedesmus,
+                      pond.copepod,
+                      pond.rotifer,
+                      pond.nauplius,
+                      pond.brachionus,
+                      pond.spirulina,
+                      pond.chaetoceros,
+                      pond.skeletonema,
+                      pond.rhizosolenia,
+                      pond.anabaena,
+                      pond.oscillatoria,
+                      pond.microcystis,
+                      pond.coscinodiscus,
+                      pond.nitzchia,
+                      pond.navicula,
+                      pond.noctiluca,
+                      pond.ceratium,
+                      pond.dinophysis,
+                      pond.gymnodinium,
+                      pond.zoothamnium,
+                      pond.tintinnopsis,
+                      pond.favella,
+                    ].map((val, idx) => (
+                      <td
+                        key={idx}
+                        className={`text-center ${idx === 24 ? "" : "border-r"} border-black`}
+                      >
+                        {val || "-"}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -598,31 +615,30 @@ useEffect(() => {
           </div>
         </div>
 
-        <div className="mb-6 border border-black p-2">
-          <h4 className="font-semibold text-sm mb-2">Remarks & Recommendations:</h4>
-          <div className="min-h-[80px] border-t border-dashed border-gray-400 mt-2"></div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 border-t-2 border-black pt-4">
-          <div>
-            <p className="font-semibold text-sm">Reported by: {formData.technicianName || "________________"}</p>
-          </div>
-          <div>
-            <p className="font-semibold text-sm">Checked by: ________________</p>
+        {/* Remarks & Recommendations */}
+        <div className="mb-1 border border-black p-1">
+          <h4 className="font-bold text-xs mb-1">Remarks & Recommendations:</h4>
+          <div className="min-h-[40px] mt-1 text-[10px] whitespace-pre-wrap">
+            {remarksAndRecommendations || "No remarks provided."}
           </div>
         </div>
 
-        <div className="mt-4 text-xs italic text-gray-600">
+        {/* Footer Signatures */}
+        <div className="flex justify-between items-center border-t border-black pt-4">
+          <p className="font-bold text-xs">Reported by: {formData.technicianName || "________________"}</p>
+          <p className="font-bold text-xs">Checked by: ________________</p>
+        </div>
+
+        <div className="mt-2 text-[9px] italic text-gray-600 leading-tight">
           <p>Note: The Samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose, Not for any Litigation.</p>
         </div>
       </div>
 
-      {/* ONLY ADDED: Print CSS to force everything on ONE A4 page */}
       <style>{`
         @media print {
           @page {
-            size: A4 portrait;
-            margin: 0.5cm;
+            size: A4 landscape;
+            margin: 0.2cm;
           }
           body * { visibility: hidden; }
           #report, #report * { visibility: visible; }
@@ -631,15 +647,12 @@ useEffect(() => {
             left: 0;
             top: 0;
             width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-            page-break-after: avoid;
-            page-break-before: avoid;
+            padding: 0;
+            margin: 0;
           }
-          table { page-break-inside: avoid; }
-          .overflow-x-auto { overflow: visible !important; }
-          img { max-width: 100% !important; height: auto !important; }
           .print\\:hidden { display: none !important; }
+          table { width: 100% !important; border-collapse: collapse !important; }
+          tr { page-break-inside: avoid; }
         }
       `}</style>
     </>

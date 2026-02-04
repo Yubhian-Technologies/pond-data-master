@@ -1,6 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  setDoc, 
+  updateDoc, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
-import { collection, doc, getDoc, setDoc, updateDoc, getDocs } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../../contexts/UserSessionContext";
 
@@ -36,14 +45,12 @@ interface Sample {
 }
 
 interface SoilFormProps {
-  invoice: any;
   invoiceId: string;
   locationId: string;
-  onSubmit: () => void; // Now simplified — parent handles navigation/report
+  onSubmit: () => void;
 }
 
 export default function SoilForm({
-  invoice,
   invoiceId,
   locationId,
   onSubmit,
@@ -75,10 +82,69 @@ export default function SoilForm({
 
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
+  const [localInvoice, setLocalInvoice] = useState<any>(null);
+
+  // Fetch invoice using query (matches LabResults and InvoicePage logic)
+  useEffect(() => {
+    if (!locationId || !invoiceId) {
+      console.warn("Missing locationId or invoiceId for SoilForm fetch");
+      return;
+    }
+
+    const fetchInvoice = async () => {
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        // Try by 'invoiceId' field first (new invoices)
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let querySnapshot = await getDocs(q);
+
+        // Fallback to old 'id' field (legacy invoices)
+        if (querySnapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          querySnapshot = await getDocs(q);
+        }
+
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const data = docSnap.data();
+          const docId = docSnap.id;
+
+          setLocalInvoice({ ...data, docId });
+          console.log("SoilForm - Invoice loaded OK:", { 
+            docId, 
+            invoiceId: data.invoiceId || data.id || "unknown" 
+          });
+        } else {
+          console.error("SoilForm - Invoice NOT FOUND for ID:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice in SoilForm:", err);
+      }
+    };
+
+    fetchInvoice();
+  }, [locationId, invoiceId]);
 
   const totalSamples = Number(
-    invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")?.count || 1
+    localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")?.count || 1
   );
+
+  // Per-sample selected soil tests from invoice
+  const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.soil || {};
+
+  const testNameMap: Record<string, string> = {
+    pondNo: "Pond No.",
+    pH: "pH",
+    ec: "EC",
+    caco3: "CaCO₃",
+    soilTexture: "Soil Texture",
+    organicCarbon: "Organic Carbon",
+    availableNitrogen: "Available Nitrogen",
+    availablePhosphorus: "Available Phosphorus",
+    redoxPotential: "Redox Potential",
+    remarks: "Remarks",
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -101,7 +167,7 @@ export default function SoilForm({
 
   useEffect(() => {
     const loadData = async () => {
-      if (!invoice || !locationId || !invoiceId) {
+      if (!localInvoice || !locationId || !invoiceId) {
         setLoading(false);
         return;
       }
@@ -109,19 +175,20 @@ export default function SoilForm({
       try {
         setLoading(true);
 
-        // Load farmer info
-        if (invoice.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", invoice.farmerId);
+        // Pre-fill farmer info
+        if (localInvoice.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
           const farmerSnap = await getDoc(farmerRef);
           if (farmerSnap.exists()) {
             const farmer = farmerSnap.data();
             setFormData(prev => ({
               ...prev,
               farmerName: farmer.name || "",
-              farmerUID: farmer.farmerUID || "",
+              farmerUID: farmer.farmerId || "",
               farmerAddress: `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
               mobile: farmer.phone || "",
               noOfSamples: String(totalSamples),
+              sampleDate: localInvoice.dateOfCulture || today,
             }));
           }
         }
@@ -141,6 +208,7 @@ export default function SoilForm({
             reportedBy: headerData.technicianName || technicianName,
             checkedBy: headerData.technicianName || technicianName,
             cmisBy: headerData.technicianName || technicianName,
+            sampleDate: headerData.sampleDate || localInvoice.dateOfCulture || today,
           }));
         }
 
@@ -185,11 +253,16 @@ export default function SoilForm({
       }
     };
 
-    loadData();
-  }, [invoice, invoiceId, locationId, technicianName, currentTime, totalSamples]);
+    if (localInvoice) {
+      loadData();
+    }
+  }, [localInvoice, invoiceId, locationId, technicianName, totalSamples]);
 
   const saveAllData = async () => {
-    if (!locationId || !invoiceId) return;
+    if (!locationId || !invoiceId || !localInvoice?.docId) {
+      alert("Cannot save: Invoice not loaded or missing ID");
+      return;
+    }
 
     try {
       // Save shared header
@@ -201,6 +274,7 @@ export default function SoilForm({
         sampleTime: formData.sampleTime,
         reportTime: formData.reportTime,
         technicianName: technicianName,
+        sampleDate: formData.sampleDate,
       }, { merge: true });
 
       // Save all samples
@@ -214,8 +288,8 @@ export default function SoilForm({
 
       await Promise.all(savePromises);
 
-      // Mark as completed
-      const invoiceRef = doc(db, "locations", locationId, "invoices", invoice.docId || invoiceId);
+      // Mark as completed – use real docId
+      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
       await updateDoc(invoiceRef, {
         "reportsProgress.soil": "completed",
       });
@@ -228,7 +302,7 @@ export default function SoilForm({
 
   const handleSubmit = async () => {
     await saveAllData();
-    onSubmit(); 
+    onSubmit();
   };
 
   if (loading) {
@@ -284,15 +358,26 @@ export default function SoilForm({
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-1">Sample Date</label>
+            <input 
+              type="date" 
+              name="sampleDate" 
+              value={formData.sampleDate} 
+              readOnly 
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-1">Sample Collection Time</label>
             <input type="time" name="sampleCollectionTime" value={formData.sampleCollectionTime} onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           </div>
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium mb-1">Sample Time</label>
             <input type="time" name="sampleTime" value={formData.sampleTime} onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-          </div>
+          </div> */}
           <div>
             <label className="block text-sm font-medium mb-1">Report Time</label>
             <input type="time" value={formData.reportTime} readOnly
@@ -302,49 +387,60 @@ export default function SoilForm({
       </div>
 
       {/* All Samples - One Section Per Sample */}
-      {samples.map((sample, index) => (
-        <div key={index} className="mb-10">
-          <h3 className="font-bold mb-3 text-gray-700">
-            Test Results - Sample {index + 1} of {totalSamples}
-          </h3>
-          <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {Object.entries(sample).map(([key, value]) => (
-                <div key={key}>
-                  <label className="block text-xs font-medium mb-1 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </label>
-                  <input
-                    type="text"
-                    value={value}
-                    onChange={(e) => handleSampleChange(index, key as keyof Sample, e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+      {samples.map((sample, index) => {
+        const sampleNumber = index + 1;
+        const sampleSelectedIds = perSampleSelectedTests[sampleNumber] || [];
+        const sampleSelectedNames = sampleSelectedIds
+          .map(id => testNameMap[id] || id)
+          .filter(Boolean);
+
+        return (
+          <div key={index} className="mb-10">
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm font-medium text-blue-800 mb-1">
+                Tests selected for Sample #{sampleNumber}:
+              </p>
+              {sampleSelectedNames.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {sampleSelectedNames.map((name, i) => (
+                    <span
+                      key={i}
+                      className="inline-block px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
+                    >
+                      {name}
+                    </span>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <p className="text-sm text-gray-500 italic">
+                  No specific tests selected for this sample
+                </p>
+              )}
+            </div>
+
+            <h3 className="font-bold mb-3 text-gray-700">
+              Test Results - Sample {sampleNumber} of {totalSamples}
+            </h3>
+            <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {Object.entries(sample).map(([key, value]) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium mb-1 capitalize">
+                      {key.replace(/([A-Z])/g, ' $1').trim()}
+                    </label>
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => handleSampleChange(index, key as keyof Sample, e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
-
-      {/* Verification */}
-      {/* <div className="mb-6">
-        <h3 className="font-bold mb-3 text-gray-700">Verification</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Reported By</label>
-            <input type="text" value={formData.reportedBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Checked By</label>
-            <input type="text" value={formData.checkedBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">CMIS By</label>
-            <input type="text" value={formData.cmisBy} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
-          </div>
-        </div>
-      </div> */}
+        );
+      })}
 
       {/* Final Submit Button */}
       <div className="flex justify-center mt-8">

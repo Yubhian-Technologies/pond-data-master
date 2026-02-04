@@ -1,6 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  setDoc, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
+import { useNavigate } from "react-router-dom";
 
 interface FarmerInfo {
   farmerName: string;
@@ -10,17 +19,16 @@ interface FarmerInfo {
   sampleTime: string;
   reportDate: string;
   reportTime: string;
+  farmerId: string;
 }
 
 interface PLFormProps {
-  invoice: any;
   invoiceId: string;
   locationId: string;
-  onSubmit: () => void; // Parent handles completion
+  onSubmit: () => void;
 }
 
 export default function PLForm({
-  invoice,
   invoiceId,
   locationId,
   onSubmit,
@@ -35,10 +43,12 @@ export default function PLForm({
   const normalizeArray = (arr: string[] = [], length: number) =>
     Array.from({ length }, (_, i) => arr[i] ?? "");
 
+  const [localInvoice, setLocalInvoice] = useState<any>(null);
+
   // Get total PL sample count from invoice
   const totalSamples =
     Number(
-      invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pl")?.count || 1
+      localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pl")?.count || 1
     );
 
   /* ---------- empty structure ---------- */
@@ -65,22 +75,151 @@ export default function PLForm({
   };
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
-    farmerName: invoice?.farmerName ?? "",
-    village: invoice?.village ?? "",
-    mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
-    sampleDate: invoice?.sampleDate || today,
+    farmerName: "",
+    village: "",
+    mobile: "",
+    sampleDate: today,
     sampleTime: "",
     reportDate: today,
     reportTime: currentTime,
+    farmerId: "",
   });
 
   const [plData, setPlData] = useState<any>(emptyPLData);
   const [loading, setLoading] = useState(true);
 
-  /* ---------- Load existing data on mount ---------- */
+  const [sampleType, setSampleType] = useState<string>("PL (Post Larvae)");
+
+  // Read-only display field
+  const [farmerUID, setFarmerUID] = useState<string>("");
+
   useEffect(() => {
-    const fetchPLData = async () => {
-      if (!invoiceId || !locationId) {
+  if (!invoiceId || !locationId) return;
+
+  const fetchInvoice = async () => {
+    try {
+      const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+      // Try new invoices
+      let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+      let snap = await getDocs(q);
+
+      // Fallback to old invoices
+      if (snap.empty) {
+        q = query(invoicesRef, where("id", "==", invoiceId));
+        snap = await getDocs(q);
+      }
+
+      if (!snap.empty) {
+        const docSnap = snap.docs[0];
+        setLocalInvoice({ ...docSnap.data(), docId: docSnap.id });
+        console.log("PLForm loaded invoice:", docSnap.id);
+      } else {
+        console.error("PLForm invoice not found:", invoiceId);
+      }
+    } catch (err) {
+      console.error("PLForm invoice fetch error:", err);
+    }
+  };
+
+  fetchInvoice();
+}, [invoiceId, locationId]);
+
+
+ // Pre-fill from invoice + load saved report data
+useEffect(() => {
+  const loadData = async () => {
+    if (!localInvoice) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Compute dates/times INSIDE the effect (stable!)
+      const today = new Date().toISOString().split("T")[0];
+      const currentTime = new Date().toTimeString().slice(0, 5);
+
+      // Step 1: Always pre-fill from invoice/farmer master
+      let loadedFarmerId = "";
+      if (localInvoice?.farmerId) {
+        const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
+        const farmerSnap = await getDoc(farmerRef);
+        if (farmerSnap.exists()) {
+          const farmerData = farmerSnap.data();
+          loadedFarmerId = farmerData.farmerId || "";
+          setFarmerUID(loadedFarmerId);
+
+          setFarmerInfo(prev => ({
+            ...prev,
+            farmerName: farmerData.name || prev.farmerName || "",
+            village: farmerData.city || prev.village || "",
+            mobile: farmerData.phone || prev.mobile || "",
+            sampleDate: localInvoice.dateOfCulture || today,
+            farmerId: loadedFarmerId,
+          }));
+        }
+      }
+
+      // Step 2: Load saved PL report data (overrides if exists)
+      const plReportRef = doc(
+        db,
+        "locations",
+        locationId,
+        "invoices",
+        localInvoice.docId,
+        "plReports",
+        "data"
+      );
+
+      const snap = await getDoc(plReportRef);
+
+      if (snap.exists()) {
+        const data = snap.data() || {};
+
+        if (data.farmerInfo) {
+          setFarmerInfo({
+            farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
+            village: data.farmerInfo.village || farmerInfo.village,
+            mobile: data.farmerInfo.mobile || farmerInfo.mobile,
+            sampleDate: data.farmerInfo.sampleDate || localInvoice?.dateOfCulture || today,
+            sampleTime: data.farmerInfo.sampleTime || "",
+            reportDate: data.farmerInfo.reportDate || today,
+            reportTime: data.farmerInfo.reportTime || currentTime,
+            farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",
+          });
+        }
+
+        if (data.sampleType) {
+          setSampleType(data.sampleType);
+        }
+
+        const savedPlData = data.plData || {};
+        const normalized: any = {};
+
+        Object.keys(emptyPLData).forEach((key) => {
+          normalized[key] = normalizeArray(savedPlData[key], totalSamples);
+        });
+
+        setPlData(normalized);
+      }
+
+    } catch (error) {
+      console.error("Error loading PL data:", error);
+      setPlData(emptyPLData);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadData();
+}, [localInvoice, locationId]);  
+
+  // Pre-fill from invoice + load saved report data
+  useEffect(() => {
+    const loadData = async () => {
+      if (!localInvoice) {
         setLoading(false);
         return;
       }
@@ -88,12 +227,35 @@ export default function PLForm({
       try {
         setLoading(true);
 
+        // Step 1: Always pre-fill from invoice (runs on first load)
+        let loadedFarmerId = "";
+        if (localInvoice?.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
+          const farmerSnap = await getDoc(farmerRef);
+          if (farmerSnap.exists()) {
+            const farmerData = farmerSnap.data();
+            loadedFarmerId = farmerData.farmerId || "";
+            setFarmerUID(loadedFarmerId);
+
+            // Pre-fill basic info from farmer master + invoice
+            setFarmerInfo(prev => ({
+              ...prev,
+              farmerName: farmerData.name || prev.farmerName || "",
+              village: farmerData.city || prev.village || "",
+              mobile: farmerData.phone || prev.mobile || "",
+              sampleDate: localInvoice.dateOfCulture || today,
+              farmerId: loadedFarmerId,
+            }));
+          }
+        }
+
+        // Step 2: Load saved PL report data (overrides pre-fill if exists)
         const plReportRef = doc(
           db,
           "locations",
           locationId,
           "invoices",
-          invoiceId,
+          localInvoice.docId,
           "plReports",
           "data"
         );
@@ -101,22 +263,25 @@ export default function PLForm({
         const snap = await getDoc(plReportRef);
 
         if (snap.exists()) {
-          const data = snap.data();
+          const data = snap.data() || {};
 
-          // Load saved farmer info
           if (data.farmerInfo) {
             setFarmerInfo({
-              farmerName: data.farmerInfo.farmerName || invoice?.farmerName || "",
-              village: data.farmerInfo.village || invoice?.village || "",
-              mobile: data.farmerInfo.mobile || invoice?.farmerPhone || invoice?.mobile || "",
-              sampleDate: data.farmerInfo.sampleDate || invoice?.sampleDate || today,
+              farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
+              village: data.farmerInfo.village || farmerInfo.village,
+              mobile: data.farmerInfo.mobile || farmerInfo.mobile,
+              sampleDate: data.farmerInfo.sampleDate || localInvoice?.dateOfCulture || today,
               sampleTime: data.farmerInfo.sampleTime || "",
               reportDate: data.farmerInfo.reportDate || today,
               reportTime: data.farmerInfo.reportTime || currentTime,
+              farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",
             });
           }
 
-          // Load PL test data
+          if (data.sampleType) {
+            setSampleType(data.sampleType);
+          }
+
           const savedPlData = data.plData || {};
           const normalized: any = {};
 
@@ -125,19 +290,8 @@ export default function PLForm({
           });
 
           setPlData(normalized);
-        } else {
-          // First time
-          setFarmerInfo({
-            farmerName: invoice?.farmerName ?? "",
-            village: invoice?.village ?? "",
-            mobile: invoice?.farmerPhone ?? invoice?.mobile ?? "",
-            sampleDate: invoice?.sampleDate || today,
-            sampleTime: "",
-            reportDate: today,
-            reportTime: currentTime,
-          });
-          setPlData(emptyPLData);
         }
+
       } catch (error) {
         console.error("Error loading PL data:", error);
         setPlData(emptyPLData);
@@ -146,8 +300,8 @@ export default function PLForm({
       }
     };
 
-    fetchPLData();
-  }, [invoice, invoiceId, locationId, today, currentTime, totalSamples]);
+    loadData();
+  }, [localInvoice, locationId, today, currentTime]);
 
   /* ---------- Update individual cell ---------- */
   const updateColumn = (field: string, index: number, value: string) => {
@@ -160,7 +314,10 @@ export default function PLForm({
 
   /* ---------- Save all data ---------- */
   const handleSave = async () => {
-    if (!invoiceId || !locationId) return;
+    if (!invoiceId || !locationId || !localInvoice?.docId) {
+      alert("Cannot save: Invoice not loaded or missing ID");
+      return;
+    }
 
     try {
       const plReportRef = doc(
@@ -168,7 +325,7 @@ export default function PLForm({
         "locations",
         locationId,
         "invoices",
-        invoiceId,
+        localInvoice.docId,
         "plReports",
         "data"
       );
@@ -179,12 +336,13 @@ export default function PLForm({
           farmerInfo,
           plData,
           totalSamples,
+          sampleType,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
       );
 
-      onSubmit(); // Notify LabResults to mark PL as completed and proceed
+      onSubmit();
     } catch (error) {
       console.error("Error saving PL report:", error);
       alert("Failed to save. Please try again.");
@@ -227,7 +385,7 @@ export default function PLForm({
         PL Health Check Report – All Samples ({totalSamples})
       </h1>
 
-      {/* Farmer Information - With Date/Time Fields */}
+      {/* Farmer Information */}
       <section className="mb-10 bg-gray-50 p-5 rounded-lg">
         <h2 className="text-lg font-semibold mb-4 text-gray-800">Farmer Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -255,33 +413,30 @@ export default function PLForm({
               onChange={(e) => setFarmerInfo({ ...farmerInfo, mobile: e.target.value })}
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Farmer UID</label>
+            <input
+              className="w-full border border-gray-300 p-2 rounded bg-gray-100"
+              value={farmerUID}
+              readOnly
+            />
+          </div>
 
-          {/* Sample Date & Time */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Sample Date</label>
             <input
               type="date"
-              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 p-2 rounded bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={farmerInfo.sampleDate}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, sampleDate: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sample Time</label>
-            <input
-              type="time"
-              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
-              value={farmerInfo.sampleTime}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, sampleTime: e.target.value })}
+              readOnly
             />
           </div>
 
-          {/* Report Date & Time */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Report Date</label>
             <input
               type="date"
-              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={farmerInfo.reportDate}
               onChange={(e) => setFarmerInfo({ ...farmerInfo, reportDate: e.target.value })}
             />
@@ -293,6 +448,26 @@ export default function PLForm({
               className="w-full border border-gray-300 p-2 rounded bg-gray-100"
               value={farmerInfo.reportTime}
               readOnly
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">No. of Samples</label>
+            <input
+              type="text"
+              className="w-full border border-gray-300 p-2 rounded bg-gray-100"
+              value={totalSamples}
+              readOnly
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sample Type</label>
+            <input
+              type="text"
+              className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={sampleType}
+              onChange={(e) => setSampleType(e.target.value)}
+              placeholder="e.g. PL (Post Larvae)"
             />
           </div>
         </div>

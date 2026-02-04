@@ -19,17 +19,25 @@ interface InvoiceState {
   tests: {
     [type: string]: TestItem[];
   };
-  total: number;
-  paymentMode: "cash" | "qr" | "neft";
+  subtotal: number;
+  discountPercent?: number;     // ← from previous page (optional)
+  discountAmount?: number;      // ← from previous page (optional)
+  total: number;                // grand total after discount
+  paymentMode: "cash" | "qr" | "neft" | "rtgs" | "pending";
+  transactionRef?: string | null;
+  isPartialPayment?: boolean;
+  paidAmount?: number | null;
+  balanceAmount?: number;
+  isZeroInvoice?: boolean;
 }
 
-// Allow state to be null/undefined for safety
 interface InvoiceTemplateProps {
   state: InvoiceState | null;
 }
 
 const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
-  // Safety check — prevent any crash if state is missing
+  const navigate = useNavigate();
+
   if (!state) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
@@ -45,23 +53,25 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
     );
   }
 
-  // Dynamic Financial Year (Indian FY: April to March)
+  const isZeroInvoice = state.isZeroInvoice ?? false;
+
   const getFinancialYear = (): string => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = today.getMonth() + 1; // January = 1
+    const month = today.getMonth() + 1;
     return month >= 4 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
   };
 
-  const financialYear = getFinancialYear(); // e.g., "2025-26"
+  const financialYear = getFinancialYear();
 
-  // GST Calculation
-  const GST_RATE = 18; // 9% CGST + 9% SGST
-  const baseTotal = state.total;
-  const gstAmount = Math.round(baseTotal * (GST_RATE / 100));
-  const halfGst = gstAmount / 2;
-  const grandTotal = baseTotal + gstAmount;
-  const Navigate=useNavigate();
+  const subtotal = state.subtotal;
+  const discountPercent = state.discountPercent || 0;
+  const discountAmount = state.discountAmount || 0;
+  const grandTotal = state.total;
+
+  // For zero invoice → always show paid = 0, balance = 0
+  const paidAmount = isZeroInvoice ? 0 : (state.paymentMode === "pending" ? 0 : grandTotal);
+  const balanceAmount = isZeroInvoice ? 0 : (state.paymentMode === "pending" ? grandTotal : 0);
 
   const numberToWords = (num: number): string => {
     const a = [
@@ -104,8 +114,16 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
     return result + " Only";
   };
 
-  const tick = (mode: "cash" | "qr" | "neft") =>
-    state.paymentMode === mode ? "Checked" : "Unchecked";
+  const getPaymentModeLabel = (mode: InvoiceState["paymentMode"]) => {
+    switch (mode) {
+      case "cash": return "CASH";
+      case "qr": return "QR SCAN / UPI";
+      case "neft": return "NEFT";
+      case "rtgs": return "RTGS";
+      case "pending": return "PENDING";
+      default: return mode;
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -113,10 +131,9 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
 
   return (
     <>
-      {/* Screen-only buttons */}
       <div className="mb-6 print:hidden flex justify-end gap-4 px-4">
         <button
-          onClick={() => Navigate('/samples')}
+          onClick={() => navigate('/samples')}
           className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium"
         >
           ← Back
@@ -129,7 +146,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
         </button>
       </div>
 
-      {/* Printable A4 Invoice */}
       <div
         id="printable-invoice"
         className="bg-white mx-auto"
@@ -148,7 +164,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
           <img src={ADC} alt="ADC Logo" style={{ width: "100px" }} />
           <div className="text-center">
             <h2 style={{ fontSize: "18px", fontWeight: "bold" }}>
-              వాటర్‌బేస్ ఆక్వా డయాగ్నస్టిక్ సెంటర్
+              వాటర్బేస్ ఆక్వా డయాగ్నస్టిక్ సెంటర్
             </h2>
             <h3 style={{ fontSize: "16px", fontWeight: "600" }}>
               WATERBASE AQUA DIAGNOSTIC CENTER
@@ -242,7 +258,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
           </section>
         ))}
 
-        {/* TOTALS WITH GST */}
+        {/* TOTALS + PAYMENT DETAILS (conditional) */}
         <section style={{ marginTop: "20px", pageBreakInside: "avoid" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
             <tbody>
@@ -251,21 +267,22 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                   Subtotal (₹)
                 </td>
                 <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                  ₹{baseTotal}
+                  ₹{subtotal.toFixed(2)}
                 </td>
               </tr>
-              <tr>
-                <td style={{ border: "1px solid #000", padding: "6px" }}>CGST @ 9% (₹)</td>
-                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                  ₹{halfGst}
-                </td>
-              </tr>
-              <tr>
-                <td style={{ border: "1px solid #000", padding: "6px" }}>SGST @ 9% (₹)</td>
-                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                  ₹{halfGst}
-                </td>
-              </tr>
+
+              {/* Discount row - only show if discount exists */}
+              {discountAmount > 0 && (
+                <tr>
+                  <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                    Discount ({discountPercent}%)
+                  </td>
+                  <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right", color: "#dc2626" }}>
+                    -₹{discountAmount.toFixed(2)}
+                  </td>
+                </tr>
+              )}
+
               <tr>
                 <td
                   style={{
@@ -275,7 +292,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                     background: "#f0f0f0",
                   }}
                 >
-                  GRAND TOTAL (₹)
+                  TOTAL AMOUNT (₹)
                 </td>
                 <td
                   style={{
@@ -286,9 +303,31 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                     background: "#f0f0f0",
                   }}
                 >
-                  ₹{grandTotal}
+                  ₹{grandTotal.toFixed(2)}
                 </td>
               </tr>
+
+              {/* Payment rows - only show when NOT zero invoice */}
+              {!isZeroInvoice && (
+                <>
+                  <tr>
+                    <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                      Amount Paid (₹)
+                    </td>
+                    <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                      ₹{paidAmount}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                      Balance Due (₹)
+                    </td>
+                    <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                      ₹{balanceAmount}
+                    </td>
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
 
@@ -296,32 +335,60 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
             Amount in Words: <strong>{numberToWords(grandTotal)}</strong>
           </p>
 
-          <div
-            style={{
-              marginTop: "15px",
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "12px",
-            }}
-          >
-            <div>
-              <p><strong>Mode of Payment:</strong></p>
-              <p>
-                CASH {tick("cash")} &nbsp;&nbsp;|&nbsp;&nbsp;
-                QR SCAN {tick("qr")} &nbsp;&nbsp;|&nbsp;&nbsp;
-                NEFT/RTGS {tick("neft")}
-              </p>
+          {/* Payment mode section - completely hidden for zero invoices */}
+          {!isZeroInvoice && (
+            <div
+              style={{
+                marginTop: "15px",
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: "12px",
+              }}
+            >
+              <div>
+                <p>
+                  <strong>Mode of Payment: </strong>
+                  {state.paymentMode === "pending" ? (
+                    <span style={{ color: "red", fontWeight: "bold", fontSize: "14px" }}>
+                      PENDING
+                    </span>
+                  ) : (
+                    getPaymentModeLabel(state.paymentMode)
+                  )}
+                </p>
+
+                {(state.paymentMode === "qr" || state.paymentMode === "neft" || state.paymentMode === "rtgs") &&
+                  state.transactionRef && (
+                    <p>
+                      <strong>Transaction Ref:</strong> {state.transactionRef}
+                    </p>
+                  )}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <p>For Waterbase Aqua Diagnostic Center</p>
+                <div style={{ height: "70px" }}></div>
+                <p style={{ fontWeight: "600" }}>Authorised Signatory</p>
+              </div>
             </div>
-            <div style={{ textAlign: "right" }}>
+          )}
+
+          {/* For zero invoice → still show signature area, but without payment info */}
+          {isZeroInvoice && (
+            <div
+              style={{
+                marginTop: "15px",
+                textAlign: "right",
+                fontSize: "12px",
+              }}
+            >
               <p>For Waterbase Aqua Diagnostic Center</p>
               <div style={{ height: "70px" }}></div>
               <p style={{ fontWeight: "600" }}>Authorised Signatory</p>
             </div>
-          </div>
+          )}
         </section>
       </div>
 
-      {/* Print Styles */}
       <style>{`
         @media print {
           body * { visibility: hidden; }

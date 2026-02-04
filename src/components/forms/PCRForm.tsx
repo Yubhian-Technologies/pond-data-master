@@ -1,12 +1,25 @@
-import React, { useEffect, useState } from "react";
-import { doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore";
+import React, { useEffect, useState,useMemo } from "react";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  setDoc, 
+  where 
+} from "firebase/firestore";
 import { db } from "../../pages/firebase";
 
 interface FarmerInfo {
   farmerName: string;
   village: string;
   mobile: string;
-  date: string;
+  farmerId: string;
+  sampleCollectionTime: string;
+  sampleType: string;
+  noOfSamples: number;
+  reportDate: string;
+  docDifference: string;
 }
 
 interface PathogenResult {
@@ -23,30 +36,53 @@ interface SamplePCRData {
 }
 
 interface PCRFormProps {
-  invoice: any;
   invoiceId: string;
   locationId: string;
   onSubmit: () => void;
 }
 
 export default function PCRForm({
-  invoice,
   invoiceId,
   locationId,
   onSubmit,
 }: PCRFormProps) {
   const today = new Date().toISOString().split("T")[0];
 
-  const totalSamples =
-    Number(
-      invoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.count || 0
-    );
+  const [localInvoice, setLocalInvoice] = useState<any>(null);
+
+ // ... your existing code ...
+
+const totalSamples = useMemo(() => {
+  const count = Number(
+    localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.count || 0
+  );
+  console.log("PCR totalSamples calculated:", {
+    rawSampleType: localInvoice?.sampleType,
+    foundPCR: localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr"),
+    count
+  });
+  return count;
+}, [localInvoice]);
+
+useEffect(() => {
+  setFarmerInfo(prev => ({
+    ...prev,
+    noOfSamples: totalSamples
+  }));
+}, [totalSamples]);
+
+
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
-    farmerName: invoice?.farmerName || "",
-    village: invoice?.village || "",
-    mobile: invoice?.farmerPhone || invoice?.mobile || "",
-    date: invoice?.formattedDate || today,
+    farmerName: "",
+    village: "",
+    mobile: "",
+    farmerId: "—",
+    sampleCollectionTime: today,
+    sampleType: "PL PCR",
+    noOfSamples: totalSamples,
+    reportDate: today,
+    docDifference: "0 days",
   });
 
   const [samplesData, setSamplesData] = useState<SamplePCRData[]>([]);
@@ -63,10 +99,94 @@ export default function PCRForm({
     pl_ihhnv: "IHHNV",
   };
 
-  // Load all PCR samples
+  // Fetch invoice using query (matches LabResults and InvoicePage logic)
+  useEffect(() => {
+    if (!locationId || !invoiceId) {
+      console.warn("Missing locationId or invoiceId for PCRForm fetch");
+      return;
+    }
+
+    const fetchInvoice = async () => {
+      try {
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+
+        // Try by 'invoiceId' field first (new invoices)
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let querySnapshot = await getDocs(q);
+
+        // Fallback to old 'id' field (legacy invoices)
+        if (querySnapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          querySnapshot = await getDocs(q);
+        }
+
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const data = docSnap.data();
+          const docId = docSnap.id;
+
+          setLocalInvoice({ ...data, docId });
+          console.log("PCRForm - Invoice loaded OK:", { 
+            docId, 
+            invoiceId: data.invoiceId || data.id || "unknown" 
+          });
+        } else {
+          console.error("PCRForm - Invoice NOT FOUND for ID:", invoiceId);
+        }
+      } catch (err) {
+        console.error("Error fetching invoice in PCRForm:", err);
+      }
+    };
+
+    fetchInvoice();
+  }, [locationId, invoiceId]);
+
+  useEffect(() => {
+    const loadFarmerFromMaster = async () => {
+      if (!localInvoice?.farmerId || !locationId) return;
+
+      try {
+        const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
+        const snap = await getDoc(farmerRef);
+
+        if (snap.exists()) {
+          const farmer = snap.data();
+
+          setFarmerInfo(prev => ({
+            ...prev,
+            farmerId: farmer.farmerId || "",   // ← Correct UID
+            farmerName: farmer.name || prev.farmerName,
+            mobile: farmer.phone || prev.mobile,
+            village: farmer.city || prev.village
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to load farmer master data in PCRForm:", err);
+      }
+    };
+
+    if (localInvoice) {
+      loadFarmerFromMaster();
+    }
+  }, [localInvoice?.farmerId, locationId]);
+
+  // Auto-calculate difference between sampleCollectionTime and reportDate
+  useEffect(() => {
+    if (farmerInfo.sampleCollectionTime && farmerInfo.reportDate) {
+      const collectionDate = new Date(farmerInfo.sampleCollectionTime);
+      const reportDateObj = new Date(farmerInfo.reportDate);
+      const diffTime = Math.abs(reportDateObj.getTime() - collectionDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      setFarmerInfo((prev) => ({
+        ...prev,
+        docDifference: diffDays === 0 ? "Same Day" : `${diffDays} days`,
+      }));
+    }
+  }, [farmerInfo.sampleCollectionTime, farmerInfo.reportDate]);
+
   useEffect(() => {
     const loadAllData = async () => {
-      if (!invoice || !invoiceId || !locationId || totalSamples === 0) {
+      if (!localInvoice || !invoiceId || !locationId || totalSamples === 0) {
         setLoading(false);
         return;
       }
@@ -82,7 +202,7 @@ export default function PCRForm({
             "locations",
             locationId,
             "invoices",
-            invoiceId,
+            localInvoice.docId,  // ← Use real docId here!
             "pcr_reports",
             `sample_${i}`
           );
@@ -102,10 +222,9 @@ export default function PCRForm({
               setGelImages((prev) => ({ ...prev, [i]: data.gelImageUrl }));
             }
           } else {
-            // New sample — initialize pathogens from invoice
-            const samplePathogens = invoice?.samplePathogens?.[i] || [];
+            const selectedForThisSample = localInvoice?.samplePathogens?.[i] || [];
 
-            const initialPathogens = samplePathogens.map((testId: string) => ({
+            const initialPathogens = selectedForThisSample.map((testId: string) => ({
               name: PATHOGEN_NAME_MAP[testId] || testId,
               result: "",
               ctValue: "",
@@ -128,8 +247,10 @@ export default function PCRForm({
       }
     };
 
-    loadAllData();
-  }, [invoice, invoiceId, locationId, totalSamples]);
+    if (localInvoice) {
+      loadAllData();
+    }
+  }, [localInvoice, invoiceId, locationId, totalSamples]);
 
   const handleBasicInput = (sampleIndex: number, field: keyof SamplePCRData, value: string) => {
     setSamplesData((prev) => {
@@ -192,8 +313,8 @@ export default function PCRForm({
   };
 
   const saveAllData = async () => {
-    if (!invoiceId || !locationId) {
-      alert("Missing invoice/location info");
+    if (!invoiceId || !locationId || !localInvoice?.docId) {
+      alert("Cannot save: Invoice not loaded or missing ID");
       return;
     }
 
@@ -205,7 +326,7 @@ export default function PCRForm({
           "locations",
           locationId,
           "invoices",
-          invoiceId,
+          localInvoice.docId,  // ← Use real docId!
           "pcr_reports",
           `sample_${sampleNum}`
         );
@@ -218,7 +339,7 @@ export default function PCRForm({
           pathogens: sample.pathogens,
           gelImageUrl: gelImages[sampleNum] || "",
           updatedAt: new Date().toISOString(),
-        });
+        }, { merge: true });
       });
 
       await Promise.all(savePromises);
@@ -258,15 +379,50 @@ export default function PCRForm({
           {Object.entries(farmerInfo).map(([key, value]) => (
             <div key={key}>
               <label className="block text-sm font-medium text-gray-700 capitalize mb-1">
-                {key.replace(/([A-Z])/g, " $1").trim()}
+                {key === "sampleCollectionTime"
+                  ? "Sample Collection Time"
+                  : key === "dateOfCulture"
+                  ? "Sample Collection Time"
+                  : key === "docDifference"
+                  ? "Days Difference"
+                  : key === "noOfSamples"
+                  ? "No. of Samples"
+                  : key.replace(/([A-Z])/g, " $1").trim()}
               </label>
-              <input
-                value={value}
-                onChange={(e) =>
-                  setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
-                }
-                className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
-              />
+
+              {key === "sampleCollectionTime" || key === "reportDate" ? (
+                <input
+                  type="date"
+                  value={value}
+                  onChange={(e) =>
+                    setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                />
+              ) : key === "docDifference" ? (
+                <input
+                  type="text"
+                  value={value}
+                  readOnly
+                  className="w-full border bg-gray-100 rounded px-4 py-3 cursor-not-allowed"
+                />
+              ) : key === "noOfSamples" || key === "farmerId" ? (
+                <input
+                  type="text"
+                  value={value}
+                  readOnly
+                  className="w-full border bg-gray-100 rounded px-4 py-3 cursor-not-allowed"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) =>
+                    setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
+                  }
+                  className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                />
+              )}
             </div>
           ))}
         </div>
@@ -278,13 +434,39 @@ export default function PCRForm({
       {samplesData.map((sample, sampleIndex) => {
         const sampleNum = sampleIndex + 1;
 
+        const selectedForThisSample = localInvoice?.samplePathogens?.[sampleNum] || [];
+        const selectedNames = selectedForThisSample.map(
+          (id: string) => PATHOGEN_NAME_MAP[id] || id
+        );
+
         return (
           <section key={sampleIndex} className="mb-16 pb-12 border-b-2 border-gray-200 last:border-0">
             <h3 className="text-2xl font-bold mb-8 text-blue-800">
               Sample {sampleNum}
             </h3>
 
-            {/* Sample Details */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm font-medium text-blue-800 mb-2">
+                Pathogens selected for Sample {sampleNum}:
+              </p>
+              {selectedNames.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedNames.map((name, i) => (
+                    <span
+                      key={i}
+                      className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">
+                  No pathogens selected for this sample
+                </p>
+              )}
+            </div>
+
             <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
                 <label className="block text-sm font-medium mb-1">Sample Code</label>
@@ -306,7 +488,6 @@ export default function PCRForm({
               </div>
             </div>
 
-            {/* Pathogens */}
             <div className="mb-10">
               <h4 className="font-semibold text-lg mb-5">Pathogen Results</h4>
               {sample.pathogens.length === 0 ? (
@@ -355,7 +536,6 @@ export default function PCRForm({
               )}
             </div>
 
-            {/* Gel Image */}
             <div className="mb-12">
               <h4 className="font-semibold text-lg mb-4">Gel Electrophoresis Image</h4>
               <input
@@ -380,7 +560,6 @@ export default function PCRForm({
         );
       })}
 
-      {/* Final Submit */}
       <div className="text-center mt-12">
         <button
           onClick={saveAllData}
