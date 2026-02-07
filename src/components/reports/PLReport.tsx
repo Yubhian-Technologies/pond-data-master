@@ -480,7 +480,7 @@ export default function PLReport({
               <p className="font-bold mb-2 text-red-600">PL Quality Selection - Scoring</p>
               <p className="mb-4">
                 <span className="text-red-600 font-bold">Rostral Spines:</span> 15 Points (&gt;4 Spines), Average Length: 10 points(&gt;11mm), Size Variation: 10 points (&lt;10%), Muscle Gut Ratio: 15 points (&gt;4:1
-                Spine), Hepatopancreas: 15 points (Full), Necrosis: 10 points (Absent) Fouling: 10 points (Absent), Swollen Hind Gut: 15 points (Absent)
+                Spine ), Hepatopancreas: 15 points (Full), Necrosis: 10 points (Absent) Fouling: 10 points (Absent), Swollen Hind Gut: 15 points (Absent)
               </p>
 
               <p className="mt-6">
