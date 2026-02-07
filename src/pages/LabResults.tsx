@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 
 import SoilForm from "../components/forms/SoilForm";
@@ -23,6 +23,9 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { useUserSession } from "../contexts/UserSessionContext";
+import * as htmlToImage from 'html-to-image';
+import { saveAs } from 'file-saver';
+import { Download } from "lucide-react";
 
 export default function LabResults() {
   const [invoice, setInvoice] = useState<any>(null);
@@ -38,6 +41,8 @@ export default function LabResults() {
 
   const [activeEnvReport, setActiveEnvReport] = useState<string | null>(null);
 
+  const reportRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!session?.locationId || !invoiceId) return;
     fetchInvoice();
@@ -46,11 +51,9 @@ export default function LabResults() {
   const fetchInvoice = async () => {
     const ref = collection(db, "locations", session.locationId, "invoices");
 
-    // Try querying by 'invoiceId' first (new invoices)
     let q = query(ref, where("invoiceId", "==", invoiceId));
     let snap = await getDocs(q);
 
-    // If not found, fall back to old 'id' field (for old invoices)
     if (snap.empty) {
       q = query(ref, where("id", "==", invoiceId));
       snap = await getDocs(q);
@@ -61,7 +64,6 @@ export default function LabResults() {
       const docData = docSnap.data();
       const docId = docSnap.id;
 
-      // Clean up any conflicting 'id' field
       if ('id' in docData) {
         delete (docData as any).id;
       }
@@ -92,7 +94,6 @@ export default function LabResults() {
       (!pl || progress.pl === "completed") &&
       (!pcr || progress.pcr === "completed") &&
       (!micro || progress.microbiology === "completed");
-      // WSSV is intentionally ignored here
 
     if (isEditMode) {
       if (soil) { setCurrentType("soil"); setStep("soilForm"); return; }
@@ -139,7 +140,6 @@ export default function LabResults() {
   };
 
   const handleTypeClick = (type: string) => {
-    // Prevent WSSV from doing anything
     if (type.toLowerCase() === "wssv") return;
 
     setCurrentType(type);
@@ -217,12 +217,6 @@ export default function LabResults() {
     @page {
       size: A4 portrait;
       margin: 1cm;
-      @top-left { content: none; }
-      @top-center { content: none; }
-      @top-right { content: none; }
-      @bottom-left { content: none; }
-      @bottom-center { content: none; }
-      @bottom-right { content: none; }
     }
 
     table, img, div, section { 
@@ -234,8 +228,8 @@ export default function LabResults() {
 `;
 
   const renderSignatureAndNote = () => (
-    <>
-      <div className="mt-20 border-t-2 border-black pt-8 signature-section">
+    <div className="signature-section mt-12 print:mt-8">
+      <div className="border-t-2 border-black pt-8">
         <div className="flex justify-between text-sm px-10 mb-10">
           <div>
             <p className="font-semibold">Reported by:</p>
@@ -248,10 +242,10 @@ export default function LabResults() {
         </div>
       </div>
 
-      <div className="text-sm text-gray-800 mt-8">
-        {(hasPCR || (hasPL && hasPCR)) && (
-          <p className="font-bold">
-            <strong className="text-red-600 font-bold mt-6">Important Note :</strong> EHP - Enterocytozoon hepatopanaei, WSSV - White spot syndrome virus, 
+      <div className="text-sm text-gray-800 mt-8 px-4">
+        {(hasPCR || hasPathology) && (
+          <p className="font-bold mb-4">
+            <strong className="text-red-600">Important Note :</strong> EHP - Enterocytozoon hepatopanaei, WSSV - White spot syndrome virus, 
             IHHNV - Infectious hypodermal and hematopoietic necrosis virus, VIBRIO - Vibrio parahaemolyticus 
             and Vibrio harveyi
           </p>
@@ -269,29 +263,26 @@ export default function LabResults() {
         </p>
 
         <p className="mt-6">
-          <span className="text-red-600 font-bold">Note:</span> The samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose. Not
+          <span className="text-red-600 font-bold">Note:</span> The samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose. Not for any Litigation.
         </p>
       </div>
 
-      <div className="text-center mt-20">
-        <p className="text-red-600 font-bold">TWL ADC committed for Complete farming Solutions</p>
+      <div className="text-center mt-16 text-red-600 font-bold">
+        TWL ADC committed for Complete farming Solutions
       </div>
-    </>
+    </div>
   );
 
-  const renderPathologyReport = () => (
+  const renderPathologyReportContent = () => (
     <>
-      <style>{combinedPrintStyles}</style>
       {hasPL && (
-        <div className={hasPL && hasPCR ? "pl-page" : ""}>
-          <div className={hasPL && hasPCR ? "pl-tight-bottom" : ""}>
-            <PLReport 
-              invoiceId={invoiceId!} 
-              locationId={session.locationId} 
-              allSampleCount={plCount}
-              showSignature={!hasPCR}
-            />
-          </div>
+        <div className={hasPL && hasPCR ? "pl-page pl-tight-bottom" : ""}>
+          <PLReport 
+            invoiceId={invoiceId!} 
+            locationId={session.locationId} 
+            allSampleCount={plCount}
+            showSignature={false}
+          />
         </div>
       )}
 
@@ -302,136 +293,282 @@ export default function LabResults() {
             locationId={session.locationId}
             allSampleCount={pcrCount}
             compact={hasPL && hasPCR}
+            showAllSamples={true}
           />
-          {renderSignatureAndNote()}
         </div>
       )}
+
+      {renderSignatureAndNote()}
     </>
   );
 
+  const handleDownloadJpeg = async () => {
+  if (!reportRef.current) {
+    alert("Report not ready. Please wait or try again.");
+    return;
+  }
+
+  const element = reportRef.current;
+
+  // ────────────────────────────────────────────────
+  // Find problematic containers (wide tables usually wrapped in overflow-x-auto)
+  // ────────────────────────────────────────────────
+  const scrollContainers = element.querySelectorAll('.overflow-x-auto');
+
+  // Save original styles
+  const originalElementStyles = {
+    overflow: element.style.overflow,
+    width: element.style.width,
+    maxWidth: element.style.maxWidth,
+    position: element.style.position,
+  };
+
+  const originalScrollStyles: { [key: string]: string }[] = [];
+
+  scrollContainers.forEach((container) => {
+    const el = container as HTMLElement;
+    originalScrollStyles.push({
+      overflowX: el.style.overflowX,
+      overflow: el.style.overflow,
+      width: el.style.width,
+      maxWidth: el.style.maxWidth,
+    });
+  });
+
+  try {
+    // ────────────────────────────────────────────────
+    // Force full visibility — remove scrollbars & constraints
+    // ────────────────────────────────────────────────
+    element.style.overflow = 'hidden';
+    element.style.width = 'auto';
+    element.style.maxWidth = 'none';
+    element.style.position = 'relative';
+
+    scrollContainers.forEach((container) => {
+      const el = container as HTMLElement;
+      el.style.overflowX = 'visible';
+      el.style.overflow = 'visible';
+      el.style.width = 'auto';
+      el.style.maxWidth = 'none';
+    });
+
+    await new Promise(r => setTimeout(r, 500)); 
+
+    const fullWidth = Math.max(element.scrollWidth, 794); // min A4 width ~794px @96dpi
+    const fullHeight = element.scrollHeight;
+
+    const dataUrl = await htmlToImage.toJpeg(element, {
+      quality: 0.92,
+      backgroundColor: '#ffffff',
+      canvasWidth: fullWidth * 1.5,
+      canvasHeight: fullHeight * 1.5,
+      pixelRatio: 1.5,
+      filter: (node) => {
+        if (!(node instanceof HTMLElement)) return true;
+        const style = window.getComputedStyle(node);
+        // Hide anything that looks like a scrollbar or hidden
+        return !(
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          node.classList.contains('print:hidden') ||
+          node.id === 'print-buttons' ||
+          node.id === 'view-mode-nav' ||
+          // Extra safety: hide typical scrollbar pseudo-elements if rendered as nodes
+          node.classList.contains('scrollbar') ||
+          node.classList.contains('::-webkit-scrollbar')
+        );
+      }
+    });
+
+    saveAs(dataUrl, `Lab-Report_${invoiceId || 'report'}.jpg`);
+  } catch (err) {
+    console.error("JPEG download failed:", err);
+    alert("Failed to generate JPEG.\nTry using Print → Save as PDF instead.");
+  } finally {
+    // ────────────────────────────────────────────────
+    // Restore ALL original styles
+    // ────────────────────────────────────────────────
+    element.style.overflow = originalElementStyles.overflow || '';
+    element.style.width = originalElementStyles.width || '';
+    element.style.maxWidth = originalElementStyles.maxWidth || '';
+    element.style.position = originalElementStyles.position || '';
+
+    scrollContainers.forEach((container, index) => {
+      const el = container as HTMLElement;
+      const orig = originalScrollStyles[index];
+      if (orig) {
+        el.style.overflowX = orig.overflowX || '';
+        el.style.overflow = orig.overflow || '';
+        el.style.width = orig.width || '';
+        el.style.maxWidth = orig.maxWidth || '';
+      }
+    });
+  }
+};
+
   return (
-    <div className="p-6 max-w-7xl mx-auto relative pb-24">
-      {/* Styles for printing */}
-      <style>{combinedPrintStyles}</style>
+  <div className="p-6 max-w-7xl mx-auto relative pb-24">
+    <style>{combinedPrintStyles}</style>
 
-      {showTopButtons && (
-        <>
-          <div className="overflow-x-auto pb-4 mb-8 print:hidden">
-            <div className="flex gap-4 justify-center min-w-max px-4">
-              {/* Back Button for Entry/Edit Mode */}
-              <button
-                onClick={() => navigate("/samples")}
-                className="px-3 py-2 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
-              >
-                BACK TO SAMPLES
-              </button>
+    {/* Top navigation / type selection buttons — only in entry/edit mode */}
+    {showTopButtons && (
+      <>
+        <div className="overflow-x-auto pb-4 mb-8 print:hidden">
+          <div className="flex gap-4 justify-center min-w-max px-4">
+            <button
+              onClick={() => navigate("/samples")}
+              className="px-3 py-2 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+            >
+              BACK TO SAMPLES
+            </button>
 
-              {invoice.sampleType?.map((s: any) => {
-                const type = s.type.toLowerCase();
-                const completed = invoice?.reportsProgress?.[type] === "completed";
-                const count = s.count || 0;
+            {invoice.sampleType?.map((s: any) => {
+              const type = s.type.toLowerCase();
+              const completed = invoice?.reportsProgress?.[type] === "completed";
+              const count = s.count || 0;
 
-                // Skip WSSV button completely
-                if (type === "wssv" || count === 0) return null;
+              if (type === "wssv" || count === 0) return null;
 
-                return (
-                  <button
-                    key={type}
-                    onClick={() => handleTypeClick(type)}
-                    className={`px-3 py-2 rounded-xl border-4 font-bold text-md transition-all shadow-lg whitespace-nowrap ${
-                      completed
-                        ? "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                        : currentType === type
-                        ? "bg-yellow-400 border-yellow-600 text-gray-900 ring-4 ring-yellow-300"
-                        : "bg-yellow-300 hover:bg-yellow-400 border-yellow-600 text-gray-800"
-                    }`}
-                  >
-                    {s.type.toUpperCase()} ({count}) - {completed ? "Completed" : "Pending"}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <p className="text-center text-gray-600 mb-8 text-lg print:hidden">
-            Click a button to enter results for <strong>all samples</strong> of that type on one page.
-          </p>
-        </>
-      )}
-
-      {/* Forms – no invoice prop passed to any form */}
-      {step === "soilForm" && hasSoil && (
-        <SoilForm 
-          invoiceId={invoiceId!} 
-          locationId={session.locationId} 
-          onSubmit={() => { updateProgress("soil"); setStep("soilReport"); }}
-        />
-      )}
-      {step === "waterForm" && hasWater && (
-        <WaterForm 
-          invoiceId={invoiceId!} 
-          locationId={session.locationId} 
-          onSubmit={() => { updateProgress("water"); setStep("waterReport"); }}
-        />
-      )}
-      {step === "plForm" && hasPL && (
-        <PLForm 
-          invoiceId={invoiceId!} 
-          locationId={session.locationId} 
-          onSubmit={() => { updateProgress("pl"); checkPathologyCompletion("pl"); }}
-        />
-      )}
-      {step === "pcrForm" && hasPCR && (
-        <PCRForm 
-          invoiceId={invoiceId!} 
-          locationId={session.locationId} 
-          onSubmit={() => { updateProgress("pcr"); checkPathologyCompletion("pcr"); }}
-        />
-      )}
-      {step === "microbiologyForm" && hasMicro && (
-        <MicrobiologyForm 
-          invoiceId={invoiceId!} 
-          locationId={session.locationId} 
-          onSubmit={() => { updateProgress("microbiology"); setStep("microbiologyReport"); }}
-        />
-      )}
-
-      {/* Individual Previews */}
-      {step === "soilReport" && <div id="printable-report"><SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} /></div>}
-      {step === "waterReport" && <div id="printable-report"><WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} /></div>}
-      {step === "microbiologyReport" && <div id="printable-report"><MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} /></div>}
-
-      {/* Pathology Preview during entry */}
-      {step === "pathologyReport" && <div id="printable-report">{renderPathologyReport()}</div>}
-
-      {/* Final Reports View */}
-      {isViewingReports && (
-        <div>
-          <div className="overflow-x-auto pb-4 mb-10 print:hidden">
-            <div className="flex gap-4 justify-center min-w-max px-4">
-              {/* Back Button for Viewing Mode */}
-              <button
-                onClick={() => navigate("/samples")}
-                className="px-5 py-1.5 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
-              >
-                BACK
-              </button>
-
-              {hasSoil && <button onClick={() => setActiveEnvReport("soil")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "soil" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>SOIL REPORT</button>}
-              {hasWater && <button onClick={() => setActiveEnvReport("water")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "water" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>WATER REPORT</button>}
-              {hasMicro && <button onClick={() => setActiveEnvReport("microbiology")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "microbiology" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>MICROBIOLOGY REPORT</button>}
-              {hasPathology && <button onClick={() => setActiveEnvReport("pathology")} className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${activeEnvReport === "pathology" ? "bg-green-700 text-white border-green-900" : "bg-green-600 text-white hover:bg-green-700 border-green-800"}`}>PL/PCR REPORT</button>}
-            </div>
-          </div>
-
-          <div id="printable-report" className="mt-8">
-            {activeEnvReport === "soil" && <SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} />}
-            {activeEnvReport === "water" && <WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} />}
-            {activeEnvReport === "microbiology" && <MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} />}
-            {activeEnvReport === "pathology" && renderPathologyReport()}
+              return (
+                <button
+                  key={type}
+                  onClick={() => handleTypeClick(type)}
+                  className={`px-3 py-2 rounded-xl border-4 font-bold text-md transition-all shadow-lg whitespace-nowrap ${
+                    completed
+                      ? "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                      : currentType === type
+                      ? "bg-yellow-400 border-yellow-600 text-gray-900 ring-4 ring-yellow-300"
+                      : "bg-yellow-300 hover:bg-yellow-400 border-yellow-600 text-gray-800"
+                  }`}
+                >
+                  {s.type.toUpperCase()} ({count}) - {completed ? "Completed" : "Pending"}
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
+
+        <p className="text-center text-gray-600 mb-8 text-lg print:hidden">
+          Click a button to enter results for <strong>all samples</strong> of that type on one page.
+        </p>
+      </>
+    )}
+
+    {/* ────────────────────────────────────────────────
+        REPORT VIEWING MODE HEADER CONTROLS
+        Download button + immediately below it: report selector buttons
+    ──────────────────────────────────────────────── */}
+    {isViewingReports && (
+      <div className="mb-8 print:hidden">
+        {/* Download button first */}
+        <div className="flex justify-center mb-6" id="print-buttons">
+          <button
+            onClick={handleDownloadJpeg}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+          >
+            <Download size={20} />
+            Download Full Report as JPEG
+          </button>
+        </div>
+
+        {/* Right below it: the report type selector buttons + BACK */}
+        <div className="overflow-x-auto pb-4" id="view-mode-nav">
+          <div className="flex gap-4 justify-center min-w-max px-4">
+            <button
+              onClick={() => navigate("/samples")}
+              className="px-5 py-1.5 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+            >
+              BACK
+            </button>
+
+            {hasSoil && (
+              <button
+                onClick={() => setActiveEnvReport("soil")}
+                className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                  activeEnvReport === "soil"
+                    ? "bg-green-700 text-white border-green-900"
+                    : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                }`}
+              >
+                SOIL REPORT
+              </button>
+            )}
+            {hasWater && (
+              <button
+                onClick={() => setActiveEnvReport("water")}
+                className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                  activeEnvReport === "water"
+                    ? "bg-green-700 text-white border-green-900"
+                    : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                }`}
+              >
+                WATER REPORT
+              </button>
+            )}
+            {hasMicro && (
+              <button
+                onClick={() => setActiveEnvReport("microbiology")}
+                className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                  activeEnvReport === "microbiology"
+                    ? "bg-green-700 text-white border-green-900"
+                    : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                }`}
+              >
+                MICROBIOLOGY REPORT
+              </button>
+            )}
+            {hasPathology && (
+              <button
+                onClick={() => setActiveEnvReport("pathology")}
+                className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                  activeEnvReport === "pathology"
+                    ? "bg-green-700 text-white border-green-900"
+                    : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                }`}
+              >
+                PL/PCR REPORT
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Download button in non-viewReports report preview steps (after form submit) */}
+    {(!isViewingReports && (step === "pathologyReport" || step.includes("Report"))) && (
+      <div className="flex justify-center mb-6 print:hidden" id="print-buttons">
+        <button
+          onClick={handleDownloadJpeg}
+          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+        >
+          <Download size={20} />
+          Download Full Report as JPEG
+        </button>
+      </div>
+    )}
+
+    {/* The actual report content — this is captured for JPEG */}
+    <div ref={reportRef} className="bg-white">
+      {/* Forms */}
+      {step === "soilForm" && hasSoil && <SoilForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("soil"); setStep("soilReport"); }} />}
+      {step === "waterForm" && hasWater && <WaterForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("water"); setStep("waterReport"); }} />}
+      {step === "plForm" && hasPL && <PLForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pl"); checkPathologyCompletion("pl"); }} />}
+      {step === "pcrForm" && hasPCR && <PCRForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pcr"); checkPathologyCompletion("pcr"); }} />}
+      {step === "microbiologyForm" && hasMicro && <MicrobiologyForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("microbiology"); setStep("microbiologyReport"); }} />}
+
+      {/* Single report previews */}
+      {step === "soilReport" && <SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} />}
+      {step === "waterReport" && <WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} />}
+      {step === "microbiologyReport" && <MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} />}
+
+      {/* Pathology combined view */}
+      {(step === "pathologyReport" || (isViewingReports && activeEnvReport === "pathology")) && renderPathologyReportContent()}
+
+      {/* Individual reports when switching tabs in view mode */}
+      {isViewingReports && activeEnvReport === "soil" && <SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} />}
+      {isViewingReports && activeEnvReport === "water" && <WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} />}
+      {isViewingReports && activeEnvReport === "microbiology" && <MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} />}
     </div>
-  );
+  </div>
+);
 }

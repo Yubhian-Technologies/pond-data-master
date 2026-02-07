@@ -80,26 +80,30 @@ export default function SoilForm({
     cmisBy: technicianName,
   });
 
-  const [checkedBy, setCheckedBy] = useState(technicianName);  // ← NEW: Checked by name
-
-  const SAMPLE_FIELDS_ORDER: (keyof Sample)[] = [
-    "pondNo",
-    "pH",
-    "ec",
-    "caco3",
-    "soilTexture",
-    "organicCarbon",
-    "availableNitrogen",
-    "availablePhosphorus",
-    "redoxPotential",
-    "remarks",
-  ];
+  const [checkedBy, setCheckedBy] = useState(technicianName);
 
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [localInvoice, setLocalInvoice] = useState<any>(null);
 
-  // Fetch invoice using query (matches LabResults and InvoicePage logic)
+  // ────────────────────────────────────────────────
+  // Mapping: which test IDs control which soil fields
+  // ────────────────────────────────────────────────
+  const testToSoilFields: Record<string, (keyof Sample)[]> = {
+    // Assuming these are the possible test IDs for soil (adjust if different)
+    "soil_ph": ["pH"],
+    "soil_ec": ["ec"],
+    "soil_oc": ["organicCarbon"],
+    // Add others if you have more granular soil tests
+    // If you have a "basic_soil" or similar that includes multiple, add here
+  };
+
+  // Always show these (common / header-like fields)
+  const alwaysShowFields = new Set<keyof Sample>(["pondNo", "remarks"]);
+
+  // ────────────────────────────────────────────────
+  // Fetch invoice
+  // ────────────────────────────────────────────────
   useEffect(() => {
     if (!locationId || !invoiceId) {
       console.warn("Missing locationId or invoiceId for SoilForm fetch");
@@ -143,7 +147,6 @@ export default function SoilForm({
     localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")?.count || 1
   );
 
-  // Per-sample selected soil tests from invoice
   const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.soil || {};
 
   const testNameMap: Record<string, string> = {
@@ -223,7 +226,7 @@ export default function SoilForm({
             cmisBy: headerData.technicianName || technicianName,
             sampleDate: headerData.sampleDate || localInvoice.dateOfCulture || today,
           }));
-          setCheckedBy(headerData.checkedBy || technicianName || "");  // ← Load saved checkedBy if exists
+          setCheckedBy(headerData.checkedBy || technicianName || "");
         }
 
         // Load all soil samples
@@ -245,7 +248,7 @@ export default function SoilForm({
             loadedSamples.push(sampleDoc.data() as Sample);
           } else {
             loadedSamples.push({
-              pondNo: '',
+              pondNo: `S${i}`,
               pH: '',
               ec: '',
               caco3: '',
@@ -272,6 +275,9 @@ export default function SoilForm({
     }
   }, [localInvoice, invoiceId, locationId, technicianName, totalSamples]);
 
+  // ────────────────────────────────────────────────
+  // Save with unselected fields forced to "-"
+  // ────────────────────────────────────────────────
   const saveAllData = async () => {
     if (!locationId || !invoiceId || !localInvoice?.docId) {
       alert("Cannot save: Invoice not loaded or missing ID");
@@ -289,25 +295,50 @@ export default function SoilForm({
         reportTime: formData.reportTime,
         technicianName: technicianName,
         sampleDate: formData.sampleDate,
-        checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← Save checkedBy here too (optional redundancy)
+        checkedBy: checkedBy.trim() || technicianName || "N/A",
       }, { merge: true });
 
-      // Save all samples
-      const savePromises = samples.map((sample, index) => {
+      // Save all samples with filtering
+      const savePromises = samples.map(async (sample, index) => {
+        const sampleNumber = index + 1;
+        const selectedIds = perSampleSelectedTests[sampleNumber] || [];
+
+        // Create clean copy
+        const dataToSave: Partial<Sample> = { ...sample };
+
+        // Reset all analyzable fields to "-"
+        [
+          "pH", "ec", "caco3", "soilTexture", "organicCarbon",
+          "availableNitrogen", "availablePhosphorus", "redoxPotential"
+        ].forEach(field => {
+          (dataToSave as any)[field] = "-";
+        });
+
+        // Restore only selected ones
+        selectedIds.forEach(testId => {
+          const fields = testToSoilFields[testId];
+          if (fields) {
+            fields.forEach(field => {
+              (dataToSave as any)[field] = sample[field] || "";
+            });
+          }
+        });
+
         const sampleDocRef = doc(
           collection(db, "locations", locationId, "reports", invoiceId, "soil samples"),
-          `sample_${index + 1}`
+          `sample_${sampleNumber}`
         );
-        return setDoc(sampleDocRef, sample);
+
+        return setDoc(sampleDocRef, dataToSave, { merge: true });
       });
 
       await Promise.all(savePromises);
 
-      // Mark as completed + save checkedBy to invoice
+      // Mark as completed
       const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
       await updateDoc(invoiceRef, {
         "reportsProgress.soil": "completed",
-        checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← Save to invoice (main place)
+        checkedBy: checkedBy.trim() || technicianName || "N/A",
       });
 
     } catch (err) {
@@ -389,11 +420,6 @@ export default function SoilForm({
             <input type="time" name="sampleCollectionTime" value={formData.sampleCollectionTime} onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
           </div>
-          {/* <div>
-            <label className="block text-sm font-medium mb-1">Sample Time</label>
-            <input type="time" name="sampleTime" value={formData.sampleTime} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-          </div> */}
           <div>
             <label className="block text-sm font-medium mb-1">Report Time</label>
             <input type="time" value={formData.reportTime} readOnly
@@ -409,6 +435,35 @@ export default function SoilForm({
         const sampleSelectedNames = sampleSelectedIds
           .map(id => testNameMap[id] || id)
           .filter(Boolean);
+
+        // Determine which fields to show for this sample
+        const enabledFields = new Set<keyof Sample>();
+
+        sampleSelectedIds.forEach(testId => {
+          const fields = testToSoilFields[testId];
+          if (fields) {
+            fields.forEach(f => enabledFields.add(f));
+          }
+        });
+
+        // Define all possible fields with labels
+        const allSoilFields: { key: keyof Sample; label: string }[] = [
+          { key: "pondNo", label: "Pond No." },
+          { key: "pH", label: "pH" },
+          { key: "ec", label: "Electrical Conductivity (EC)" },
+          { key: "caco3", label: "CaCO₃" },
+          { key: "soilTexture", label: "Soil Texture" },
+          { key: "organicCarbon", label: "Organic Carbon" },
+          { key: "availableNitrogen", label: "Available Nitrogen" },
+          { key: "availablePhosphorus", label: "Available Phosphorus" },
+          { key: "redoxPotential", label: "Redox Potential" },
+          { key: "remarks", label: "Remarks" },
+        ];
+
+        // Filter to show only enabled + always shown
+        const displayedFields = allSoilFields.filter(
+          f => alwaysShowFields.has(f.key) || enabledFields.has(f.key)
+        );
 
         return (
           <div key={index} className="mb-10">
@@ -439,29 +494,26 @@ export default function SoilForm({
             </h3>
             <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {SAMPLE_FIELDS_ORDER.map((key) => {
-                  const value = sample[key] || ''; 
-                  return (
-                    <div key={key}>
-                      <label className="block text-xs font-medium mb-1 capitalize">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}
-                      </label>
-                      <input
-                        type="text"
-                        value={value}
-                        onChange={(e) => handleSampleChange(index, key, e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  );
-                })}
+                {displayedFields.map(({ key, label }) => (
+                  <div key={key}>
+                    <label className="block text-xs font-medium mb-1">
+                      {label}
+                    </label>
+                    <input
+                      type="text"
+                      value={sample[key] || ""}
+                      onChange={(e) => handleSampleChange(index, key, e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         );
       })}
 
-      {/* NEW: Checked by input field */}
+      {/* Checked by input field */}
       <div className="mb-12 max-w-md mx-auto">
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by

@@ -129,7 +129,7 @@ export default function PCRReport({
               gelImageUrl: data.gelImageUrl || null,
               farmerInfo: {
                 farmerName: data.farmerName || "",
-                village: data.village || "",
+                address: data.address || "",
                 mobile: data.mobile || "",
                 farmerId: data.farmerId || "",
                 sampleCollectionTime: data.sampleCollectionTime || "",
@@ -172,7 +172,7 @@ export default function PCRReport({
 
             setFarmerInfo({
               farmerName: data.farmerName || "",
-              village: data.village || "",
+              address: data.address || "",
               mobile: data.mobile || "",
               farmerId: data.farmerId || "",
               sampleCollectionTime: data.sampleCollectionTime || "",
@@ -449,8 +449,8 @@ export default function PCRReport({
               <tr>
                 <td className="border px-6 py-3 font-bold bg-gray-100">Farmer Name</td>
                 <td className="border px-6 py-3">{farmerInfo.farmerName || "-"}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Village</td>
-                <td className="border px-6 py-3">{farmerInfo.village || "-"}</td>
+                <td className="border px-6 py-3 font-bold bg-gray-100">Address</td>
+                <td className="border px-6 py-3">{farmerInfo.address || "-"}</td>
                 <td className="border px-6 py-3 font-bold bg-gray-100">Sample Collected</td>
                 <td className="border px-6 py-3">{farmerInfo.sampleCollectionTime || "-"}</td>
               </tr>

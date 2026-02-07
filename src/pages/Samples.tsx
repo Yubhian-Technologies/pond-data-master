@@ -490,7 +490,7 @@ const sortedInvoices = useMemo(() => {
                     </Select>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  {/* <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Users className="w-4 h-4 text-amber-600" />
                       <span className="font-medium">Submit as Tech:</span>
@@ -511,7 +511,7 @@ const sortedInvoices = useMemo(() => {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                  </div> */}
                 </div>
               </CardHeader>
 

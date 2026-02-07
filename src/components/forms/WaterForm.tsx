@@ -101,7 +101,7 @@ export default function WaterForm({
   });
 
   const [remarksAndRecommendations, setRemarksAndRecommendations] = useState("");
-  const [checkedBy, setCheckedBy] = useState("");  // ← NEW: Checked by name
+  const [checkedBy, setCheckedBy] = useState("");
 
   const emptyPond: Pond = {
     id: 1,
@@ -121,7 +121,24 @@ export default function WaterForm({
 
   const [ponds, setPonds] = useState<Pond[]>([]);
 
-  // Fetch invoice using query (matches LabResults and InvoicePage logic)
+ 
+  const testToPhysicoFields: Record<string, (keyof Pond)[]> = {
+    basic_water: [
+      "pH", "salinity", "co3", "hco3", "alkalinity", "hardness",
+      "ca", "mg",  "totalAmmonia", "unionizedAmmonia",
+       "nitrite",  "dissolvedOxygen",
+      
+    ],
+    potassium: ["k"],
+    sodium: ["na"],
+    iron: ["iron"],
+    chlorine: ["chlorine"],
+    nitrate: ["nitrate"],
+    h2s: ["h2s"],
+    tom: ["totalDissolvedMatter"],  
+  };
+
+  
   useEffect(() => {
     if (!locationId || !invoiceId) {
       console.warn("Missing locationId or invoiceId for WaterForm fetch");
@@ -132,11 +149,9 @@ export default function WaterForm({
       try {
         const invoicesRef = collection(db, "locations", locationId, "invoices");
 
-        // Try by 'invoiceId' field first (new invoices)
         let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
         let querySnapshot = await getDocs(q);
 
-        // Fallback to old 'id' field (legacy invoices)
         if (querySnapshot.empty) {
           q = query(invoicesRef, where("id", "==", invoiceId));
           querySnapshot = await getDocs(q);
@@ -222,6 +237,9 @@ export default function WaterForm({
     favella: "Favella",
   };
 
+  // ────────────────────────────────────────────────
+  // Load data + initialize ponds
+  // ────────────────────────────────────────────────
   useEffect(() => {
     const loadData = async () => {
       if (!localInvoice || !locationId || !invoiceId) {
@@ -356,20 +374,50 @@ export default function WaterForm({
     );
   };
 
+  // ────────────────────────────────────────────────
+  // Save with unselected physico-chemical fields set to "-"
+  // ────────────────────────────────────────────────
   const saveAllPonds = async () => {
     if (!localInvoice?.docId) {
       alert("Cannot save: Invoice not loaded or missing ID");
       return;
     }
 
-    const savePromises = ponds.map((pond, index) => {
+    const savePromises = ponds.map(async (pond, index) => {
+      const sampleNumber = index + 1;
+      const selectedIds = perSampleSelectedTests[sampleNumber] || [];
+
+      // Create a copy and reset unselected fields to "-"
+      const dataToSave = { ...pond };
+
+      // Reset all physico-chemical fields first
+      [
+        "pH", "salinity", "co3", "hco3", "alkalinity", "hardness",
+        "ca", "mg", "na", "k", "totalAmmonia", "unionizedAmmonia",
+        "h2s", "nitrite", "nitrate", "iron", "chlorine", "dissolvedOxygen",
+        "totalDissolvedMatter"
+      ].forEach(field => {
+        (dataToSave as any)[field] = "-";
+      });
+
+      // Only keep values for selected tests
+      selectedIds.forEach(testId => {
+        const fields = testToPhysicoFields[testId];
+        if (fields) {
+          fields.forEach(field => {
+            (dataToSave as any)[field] = pond[field] || "";
+          });
+        }
+      });
+
       const ref = doc(
         collection(db, "locations", locationId, "invoices", localInvoice.docId, "water_reports"),
-        `sample_${index + 1}`
+        `sample_${sampleNumber}`
       );
+
       return setDoc(ref, {
-        ...pond,
-        sampleNumber: index + 1,
+        ...dataToSave,
+        sampleNumber: sampleNumber,
         savedAt: new Date(),
         remarksAndRecommendations,
       }, { merge: true });
@@ -401,7 +449,7 @@ export default function WaterForm({
         sampleCollectionTime: formData.sampleCollectionTime,
         reportDate: formData.reportDate,
         reportTime: formData.reportTime,
-        checkedBy: checkedBy.trim() || "N/A",  // ← NEW: save checkedBy to invoice
+        checkedBy: checkedBy.trim() || "N/A",
       });
 
       onSubmit();
@@ -461,6 +509,40 @@ export default function WaterForm({
           .map(id => testNameMap[id] || id)
           .filter(Boolean);
 
+        // Determine which physico-chemical fields should be shown
+        const enabledFields = new Set<string>();
+
+        sampleSelectedIds.forEach(testId => {
+          const fields = testToPhysicoFields[testId];
+          if (fields) {
+            fields.forEach(f => enabledFields.add(f));
+          }
+        });
+
+        // Always show pondNo
+        const physicoParams = [
+          { key: "pondNo" as keyof Pond, label: "Pond No." },
+          { key: "pH" as keyof Pond, label: "pH" },
+          { key: "salinity" as keyof Pond, label: "Salinity (PPT)" },
+          { key: "co3" as keyof Pond, label: "CO₃" },
+          { key: "hco3" as keyof Pond, label: "HCO₃" },
+          { key: "alkalinity" as keyof Pond, label: "Alkalinity" },
+          { key: "hardness" as keyof Pond, label: "Hardness" },
+          { key: "ca" as keyof Pond, label: "Calcium (Ca)" },
+          { key: "mg" as keyof Pond, label: "Magnesium (Mg)" },
+          { key: "na" as keyof Pond, label: "Sodium (Na)" },
+          { key: "k" as keyof Pond, label: "Potassium (K)" },
+          { key: "totalAmmonia" as keyof Pond, label: "Total Ammonia" },
+          { key: "unionizedAmmonia" as keyof Pond, label: "Un-ionized NH₃" },
+          { key: "h2s" as keyof Pond, label: "H₂S (ppm)" },
+          { key: "nitrite" as keyof Pond, label: "Nitrite" },
+          { key: "nitrate" as keyof Pond, label: "Nitrate" },
+          { key: "iron" as keyof Pond, label: "Iron" },
+          { key: "chlorine" as keyof Pond, label: "Chlorine" },
+          { key: "dissolvedOxygen" as keyof Pond, label: "DO (ppm)" },
+          { key: "totalDissolvedMatter" as keyof Pond, label: "TDM (ppm)" },
+        ].filter(item => item.key === "pondNo" || enabledFields.has(item.key));
+
         return (
           <div key={pond.id} className="mb-12">
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
@@ -491,33 +573,12 @@ export default function WaterForm({
               </h3>
 
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {([
-                  { key: "pondNo", label: "Pond No." },
-                  { key: "pH", label: "pH" },
-                  { key: "salinity", label: "Salinity (PPT)" },
-                  { key: "co3", label: "CO₃" },
-                  { key: "hco3", label: "HCO₃" },
-                  { key: "alkalinity", label: "Alkalinity" },
-                  { key: "hardness", label: "Hardness" },
-                  { key: "ca", label: "Calcium (Ca)" },
-                  { key: "mg", label: "Magnesium (Mg)" },
-                  { key: "na", label: "Sodium (Na)" },
-                  { key: "k", label: "Potassium (K)" },
-                  { key: "totalAmmonia", label: "Total Ammonia" },
-                  { key: "unionizedAmmonia", label: "Un-ionized NH₃" },
-                  { key: "h2s", label: "H₂S (ppm)" },
-                  { key: "nitrite", label: "Nitrite" },
-                  { key: "nitrate", label: "Nitrate" },
-                  { key: "iron", label: "Iron" },
-                  { key: "chlorine", label: "Chlorine" },
-                  { key: "dissolvedOxygen", label: "DO (ppm)" },
-                  { key: "totalDissolvedMatter", label: "TDM (ppm)" },
-                ] as const).map(({ key, label }) => (
+                {physicoParams.map(({ key, label }) => (
                   <div key={key}>
                     <label className="block text-xs font-medium mb-1">{label}</label>
                     <input
                       type="text"
-                      value={pond[key]}
+                      value={pond[key] || ""}
                       onChange={(e) => handlePondChange(pond.id, key, e.target.value)}
                       className="w-full border border-gray-400 rounded px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
                       placeholder={key === "pondNo" ? "e.g. P1" : ""}
@@ -624,7 +685,6 @@ export default function WaterForm({
         />
       </div>
 
-      {/* NEW: Checked by input field */}
       <div className="mb-12 max-w-md mx-auto">
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by
@@ -645,7 +705,7 @@ export default function WaterForm({
           className="bg-green-600 text-white px-8 py-4 rounded-lg hover:bg-green-700 font-semibold text-lg"
         >
           Complete & Generate Report
-        </button>
+        </button> 
       </div>
     </div>
   );

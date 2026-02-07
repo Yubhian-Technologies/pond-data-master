@@ -11,11 +11,11 @@ import {
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import { useNavigate } from "react-router-dom";
-import { useUserSession } from "../../contexts/UserSessionContext";  // ← Added
+import { useUserSession } from "../../contexts/UserSessionContext";
 
 interface FarmerInfo {
   farmerName: string;
-  village: string;
+  address: string;          // ← Changed from village to address
   mobile: string;
   farmerId: string;
   sampleCollectionTime: string;
@@ -49,8 +49,8 @@ export default function PCRForm({
   locationId,
   onSubmit,
 }: PCRFormProps) {
-  const { session } = useUserSession();  // ← Added
-  const technicianName = session?.technicianName || "";  // ← Added
+  const { session } = useUserSession();
+  const technicianName = session?.technicianName || "";
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -70,7 +70,7 @@ export default function PCRForm({
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
     farmerName: "",
-    village: "",
+    address: "",                // ← Changed from village
     mobile: "",
     farmerId: "—",
     sampleCollectionTime: today,
@@ -85,7 +85,7 @@ export default function PCRForm({
   const [uploading, setUploading] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [checkedBy, setCheckedBy] = useState(technicianName);  // ← NEW: Checked by
+  const [checkedBy, setCheckedBy] = useState(technicianName);
 
   const PATHOGEN_NAME_MAP: Record<string, string> = {
     pl_ehp: "PL EHP",
@@ -159,7 +159,7 @@ export default function PCRForm({
             farmerId: farmer.farmerId || "",   
             farmerName: farmer.name || prev.farmerName,
             mobile: farmer.phone || prev.mobile,
-            village: farmer.city || prev.village
+            address: farmer.address || prev.address   // ← Changed: use address from master
           }));
         }
       } catch (err) {
@@ -225,7 +225,7 @@ export default function PCRForm({
               setGelImages((prev) => ({ ...prev, [i]: data.gelImageUrl }));
             }
 
-            // Load checkedBy from first saved sample (simple approach)
+            // Load checkedBy from first saved sample
             if (i === 1 && data.checkedBy) {
               firstCheckedBy = data.checkedBy;
             }
@@ -248,7 +248,7 @@ export default function PCRForm({
         }
 
         setSamplesData(loadedSamples);
-        setCheckedBy(firstCheckedBy);  // Apply loaded value
+        setCheckedBy(firstCheckedBy);
       } catch (err) {
         console.error("Error loading PCR data:", err);
       } finally {
@@ -348,7 +348,7 @@ export default function PCRForm({
           pathogens: sample.pathogens,
           gelImageUrl: gelImages[sampleNum] || "",
           updatedAt: new Date().toISOString(),
-          checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← NEW
+          checkedBy: checkedBy.trim() || technicianName || "N/A",
         }, { merge: true });
       });
 
@@ -404,6 +404,8 @@ export default function PCRForm({
                   ? "Days Difference"
                   : key === "noOfSamples"
                   ? "No. of Samples"
+                  : key === "address"
+                  ? "Address"                // ← Changed label
                   : key.replace(/([A-Z])/g, " $1").trim()}
               </label>
 
@@ -577,7 +579,7 @@ export default function PCRForm({
         );
       })}
 
-      {/* NEW: Checked by input */}
+      {/* Checked by input */}
       <div className="mb-12 max-w-md mx-auto">
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by

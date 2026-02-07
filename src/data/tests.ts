@@ -14,7 +14,6 @@ export const availableTests = [
   { id: "nitrate", name: "Analysis of Nitrate (NO3)", price: 50, sampleType: "water" as const, category: "WATER ANALYSIS" },
   { id: "h2s", name: "Analysis of H2S (Hydrogen Sulphide)", price: 100, sampleType: "water" as const, category: "WATER ANALYSIS" },
   { id: "vibrio", name: "Analysis Vibrio Plating (Green/Yellow)", price: 50, sampleType: "water" as const, category: "WATER ANALYSIS" },
-  { id: "pl_vibrio", name: "Analysis of PL/Animal Tissue Vibrio Plating (Green/Yellow)", price: 50, sampleType: "water" as const, category: "WATER ANALYSIS" },
 
   // Rt-q PCR ANALYSIS
   { id: "pl_general", name: "Post larvae General Analysis", price: 100, sampleType: "pl" as const, category: "Rt-q PCR ANALYSIS" },
@@ -28,8 +27,8 @@ export const availableTests = [
   //  MICROBIOLOGY TESTS
   {
     id: "micro_vibrio_plating",
-    name: "Vibrio Plating (Yellow & Green Colonies)",
-    price: 50.00,
+    name: "Analysis of PL/Animal Tissue Vibrio Plating (Green/Yellow)",
+    price: 100.00,
     sampleType: "microbiology" as const,
     category: "MICROBIOLOGY",
   },
@@ -40,13 +39,7 @@ export const availableTests = [
     sampleType: "microbiology" as const,
     category: "MICROBIOLOGY",
   },
-  {
-    id: "micro_seed_vibrio",
-    name: "Seed Vibrio Plating",
-    price: 100.00,
-    sampleType: "microbiology" as const,
-    category: "MICROBIOLOGY",
-  },
+  
   {
     id:"wssv",
     name:"WSSV Rapid Test analysis",

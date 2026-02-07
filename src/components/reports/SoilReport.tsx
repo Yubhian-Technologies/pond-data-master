@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { Printer } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import { Printer, Download } from "lucide-react";
 import { useParams } from "react-router-dom";
+import html2canvas from "html2canvas";
 import {
   doc,
   getDoc,
@@ -10,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
+
 import AV from "@/assets/AV.jpg";
 import ADC from "@/assets/ADC.jpg";
 
@@ -54,6 +56,8 @@ const SoilReport: React.FC<SoilReportProps> = ({
   const invoiceId = propInvoiceId || routeParams.invoiceId;
   const locationId = propLocationId || routeParams.locationId;
 
+  const reportRef = useRef<HTMLDivElement>(null);
+
   const [locationDetails, setLocationDetails] = useState<{
     address: string;
     email: string;
@@ -87,142 +91,139 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
   const handlePrint = () => window.print();
 
+  
+
   useEffect(() => {
-  const fetchData = async () => {
-    try {
-      if (!invoiceId || !locationId) return;
+    const fetchData = async () => {
+      try {
+        if (!invoiceId || !locationId) return;
 
-      // Fetch report data (soil-specific fields)
-      const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
-      const reportSnap = await getDoc(reportRef);
+        // Fetch report data (soil-specific fields)
+        const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
+        const reportSnap = await getDoc(reportRef);
 
-      let technicianName = "";
-      let soilType = "";
-      let sourceOfSoil = "";
-      let sampleCollectionTime = "-";
-      let sampleTime = "-";
-      let reportTime = new Date().toTimeString().slice(0, 5);
-      let savedSampleDate = ""; // ← from saved report
+        let technicianName = "";
+        let soilType = "";
+        let sourceOfSoil = "";
+        let sampleCollectionTime = "-";
+        let sampleTime = "-";
+        let reportTime = new Date().toTimeString().slice(0, 5);
+        let savedSampleDate = "";
 
-      if (reportSnap.exists()) {
-        const data = reportSnap.data();
-        technicianName = data?.technicianName || "";
-        soilType = data?.soilType || "";
-        sourceOfSoil = data?.sourceOfSoil || "";
-        sampleCollectionTime = data?.sampleCollectionTime || "-";
-        sampleTime = data?.sampleTime || "-";
-        reportTime = data?.reportTime || reportTime;
-        savedSampleDate = data?.sampleDate || ""; // ← saved value has priority
-      }
-
-      // Fetch invoice data — supports both new and old invoices
-      const invoicesRef = collection(db, "locations", locationId, "invoices");
-      let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
-      let snapshot = await getDocs(q);
-
-      // Fallback for old invoices that used 'id' field
-      if (snapshot.empty) {
-        q = query(invoicesRef, where("id", "==", invoiceId));
-        snapshot = await getDocs(q);
-      }
-
-      if (snapshot.empty) {
-        console.log("Invoice not found for invoiceId:", invoiceId);
-        setLoading(false);
-        return;
-      }
-
-      const invoiceDoc = snapshot.docs[0];
-      const data = invoiceDoc.data();
-
-      const calculatedSoilCount =
-        data.sampleType
-          ?.filter((s: any) => s.type?.toLowerCase() === "soil")
-          .reduce((sum: number, item: any) => sum + Number(item.count || 0), 0) || 0;
-
-      const displaySampleCount = allSampleCount > 0 ? allSampleCount : calculatedSoilCount;
-
-      // Priority for sampleDate: saved report → invoice.dateOfCulture → today
-      const finalSampleDate =
-        savedSampleDate ||
-        data.dateOfCulture ||
-        data.sampleDate ||
-        data.formattedDate ||
-        (data.createdAt?.toDate?.()?.toISOString().split("T")[0]) ||
-        new Date().toISOString().split("T")[0];
-
-      // Set initial form data from invoice + saved report
-      setFormData((prev) => ({
-        ...prev,
-        reportedBy: technicianName || "",
-        checkedBy: "",
-        farmerName: data.farmerName || "",
-        farmerUID: data.farmerId || "",
-        farmerAddress: data.village || data.farmerAddress || "",
-        mobile: data.farmerPhone || data.mobile || "",
-        noOfSamples: displaySampleCount.toString(),
-        sampleDate: finalSampleDate,           // ← now correctly prioritized
-        reportDate: new Date().toISOString().split("T")[0],
-        soilType,
-        sourceOfSoil,
-        sampleCollectionTime,
-        sampleTime,
-        reportTime,
-      }));
-      
-      setCheckedByName(data.checkedBy || "________________");
-
-      // Fetch REAL formatted farmerId from farmer document (overrides temp value)
-      if (data.farmerId) {
-        const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
-        const farmerSnap = await getDoc(farmerRef);
-
-        if (farmerSnap.exists()) {
-          const farmerData = farmerSnap.data();
-
-          setFormData((prev) => ({
-            ...prev,
-            farmerUID: farmerData.farmerId || prev.farmerUID,  // correct formatted ID
-            farmerAddress: [farmerData.address, farmerData.city, farmerData.state]
-              .filter(Boolean)
-              .join(", ") || prev.farmerAddress,
-            mobile: farmerData.phone || prev.mobile,
-          }));
+        if (reportSnap.exists()) {
+          const data = reportSnap.data();
+          technicianName = data?.technicianName || "";
+          soilType = data?.soilType || "";
+          sourceOfSoil = data?.sourceOfSoil || "";
+          sampleCollectionTime = data?.sampleCollectionTime || "-";
+          sampleTime = data?.sampleTime || "-";
+          reportTime = data?.reportTime || reportTime;
+          savedSampleDate = data?.sampleDate || "";
         }
+
+        // Fetch invoice data — supports both new and old invoices
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          snapshot = await getDocs(q);
+        }
+
+        if (snapshot.empty) {
+          console.log("Invoice not found for invoiceId:", invoiceId);
+          setLoading(false);
+          return;
+        }
+
+        const invoiceDoc = snapshot.docs[0];
+        const data = invoiceDoc.data();
+
+        const calculatedSoilCount =
+          data.sampleType
+            ?.filter((s: any) => s.type?.toLowerCase() === "soil")
+            .reduce((sum: number, item: any) => sum + Number(item.count || 0), 0) || 0;
+
+        const displaySampleCount = allSampleCount > 0 ? allSampleCount : calculatedSoilCount;
+
+        const finalSampleDate =
+          savedSampleDate ||
+          data.dateOfCulture ||
+          data.sampleDate ||
+          data.formattedDate ||
+          (data.createdAt?.toDate?.()?.toISOString().split("T")[0]) ||
+          new Date().toISOString().split("T")[0];
+
+        setFormData((prev) => ({
+          ...prev,
+          reportedBy: technicianName || "",
+          checkedBy: "",
+          farmerName: data.farmerName || "",
+          farmerUID: data.farmerId || "",
+          farmerAddress: data.village || data.farmerAddress || "",
+          mobile: data.farmerPhone || data.mobile || "",
+          noOfSamples: displaySampleCount.toString(),
+          sampleDate: finalSampleDate,
+          reportDate: new Date().toISOString().split("T")[0],
+          soilType,
+          sourceOfSoil,
+          sampleCollectionTime,
+          sampleTime,
+          reportTime,
+        }));
+        
+        setCheckedByName(data.checkedBy || "________________");
+
+        if (data.farmerId) {
+          const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
+          const farmerSnap = await getDoc(farmerRef);
+
+          if (farmerSnap.exists()) {
+            const farmerData = farmerSnap.data();
+
+            setFormData((prev) => ({
+              ...prev,
+              farmerUID: farmerData.farmerId || prev.farmerUID,
+              farmerAddress: [farmerData.address, farmerData.city, farmerData.state]
+                .filter(Boolean)
+                .join(", ") || prev.farmerAddress,
+              mobile: farmerData.phone || prev.mobile,
+            }));
+          }
+        }
+
+        const samplesRef = collection(
+          db,
+          "locations",
+          locationId,
+          "reports",
+          invoiceId,
+          "soil samples"
+        );
+
+        const sampleSnap = await getDocs(samplesRef);
+        const list = sampleSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+
+        const formattedSamples = list.map((s: any, i: number) => ({
+          id: s.id,
+          ...s,
+          pondNo: s.pondNo || `Sample ${i + 1}`,
+        }));
+
+        setSamples(formattedSamples);
+      } catch (error) {
+        console.error("Error loading soil report:", error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      // Fetch soil samples
-      const samplesRef = collection(
-        db,
-        "locations",
-        locationId,
-        "reports",
-        invoiceId,
-        "soil samples"
-      );
-
-      const sampleSnap = await getDocs(samplesRef);
-      const list = sampleSnap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
-
-      const formattedSamples = list.map((s: any, i: number) => ({
-        id: s.id,
-        ...s,
-        pondNo: s.pondNo || `Sample ${i + 1}`,
-      }));
-
-      setSamples(formattedSamples);
-    } catch (error) {
-      console.error("Error loading soil report:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchData();
-}, [invoiceId, locationId, allSampleCount]);
+    fetchData();
+  }, [invoiceId, locationId, allSampleCount]);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -253,16 +254,18 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
   return (
     <>
-      <div className="mb-6 print:hidden text-center">
+      <div className="mb-6 print:hidden flex justify-center gap-4">
         <button
           onClick={handlePrint}
-          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 mx-auto"
+          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
         >
-          <Printer size={20} /> Print Report
+          <Printer size={20} /> Print Report (PDF)
         </button>
+
+        
       </div>
 
-      <div className="bg-white" id="report">
+      <div ref={reportRef} className="bg-white" id="report">
         <div className="flex justify-between items-start mb-8 border-b-2 border-black">
           <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
           <div className="text-center flex-1">
@@ -278,46 +281,84 @@ const SoilReport: React.FC<SoilReportProps> = ({
             <p className="text-sm text-black">
               GSTIN: - 37AABCT0601L1ZJ
             </p>
-            
           </div>
           <img src={AV} alt="AV Logo" className="w-40 object-contain" />
         </div>
 
-       
-       <div className="text-center m-5">
-        <h2 className="text-2xl font-bold text-red-600 mt-3">
-              Soil Analysis Report
-            </h2>
-       </div>
-
-        <div className="grid grid-cols-10 gap-0 text-sm mb-6 border border-black">
-          <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Name</div>
-          <div className="col-span-2 border-r border-black p-0.5">{formData.farmerName || "-"}</div>
-          <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">Mobile</div>
-          <div className="col-span-1 border-r border-black p-0.5">{formData.mobile || "-"}</div>
-          <div className="col-span-1 border-r border-black p-0.5 text-start font-semibold bg-gray-100">Soil Type</div>
-          <div className="col-span-1 border-r border-black p-0.5">{formData.soilType || "-"}</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Sample Collection Time</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sampleCollectionTime || "-"}</div>
-
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Farmer UID</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5">{formData.farmerUID || "-"}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Farmer Address </div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.farmerAddress || "-"}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Sample Date</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sampleDate || "-"}</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Source of Soil</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.sourceOfSoil|| "-"}</div>
-
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Report Id</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5">{invoiceId || "-"}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">No.of Samples</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.noOfSamples}</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Report Date</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.reportDate}</div>
-          <div className="col-span-2 border-r border-t border-black p-0.5 text-start font-semibold bg-gray-100">Report Time</div>
-          <div className="col-span-1 border-r border-t border-black p-0.5">{formData.reportTime}</div>
+        <div className="text-center m-5">
+          <h2 className="text-2xl font-bold text-red-600 mt-3">
+            Soil Analysis Report
+          </h2>
         </div>
+
+       <div className="grid grid-cols-6 gap-0 text-sm mb-6 border border-black">
+  {/* Row 1 */}
+  <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
+    Farmer Name
+  </div>
+  <div className="col-span-1 border-r border-black p-1 break-words whitespace-normal">
+    {formData.farmerName || "-"}
+  </div>
+
+  <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
+    Mobile
+  </div>
+  <div className="col-span-1 border-r border-black p-1">
+    {formData.mobile || "-"}
+  </div>
+
+  <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
+    Sample Date
+  </div>
+  <div className="col-span-1 border-black p-1">
+    {formData.sampleDate || "-"}
+  </div>
+
+  {/* Row 2 */}
+  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+    Farmer UID
+  </div>
+  <div className="col-span-1 border-r border-t border-black p-1">
+    {formData.farmerUID || "-"}
+  </div>
+
+  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+    Farmer Address
+  </div>
+  <div className="col-span-1 border-r border-t border-black p-1 break-words whitespace-normal">
+    {formData.farmerAddress || "-"}
+  </div>
+
+  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+    Sample Collection Time
+  </div>
+  <div className="col-span-1 border-t border-black p-1">
+    {formData.sampleCollectionTime || "-"}
+  </div>
+
+  {/* Row 3 */}
+  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+    Report Id
+  </div>
+  <div className="col-span-1 border-t border-black p-1">
+    {invoiceId || "-"}
+  </div>
+  
+
+  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+    Source of Soil
+  </div>
+  <div className="col-span-1 border-r border-t border-black p-1">
+    {formData.sourceOfSoil || "-"}
+  </div>
+
+  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+    No. of Samples
+  </div>
+  <div className="col-span-1 border-r border-t border-black p-1">
+    {formData.noOfSamples || "-"}
+  </div>
+</div>
 
         <table className="w-full mb-4 text-xs" style={{ border: '2px solid #1f2937' }}>
           <thead>
@@ -387,7 +428,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
   @media print {
     @page {
       size: A4 landscape;
-      margin: 0.4cm 0.5cm;
+      margin: 1cm 1.2cm;           /* Slightly larger page margins overall */
     }
 
     html, body {
@@ -413,40 +454,55 @@ const SoilReport: React.FC<SoilReportProps> = ({
       position: absolute !important;
       left: 0 !important;
       top: 0 !important;
-      width: 297mm !important;
-      height: 210mm !important;
+      width: 100% !important;
+      height: auto !important;
       padding: 0 !important;
       margin: 0 !important;
       box-sizing: border-box !important;
       background: white !important;
     }
 
-    #report > div,
-    #report table,
-    #report .grid {
-      width: 100% !important;
-      max-width: none !important;
-      margin: 0 0 6px 0 !important;
-      padding: 0 !important;
+    /* ────────────────────────────────────────────────
+       KEY CHANGES: Increased spacing between major sections
+    ──────────────────────────────────────────────── */
+
+    #report > div.mb-8,               /* Farmer info grid */
+    #report > div.mb-6,
+    #report > table.mb-4,             /* Soil analysis table */
+    #report > div.mb-4,               /* Note section */
+    #report > div.text-center {       /* Final footer text */
+      margin-bottom: 24px !important; /* ← increased from 12px to 24px */
+    }
+
+    /* Extra spacing specifically between Farmer grid and Soil table */
+    .grid.mb-6 + table.mb-4 {
+      margin-top: 20px !important;
+    }
+
+    /* Extra spacing before/after Note section */
+    div[style*="border: '2px solid #1f2937'"] {
+      margin-top: 20px !important;
+      margin-bottom: 24px !important;
     }
 
     table {
       table-layout: fixed;
       width: 100% !important;
-      font-size: 9.5px !important; /* ← little smaller to fit better in landscape */
+      margin-bottom: 24px !important;  /* ← increased from 16px to 24px */
+      font-size: 9.5px !important;
+      border-collapse: collapse !important;
+    }
+
+    tr {
+      page-break-inside: avoid;
     }
 
     .print\\:hidden {
       display: none !important;
     }
 
-    /* Optional: make header a bit more compact */
-    h1 {
-      font-size: 2.1rem !important;
-    }
-    h2 {
-      font-size: 1.5rem !important;
-    }
+    h1 { font-size: 2.1rem !important; }
+    h2 { font-size: 1.5rem !important; }
   }
 `}</style>
     </>

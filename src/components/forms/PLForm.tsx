@@ -11,11 +11,11 @@ import {
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import { useNavigate } from "react-router-dom";
-import { useUserSession } from "../../contexts/UserSessionContext";  // ← Added import
+import { useUserSession } from "../../contexts/UserSessionContext";
 
 interface FarmerInfo {
   farmerName: string;
-  village: string;
+  address: string;          // ← Changed from village to address
   mobile: string;
   sampleDate: string;
   sampleTime: string;
@@ -35,8 +35,8 @@ export default function PLForm({
   locationId,
   onSubmit,
 }: PLFormProps) {
-  const { session } = useUserSession();  // ← Added
-  const technicianName = session?.technicianName || "";  // ← Added
+  const { session } = useUserSession();
+  const technicianName = session?.technicianName || "";
 
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
   const currentTime = useMemo(() => new Date().toTimeString().slice(0, 5), []);
@@ -76,7 +76,7 @@ export default function PLForm({
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
     farmerName: "",
-    village: "",
+    address: "",          // ← Changed from village
     mobile: "",
     sampleDate: today,
     sampleTime: "",
@@ -93,7 +93,7 @@ export default function PLForm({
   // Read-only display field
   const [farmerUID, setFarmerUID] = useState<string>("");
 
-  const [checkedBy, setCheckedBy] = useState(technicianName);  // ← NEW: Checked by
+  const [checkedBy, setCheckedBy] = useState(technicianName);
 
   // Fetch invoice
   useEffect(() => {
@@ -154,7 +154,7 @@ export default function PLForm({
             setFarmerInfo((prev) => ({
               ...prev,
               farmerName: farmerData.name || prev.farmerName || "",
-              village: farmerData.city || prev.village || "",
+              address: farmerData.address || prev.address || "",          // ← Changed: use address
               mobile: farmerData.phone || prev.mobile || "",
               sampleDate: localInvoice.dateOfCulture || today,
               farmerId: loadedFarmerId,
@@ -184,7 +184,7 @@ export default function PLForm({
           if (data.farmerInfo) {
             setFarmerInfo({
               farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
-              village: data.farmerInfo.village || farmerInfo.village,
+              address: data.farmerInfo.address || farmerInfo.address,          // ← Changed
               mobile: data.farmerInfo.mobile || farmerInfo.mobile,
               sampleDate: data.farmerInfo.sampleDate || localInvoice?.dateOfCulture || today,
               sampleTime: data.farmerInfo.sampleTime || "",
@@ -198,7 +198,7 @@ export default function PLForm({
             setSampleType(data.sampleType);
           }
 
-          // IMPORTANT: use the correct 'count' here (not totalSamples state yet)
+          // IMPORTANT: use the correct 'count' here
           const savedPlData = data.plData || {};
           const normalized: any = {};
 
@@ -208,7 +208,7 @@ export default function PLForm({
 
           finalPlData = normalized;
 
-          // ← NEW: Load checkedBy if saved in PL report data
+          // Load checkedBy if saved
           if (data.checkedBy) {
             setCheckedBy(data.checkedBy);
           }
@@ -274,12 +274,12 @@ export default function PLForm({
           totalSamples,
           sampleType,
           updatedAt: new Date().toISOString(),
-          checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← NEW: save checkedBy here
+          checkedBy: checkedBy.trim() || technicianName || "N/A",
         },
         { merge: true }
       );
 
-      // Also save to invoice document (consistent with other forms)
+      // Also save to invoice document
       const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
       await updateDoc(invoiceRef, {
         checkedBy: checkedBy.trim() || technicianName || "N/A",
@@ -341,11 +341,11 @@ export default function PLForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Village</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>  {/* ← Changed from Village */}
             <input
               className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
-              value={farmerInfo.village}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, village: e.target.value })}
+              value={farmerInfo.address}                                           
+              onChange={(e) => setFarmerInfo({ ...farmerInfo, address: e.target.value })}  
             />
           </div>
           <div>
@@ -450,7 +450,7 @@ export default function PLForm({
         ))}
       </section>
 
-      {/* NEW: Checked by input */}
+      {/* Checked by input */}
       <div className="mb-10 max-w-md mx-auto">
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by

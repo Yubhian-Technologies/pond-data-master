@@ -1,6 +1,4 @@
-
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   doc, 
   getDoc, 
@@ -12,12 +10,14 @@ import {
 import { db } from "../../pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
-import { Printer } from "lucide-react";
+import { Printer, Download } from "lucide-react";
 import { useUserSession } from "@/contexts/UserSessionContext";
+import * as htmlToImage from 'html-to-image';
+import { saveAs } from 'file-saver';
 
 interface FarmerInfo {
   farmerName: string;
-  village: string;
+  address: string;
   mobile: string;
   sampleDate: string;
   sampleTime: string;
@@ -77,6 +77,7 @@ export default function PLReport({
   });
 
   const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchRealDocId = async () => {
@@ -110,6 +111,9 @@ export default function PLReport({
 
     fetchRealDocId();
   }, [invoiceId, locationId]);
+  const handlePrint = () => {
+    window.print();
+  };
 
   useEffect(() => {
     const fetchPLReport = async () => {
@@ -142,7 +146,7 @@ export default function PLReport({
           const savedFarmerInfo = data.farmerInfo || {};
           setFarmerInfo({
             farmerName: savedFarmerInfo.farmerName || "-",
-            village: savedFarmerInfo.village || "-",
+            address: savedFarmerInfo.address || "-",
             mobile: savedFarmerInfo.mobile || "-",
             sampleDate: savedFarmerInfo.sampleDate || "-",
             sampleTime: savedFarmerInfo.sampleTime || "-",
@@ -201,7 +205,7 @@ export default function PLReport({
 
           setFarmerInfo({
             farmerName: "-",
-            village: "-",
+            address: "-",
             mobile: "-",
             sampleDate: "-",
             sampleTime: "-",
@@ -210,15 +214,15 @@ export default function PLReport({
           });
         }
 
-const invoiceRef = doc(db, "locations", locationId, "invoices", realInvoiceDocId);
-const invoiceSnap = await getDoc(invoiceRef);
+        const invoiceRef = doc(db, "locations", locationId, "invoices", realInvoiceDocId!);
+        const invoiceSnap = await getDoc(invoiceRef);
 
-if (invoiceSnap.exists()) {
-  const invoiceData = invoiceSnap.data();
-  setCheckedByName(invoiceData.checkedBy || "______________________");
-} else {
-  setCheckedByName("______________________");
-}
+        if (invoiceSnap.exists()) {
+          const invoiceData = invoiceSnap.data();
+          setCheckedByName(invoiceData.checkedBy || "______________________");
+        } else {
+          setCheckedByName("______________________");
+        }
       } catch (err) {
         console.error("Error fetching PL report:", err);
       } finally {
@@ -253,7 +257,9 @@ if (invoiceSnap.exists()) {
     fetchLocationDetails();
   }, [locationId]);
 
-  const handlePrint = () => window.print();
+  
+
+  
 
   if (loading) return <p className="text-center py-8 text-lg">Loading Report...</p>;
   if (!plData || !farmerInfo) return <p className="text-center py-8 text-red-600 text-xl">No PL report found.</p>;
@@ -274,10 +280,8 @@ if (invoiceSnap.exists()) {
     { label: "Fouling - Appendages", key: "foulAppend" },
     { label: "Fouling - Gill", key: "foulGill" },
     { label: "Fouling - Abdomen", key: "foulAbdomen" },
-    // Stress Test items grouped under blue header
     { label: "Stress Tank Salinity", key: "stressTankSalinity" },
     { label: "Salinity Test %", key: "salinityPercent" },
-    // Total Score with blue background
     { label: "Total Score", key: "totalScore" },
   ];
 
@@ -310,16 +314,18 @@ if (invoiceSnap.exists()) {
         .print-only { display: none; }
       `}</style>
 
-      <div className="rounded-lg p-8" id="pl-report">
-        <div className="mb-5 print:hidden">
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
-          >
-            <Printer size={20} /> Print Report
-          </button>
-        </div>
+      <div className="flex gap-4 mb-6 print:hidden">
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+        >
+          <Printer size={20} /> Print Report
+        </button>
 
+       
+      </div>
+
+      <div ref={reportRef} className="rounded-lg p-8 bg-white" id="pl-report">
         <div className="flex justify-between items-start mb-8 border-b-2 border-black">
           <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
           <div className="text-center flex-1">
@@ -344,8 +350,8 @@ if (invoiceSnap.exists()) {
               <tr>
                 <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer Name</td>
                 <td className="border px-4 py-2">{farmerInfo.farmerName}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Village</td>
-                <td className="border px-4 py-2">{farmerInfo.village}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2">Address</td>
+                <td className="border px-4 py-2">{farmerInfo.address}</td>
                 <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Date</td>
                 <td className="border px-4 py-2">{farmerInfo.sampleDate}</td>
               </tr>
@@ -375,7 +381,10 @@ if (invoiceSnap.exists()) {
           </h2>
         </div>
 
-        <div className="flex justify-center overflow-x-auto">
+        <div 
+          className="flex justify-center overflow-x-auto"
+          style={{ overflowX: 'hidden', maxWidth: '100%' }}  // ← added to help jpeg capture
+        >
           <table className="inline-table border-2 border-gray-800 text-xs whitespace-nowrap">
             <thead>
               <tr className="bg-blue-100">
@@ -388,57 +397,56 @@ if (invoiceSnap.exists()) {
               </tr>
             </thead>
             <tbody>
-  {plRows.map((row) => (
-    <React.Fragment key={row.key}>
-      <tr
-        className={row.key === "totalScore" ? "bg-blue-100" : ""}
-      >
-        <td 
-          className={`border px-4 py-2 font-semibold ${
-            row.key === "totalScore" 
-              ? "bg-blue-100" 
-              : "bg-gray-50"
-          }`}
-        >
-          {row.label}
-        </td>
-        {plData[row.key].map((val, i) => (
-          <td 
-            key={i} 
-            className={`border px-4 py-2 text-center ${
-              row.key === "totalScore" ? "bg-blue-100" : ""  
-            }`}
-          >
-            {val || "-"}
-          </td>
-        ))}
-      </tr>
+              {plRows.map((row) => (
+                <React.Fragment key={row.key}>
+                  <tr
+                    className={row.key === "totalScore" ? "bg-blue-100" : ""}
+                  >
+                    <td 
+                      className={`border px-4 py-2 font-semibold ${
+                        row.key === "totalScore" 
+                          ? "bg-blue-100" 
+                          : "bg-gray-50"
+                      }`}
+                    >
+                      {row.label}
+                    </td>
+                    {plData[row.key].map((val, i) => (
+                      <td 
+                        key={i} 
+                        className={`border px-4 py-2 text-center ${
+                          row.key === "totalScore" ? "bg-blue-100" : ""  
+                        }`}
+                      >
+                        {val || "-"}
+                      </td>
+                    ))}
+                  </tr>
 
-      {/* Blue section headers */}
-      {row.key === "shg" && (
-        <tr className="bg-blue-200">
-          <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-            Necrosis
-          </td>
-        </tr>
-      )}
-      {row.key === "necMuscle" && (
-        <tr className="bg-blue-200">
-          <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-            Fouling
-          </td>
-        </tr>
-      )}
-      {row.key === "foulAbdomen" && (
-        <tr className="bg-blue-200">
-          <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-            Stress Test
-          </td>
-        </tr>
-      )}
-    </React.Fragment>
-  ))}
-</tbody>
+                  {row.key === "shg" && (
+                    <tr className="bg-blue-200">
+                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                        Necrosis
+                      </td>
+                    </tr>
+                  )}
+                  {row.key === "necMuscle" && (
+                    <tr className="bg-blue-200">
+                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                        Fouling
+                      </td>
+                    </tr>
+                  )}
+                  {row.key === "foulAbdomen" && (
+                    <tr className="bg-blue-200">
+                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                        Stress Test
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
           </table>
         </div>
 

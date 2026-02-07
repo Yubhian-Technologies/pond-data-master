@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { Printer } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import { Printer, Download } from "lucide-react";
 import { useParams } from "react-router-dom";
+import html2canvas from "html2canvas";
 import {
   doc,
   getDoc,
@@ -10,7 +11,6 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
-
 
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
@@ -107,6 +107,8 @@ const WaterReport: React.FC<WaterReportProps> = ({
   const invoiceId = propInvoiceId || routeParams.invoiceId;
   const locationId = propLocationId || routeParams.locationId;
 
+  const reportRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState({
     farmerName: "",
     mobile: "",
@@ -138,7 +140,8 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
   const handlePrint = () => window.print();
 
-  // Fetch real invoice docId
+  
+  // Fetch real invoice docId (unchanged)
   useEffect(() => {
     const fetchInvoiceDocId = async () => {
       if (!invoiceId || !locationId) {
@@ -172,7 +175,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
     fetchInvoiceDocId();
   }, [invoiceId, locationId]);
 
-  // Fetch data using real docId
+  // Fetch data using real docId (unchanged)
   useEffect(() => {
     const fetchData = async () => {
       if (!realInvoiceDocId || !locationId) {
@@ -183,7 +186,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
       try {
         setLoading(true);
 
-        // Invoice header info
         const invoiceDocRef = doc(db, "locations", locationId, "invoices", realInvoiceDocId);
         const invoiceSnap = await getDoc(invoiceDocRef);
 
@@ -210,7 +212,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
           setCheckedByName(invoiceData.checkedBy || "________________");
         }
 
-        // Water samples
         const samplesCollection = collection(
           db,
           "locations",
@@ -323,16 +324,18 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
   return (
     <>
-      <div className="mb-6 print:hidden text-center">
+      <div className="mb-6 print:hidden flex justify-center gap-4">
         <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 mx-auto"
+          onClick={handlePrint}
+          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
         >
-          <Printer size={20} /> Print Report
+          <Printer size={20} /> Print Report (PDF)
         </button>
+
+        
       </div>
 
-      <div id="report" className="bg-white p-4 max-w-[1200px] mx-auto">
+      <div ref={reportRef} id="report" className="bg-white p-4 max-w-[1200px] mx-auto">
         {/* Header */}
         <div className="flex justify-between items-start mb-2 border-b-2 border-black pb-2">
           <div className="w-32 h-24 flex items-center justify-center">
@@ -394,11 +397,11 @@ const WaterReport: React.FC<WaterReportProps> = ({
               <thead>
                 <tr className="bg-gray-100 font-bold">
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[9px]"></span></td>
-                  <td className="border-r border-black p-0.5 text-center w-12" rowSpan={3}>pH<br/><span className="text-[9px]">pH</span></td>
+                  <td className="border-r border-black p-0.5 text-center w-12" rowSpan={3}>pH<br/></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Salinity<br/><span className="text-[9px]">సాలినిటీ</span></td>
                   <td className="border-r border-black p-0.5 text-center" colSpan={3}>Alkalinity(PPM as Caco3)<br/><span className="text-[9px]">ఆల్కలినిటీ</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[9px]">మొత్తం కఠినత</span></td>
-                  <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/><span className="text-[9px]">PPM as Caco3</span></td>
+                  <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/><span className="text-[9px]">అమ్మోనియా</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Unionized NH₃<br/><span className="text-[9px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
                   
@@ -414,11 +417,11 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center font-bold">CO₃<br/><span className="text-[9px]">కార్బొనేట్</span></td>
                   <td className="border-r border-black p-0.5 text-center font-bold">HCO₃<br/><span className="text-[9px]">బైకార్బొనేట్</span></td>
                   <td className="border-r border-black p-0.5 text-center font-bold">Total <br/><span className="text-[9px]">మొత్తం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Ca<br/><span className="text-[9px]">కాల్షియం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Mg<br/><span className="text-[9px]">మెగ్నీషియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Ca++<br/><span className="text-[9px]">కాల్షియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Mg++<br/><span className="text-[9px]">మెగ్నీషియం</span></td>
                   
-                  <td className="border-r border-black p-0.5 text-center font-bold">K<br/><span className="text-[9px]">పొటాషియం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Na<br/><span className="text-[9px]">సోడియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">K++<br/><span className="text-[9px]">పొటాషియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Na++<br/><span className="text-[9px]">సోడియం</span></td>
                 </tr>
               </thead>
               <tbody>
@@ -460,12 +463,12 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center">&gt;300</td>
                   
                   <td className="border-r border-black p-0.5 text-center">&gt;10</td>
-                  <td className="border-r border-black p-0.5 text-center">300</td>
+                  <td className="border-r border-black p-0.5 text-center">&gt;300</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;1.0</td>
                   <td className="border-r border-black p-0.5 text-center">0-0.1</td>
                   
                   <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
+                  <td className="border-r border-black p-0.5 text-center">&lt;25</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;0.02</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
@@ -478,13 +481,13 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
           {/* BACTERIOLOGY - FULLY BORDERED & ALIGNED */}
           <div className="flex-[1.5]">
-            <h4 className="text-center font-bold text-[10px] bg-gray-200 border-b border-black py-1 text-red-600">BACTERIOLOGY</h4>
+            <h4 className="text-center font-bold text-[12px] bg-gray-200 border-b border-black py-1 text-red-600">BACTERIOLOGY</h4>
             <table className="w-full text-[10px] border-collapse">
               <thead>
                 <tr className="bg-gray-100 font-bold">
-                  <td className="border-b border-black text-center py-[6px]" colSpan={3}>Vibrio CFU /ml</td>
+                  <td className="border-b border-black text-center " colSpan={3}>Vibrio CFU /ml</td>
                 </tr>
-                <tr className="bg-gray-100 text-[11px] font-bold">
+                <tr className="bg-gray-100 text-[8px] font-bold">
                   <td className="border-r border-black p-0.5 text-center">Yellow <br />Colonies <br /> <span className="text-[9px]">పసుపు కాలనీలు</span></td>
                   <td className="border-r border-black p-0.5 text-center">Green <br />Colonies <br /><span className="text-[9px]">పచ్చ కాలనీలు</span></td>
                   <td className="p-0.5 text-center">TPC <br /><span className="text-[8px]">Total Plate Count</span></td>
@@ -498,7 +501,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                     <td className="p-0.5 text-center">{p.tpc}</td>
                   </tr>
                 ))}
-                <tr className="border-t border-black font-bold text-[10px] text-red-600 bg-gray-50">
+                <tr className="border-t border-black font-bold text-[12px]  text-red-600 bg-gray-50">
                   <td className="border-r border-black p-0.5 text-center">&lt;300</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;50</td>
                   <td className="p-0.5 text-center">&lt;300</td>
@@ -534,7 +537,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <th className="border-r border-b border-black"></th>
 
                   {[
-                    
                     { img: corrella, name: "Chlorella" },
                     { img: phacus, name: "Oosystis" },
                     { img: desmids, name: "Eudorina" },
@@ -576,7 +578,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <tr key={pond.id} className="border-b border-black last:border-b-0">
                     <td className="border-r border-black text-center font-bold bg-gray-50">{pond.pondNo}</td>
                     {[
-                      
                       pond.chlorella,
                       pond.phacus,
                       pond.desmids,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { 
   collection, 
   doc, 
@@ -10,11 +10,11 @@ import {
   where 
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
-import { useUserSession } from "../../contexts/UserSessionContext";  // ← Added
+import { useUserSession } from "../../contexts/UserSessionContext";
 
 interface FarmerInfo {
   farmerName: string;
-  village: string;
+  address: string;
   mobile: string;
   date: string;
   farmerId: string;
@@ -31,8 +31,8 @@ export default function MicrobiologyForm({
   locationId,
   onSubmit,
 }: MicrobiologyFormProps) {
-  const { session } = useUserSession();  // ← Added
-  const technicianName = session?.technicianName || "";  // ← Added
+  const { session } = useUserSession();
+  const technicianName = session?.technicianName || "";
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -58,7 +58,7 @@ export default function MicrobiologyForm({
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
     farmerName: "",
-    village: "",
+    address: "",  // ← Will be pre-filled from farmer master by default
     mobile: "",
     date: today,
     farmerId: "",
@@ -71,7 +71,7 @@ export default function MicrobiologyForm({
 
   const [sampleType, setSampleType] = useState<string>("Microbiology");
 
-  const [checkedBy, setCheckedBy] = useState(technicianName);  // ← NEW: Checked by
+  const [checkedBy, setCheckedBy] = useState(technicianName);
 
   const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.microbiology || {};
 
@@ -80,6 +80,13 @@ export default function MicrobiologyForm({
     greenColonies: "Green Colonies",
     tpc: "Total Plate Count (TPC)",
     testCode: "Test Code",
+  };
+
+  // Mapping: which test IDs control which microbiology fields
+  const testToFieldsMap: Record<string, (keyof typeof emptyMicrobiologyData)[]> = {
+    micro_vibrio_plating: ["yellowColonies", "greenColonies"],
+    micro_tpc: ["tpc"],
+    // Add more if you have other microbiology test IDs
   };
 
   // Fetch invoice
@@ -122,7 +129,7 @@ export default function MicrobiologyForm({
     fetchInvoice();
   }, [locationId, invoiceId]);
 
-  // Pre-fill farmer data + load saved report
+  // Pre-fill farmer data (address by default) + load saved report
   useEffect(() => {
     const loadData = async () => {
       if (!localInvoice) {
@@ -133,7 +140,7 @@ export default function MicrobiologyForm({
       try {
         setLoading(true);
 
-        // ALWAYS pre-fill from farmer master
+        // ALWAYS pre-fill from farmer master → address comes by default here
         let loadedFarmerId = "";
         if (localInvoice?.farmerId) {
           const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
@@ -143,18 +150,17 @@ export default function MicrobiologyForm({
             loadedFarmerId = farmerData.farmerId || "";
             setFarmerUID(loadedFarmerId);
 
-            setFarmerInfo(prev => ({
-              ...prev,
-              farmerName: farmerData.name || prev.farmerName || "",
-              village: farmerData.city || prev.village || "",
-              mobile: farmerData.phone || prev.mobile || "",
+            setFarmerInfo({
+              farmerName: farmerData.name || "",
+              address: farmerData.address || "",   // ← Address pre-filled by default from farmer master
+              mobile: farmerData.phone || "",
               date: localInvoice.dateOfCulture || today,
               farmerId: loadedFarmerId,
-            }));
+            });
           }
         }
 
-        // Load saved microbiology report (overrides if exists)
+        // Load saved microbiology report (overrides default if exists)
         const reportRef = doc(
           db,
           "locations",
@@ -171,13 +177,14 @@ export default function MicrobiologyForm({
           const data = snap.data() || {};
 
           if (data.farmerInfo) {
-            setFarmerInfo({
-              farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
-              village: data.farmerInfo.village || farmerInfo.village,
-              mobile: data.farmerInfo.mobile || farmerInfo.mobile,
-              date: data.farmerInfo.date || localInvoice?.dateOfCulture || today,
-              farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",
-            });
+            setFarmerInfo(prev => ({
+              ...prev,
+              farmerName: data.farmerInfo.farmerName || prev.farmerName,
+              address: data.farmerInfo.address || prev.address,  // saved overrides default
+              mobile: data.farmerInfo.mobile || prev.mobile,
+              date: data.farmerInfo.date || prev.date,
+              farmerId: data.farmerInfo.farmerId || prev.farmerId,
+            }));
           }
 
           if (data.sampleType) {
@@ -193,7 +200,6 @@ export default function MicrobiologyForm({
 
           setMicrobiologyData(normalized);
 
-          // ← NEW: Load checkedBy if saved
           if (data.checkedBy) {
             setCheckedBy(data.checkedBy);
           }
@@ -235,15 +241,44 @@ export default function MicrobiologyForm({
         "data"
       );
 
+      // Prepare clean data with "-" for unselected fields per sample
+      const cleanMicrobiologyData: any = {
+        testCode: microbiologyData.testCode.slice(), // always kept
+      };
+
+      for (let i = 0; i < totalSamples; i++) {
+        const sampleNumber = i + 1;
+        const selectedIds = perSampleSelectedTests[sampleNumber] || [];
+
+        // Reset fields
+        cleanMicrobiologyData.yellowColonies = cleanMicrobiologyData.yellowColonies || [];
+        cleanMicrobiologyData.greenColonies = cleanMicrobiologyData.greenColonies || [];
+        cleanMicrobiologyData.tpc = cleanMicrobiologyData.tpc || [];
+
+        cleanMicrobiologyData.yellowColonies[i] = "-";
+        cleanMicrobiologyData.greenColonies[i] = "-";
+        cleanMicrobiologyData.tpc[i] = "-";
+
+        // Restore only selected
+        selectedIds.forEach((testId: string) => {
+          const fields = testToFieldsMap[testId];
+          if (fields) {
+            fields.forEach(field => {
+              cleanMicrobiologyData[field][i] = microbiologyData[field][i] || "";
+            });
+          }
+        });
+      }
+
       await setDoc(
         reportRef,
         {
           farmerInfo,
-          microbiologyData,
+          microbiologyData: cleanMicrobiologyData,
           totalSamples,
           sampleType,
           updatedAt: new Date().toISOString(),
-          checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← NEW
+          checkedBy: checkedBy.trim() || technicianName || "N/A",
         },
         { merge: true }
       );
@@ -303,11 +338,11 @@ export default function MicrobiologyForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Village</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
             <input
               className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500"
-              value={farmerInfo.village}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, village: e.target.value })}
+              value={farmerInfo.address}
+              onChange={(e) => setFarmerInfo({ ...farmerInfo, address: e.target.value })}
             />
           </div>
           <div>
@@ -390,30 +425,56 @@ export default function MicrobiologyForm({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={row.key} className={rowIndex % 2 === 0 ? "bg-gray-50" : "bg-white"}>
-                  <td className="border border-gray-400 px-4 py-3 font-semibold text-gray-800 text-md">
-                    {row.label}
-                  </td>
-                  {microbiologyData[row.key].map((value: string, i: number) => (
-                    <td key={i} className="border border-gray-400 ">
-                      <input
-                        type="text"
-                        value={value}
-                        onChange={(e) => updateColumn(row.key, i, e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center focus:ring-4 focus:ring-blue-300 focus:border-blue-600 font-medium"
-                        placeholder="Enter value"
-                      />
+              {rows.map((row, rowIndex) => {
+                // Skip rendering row if no sample has selected this parameter
+                const anySampleHasThis = Array.from({ length: totalSamples }).some((_, i) => {
+                  const sampleNumber = i + 1;
+                  const selectedIds = perSampleSelectedTests[sampleNumber] || [];
+                  return (
+                    row.key === "testCode" || // always show testCode
+                    selectedIds.some(id => testToFieldsMap[id]?.includes(row.key))
+                  );
+                });
+
+                if (!anySampleHasThis && row.key !== "testCode") return null;
+
+                return (
+                  <tr key={row.key} className={rowIndex % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                    <td className="border border-gray-400 px-4 py-3 font-semibold text-gray-800 text-md">
+                      {row.label}
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {microbiologyData[row.key].map((value: string, i: number) => {
+                      const sampleNumber = i + 1;
+                      const selectedIds = perSampleSelectedTests[sampleNumber] || [];
+                      const isEnabled =
+                        row.key === "testCode" ||
+                        selectedIds.some(id => testToFieldsMap[id]?.includes(row.key));
+
+                      return (
+                        <td key={i} className="border border-gray-400 ">
+                          {isEnabled ? (
+                            <input
+                              type="text"
+                              value={value}
+                              onChange={(e) => updateColumn(row.key, i, e.target.value)}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center focus:ring-4 focus:ring-blue-300 focus:border-blue-600 font-medium"
+                              placeholder="Enter value"
+                            />
+                          ) : (
+                            <div className="w-full px-4 py-3 text-center text-gray-500">-</div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </section>
 
-      {/* NEW: Checked by input */}
+      {/* Checked by input */}
       <div className="mb-12 max-w-md mx-auto">
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by

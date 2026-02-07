@@ -53,8 +53,6 @@ interface Farmer {
   address: string;
   state: string;
   district: string;
-  city: string;
-  pincode: string;
   waterSource: string;
   cultureAreas: number;
   species: string;
@@ -64,14 +62,12 @@ interface Farmer {
   };
 }
 
-
 const LOCATION_NAME_TO_CODE: Record<string, string> = {
   nellore: "NLR",
   bhimavaram: "BVRM",
   tamarakollu: "TMRK",
   ganapavaram: "GVRM",
   juvvalapalem: "JP",
- 
 };
 
 const Farmers = () => {
@@ -103,7 +99,6 @@ const Farmers = () => {
 
           let matchedCode = "XXX"; // fallback
 
-          // Smart matching based on name
           if (locationName.includes("nellore")) matchedCode = "NLR";
           else if (locationName.includes("bhimavaram")) matchedCode = "BVRM";
           else if (locationName.includes("tamarakollu")) matchedCode = "TMRK";
@@ -172,8 +167,6 @@ const Farmers = () => {
     address: "",
     state: "",
     district: "",
-    city: "",
-    pincode: "",
     waterSource: "",
     cultureAreas: "",
     species: "",
@@ -188,8 +181,6 @@ const Farmers = () => {
       address: farmer.address,
       state: farmer.state,
       district: farmer.district,
-      city: farmer.city,
-      pincode: farmer.pincode,
       waterSource: farmer.waterSource,
       cultureAreas: farmer.cultureAreas.toString(),
       species: farmer.species,
@@ -214,15 +205,13 @@ const Farmers = () => {
           address: formData.address,
           state: formData.state,
           district: formData.district,
-          city: formData.city,
-          pincode: formData.pincode,
           waterSource: formData.waterSource,
           cultureAreas: Number(formData.cultureAreas),
           species: formData.species,
           updatedAt: Timestamp.now(),
         });
 
-        // Sync to invoices
+        // Sync to invoices (only name & phone)
         const invoicesRef = collection(db, "locations", session.locationId, "invoices");
         const invoiceQuery = query(invoicesRef, where("farmerId", "==", editFarmerId));
         const invoiceSnap = await getDocs(invoiceQuery);
@@ -248,8 +237,6 @@ const Farmers = () => {
           address: formData.address,
           state: formData.state,
           district: formData.district,
-          city: formData.city,
-          pincode: formData.pincode,
           waterSource: formData.waterSource,
           cultureAreas: Number(formData.cultureAreas),
           species: formData.species,
@@ -271,7 +258,7 @@ const Farmers = () => {
       setEditFarmerId(null);
       setFormData({
         name: "", phone: "", address: "", state: "", district: "",
-        city: "", pincode: "", waterSource: "", cultureAreas: "", species: "",
+        waterSource: "", cultureAreas: "", species: "",
       });
 
       fetchFarmers();
@@ -351,17 +338,6 @@ const Farmers = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>City *</Label>
-                        <Input value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Pincode *</Label>
-                        <Input value={formData.pincode} onChange={(e) => setFormData({ ...formData, pincode: e.target.value })} required />
-                      </div>
-                    </div>
-
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Water Source *</Label>
@@ -382,7 +358,8 @@ const Farmers = () => {
                         setOpen(false);
                         setEditMode(false);
                         setEditFarmerId(null);
-                        setFormData({ name: "", phone: "", address: "", state: "", district: "", city: "", pincode: "", waterSource: "", cultureAreas: "", species: "" });
+                        setFormData({ name: "", phone: "", address: "", state: "", district: "",
+                          waterSource: "", cultureAreas: "", species: "" });
                       }}>
                         Cancel
                       </Button>
@@ -447,7 +424,7 @@ const Farmers = () => {
                             </div>
                           </TableCell>
                           <TableCell>{farmer.phone}</TableCell>
-                          <TableCell>{farmer.city}, {farmer.state}</TableCell>
+                          <TableCell>{farmer.district}, {farmer.state}</TableCell>
                           <TableCell>{farmer.species}</TableCell>
                           <TableCell>{farmer.cultureAreas}</TableCell>
                           <TableCell>

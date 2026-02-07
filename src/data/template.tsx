@@ -6,8 +6,8 @@ import { useNavigate } from "react-router-dom";
 interface TestItem {
   name: string;
   quantity: number;
-  price: number;
-  total: number;
+  price: number;   // original price INCLUDING GST
+  total: number;   // original total INCLUDING GST (not used directly)
 }
 
 interface InvoiceState {
@@ -19,10 +19,10 @@ interface InvoiceState {
   tests: {
     [type: string]: TestItem[];
   };
-  subtotal: number;
-  discountPercent?: number;     // ← from previous page (optional)
-  discountAmount?: number;      // ← from previous page (optional)
-  total: number;                // grand total after discount
+  subtotal: number;             // original subtotal INCLUDING GST
+  discountPercent?: number;
+  discountAmount?: number;      // discount on original incl-GST subtotal
+  total: number;                // original grand total incl GST (before discount)
   paymentMode: "cash" | "qr" | "neft" | "rtgs" | "pending";
   transactionRef?: string | null;
   isPartialPayment?: boolean;
@@ -64,14 +64,26 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
 
   const financialYear = getFinancialYear();
 
-  const subtotal = state.subtotal;
+  // Original values from InvoicePage (include GST)
+  const originalSubtotalInclGst = state.subtotal;
   const discountPercent = state.discountPercent || 0;
-  const discountAmount = state.discountAmount || 0;
-  const grandTotal = state.total;
+  const discountAmountInclGst = state.discountAmount || 0;
 
-  // For zero invoice → always show paid = 0, balance = 0
-  const paidAmount = isZeroInvoice ? 0 : (state.paymentMode === "pending" ? 0 : grandTotal);
-  const balanceAmount = isZeroInvoice ? 0 : (state.paymentMode === "pending" ? grandTotal : 0);
+  // Calculations for display
+  const subtotalExGst = originalSubtotalInclGst / 1.18;
+  const gstAmount = originalSubtotalInclGst - subtotalExGst; // exact GST portion (152.54 for 1000)
+
+  // Subtotal + GST = original incl. GST amount (1000)
+  const subtotalPlusGst = subtotalExGst + gstAmount;
+
+  // Discount applied on original incl-GST amount
+  const grandTotalAfterDiscount = subtotalPlusGst - discountAmountInclGst;
+
+  // Display values (zero invoice forces 0)
+  const displaySubtotalExGst = isZeroInvoice ? 0 : subtotalExGst;
+  const displayGstAmount = isZeroInvoice ? 0 : gstAmount;
+  const displayDiscountAmount = isZeroInvoice ? 0 : discountAmountInclGst;
+  const displayGrandTotal = isZeroInvoice ? 0 : grandTotalAfterDiscount;
 
   const numberToWords = (num: number): string => {
     const a = [
@@ -236,49 +248,71 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
-                      {idx + 1}
-                    </td>
-                    <td style={{ border: "1px solid #000", padding: "4px" }}>{item.name}</td>
-                    <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
-                      {item.quantity}
-                    </td>
-                    <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
-                      {item.price}
-                    </td>
-                    <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
-                      {item.total}
-                    </td>
-                  </tr>
-                ))}
+                {items.map((item, idx) => {
+                  const unitPriceExGst = item.price / 1.18;
+                  const rowAmountExGst = item.quantity * unitPriceExGst;
+
+                  return (
+                    <tr key={idx}>
+                      <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
+                        {idx + 1}
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "4px" }}>{item.name}</td>
+                      <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
+                        {item.quantity}
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
+                        {unitPriceExGst.toFixed(2)}
+                      </td>
+                      <td style={{ border: "1px solid #000", padding: "4px", textAlign: "center" }}>
+                        {rowAmountExGst.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </section>
         ))}
 
-        {/* TOTALS + PAYMENT DETAILS (conditional) */}
+        {/* TOTALS SECTION */}
         <section style={{ marginTop: "20px", pageBreakInside: "avoid" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
             <tbody>
               <tr>
                 <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
-                  Subtotal (₹)
+                  Subtotal (excl. GST) (₹)
                 </td>
                 <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                  ₹{subtotal.toFixed(2)}
+                  ₹{displaySubtotalExGst.toFixed(2)}
                 </td>
               </tr>
 
-              {/* Discount row - only show if discount exists */}
-              {discountAmount > 0 && (
+              <tr>
+                <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                  GST @ 18% (₹)
+                </td>
+                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                  ₹{displayGstAmount.toFixed(2)}
+                </td>
+              </tr>
+
+              <tr>
+                <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
+                  Subtotal + GST (₹)
+                </td>
+                <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+                  ₹{(displaySubtotalExGst + displayGstAmount).toFixed(2)}
+                </td>
+              </tr>
+
+              {displayDiscountAmount > 0 && (
                 <tr>
                   <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
-                    Discount ({discountPercent}%)
+                    Less: Discount ({discountPercent}%) (₹)
                   </td>
                   <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right", color: "#dc2626" }}>
-                    -₹{discountAmount.toFixed(2)}
+                    -₹{displayDiscountAmount.toFixed(2)}
                   </td>
                 </tr>
               )}
@@ -292,7 +326,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                     background: "#f0f0f0",
                   }}
                 >
-                  TOTAL AMOUNT (₹)
+                  GRAND TOTAL (incl. GST) (₹)
                 </td>
                 <td
                   style={{
@@ -303,39 +337,17 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
                     background: "#f0f0f0",
                   }}
                 >
-                  ₹{grandTotal.toFixed(2)}
+                  ₹{displayGrandTotal.toFixed(2)}
                 </td>
               </tr>
-
-              {/* Payment rows - only show when NOT zero invoice */}
-              {!isZeroInvoice && (
-                <>
-                  <tr>
-                    <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
-                      Amount Paid (₹)
-                    </td>
-                    <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                      ₹{paidAmount}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "600" }}>
-                      Balance Due (₹)
-                    </td>
-                    <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
-                      ₹{balanceAmount}
-                    </td>
-                  </tr>
-                </>
-              )}
             </tbody>
           </table>
 
           <p style={{ marginTop: "12px", fontSize: "12px", fontWeight: "600" }}>
-            Amount in Words: <strong>{numberToWords(grandTotal)}</strong>
+            Amount in Words: <strong>{numberToWords(displayGrandTotal)}</strong>
           </p>
 
-          {/* Payment mode section - completely hidden for zero invoices */}
+          {/* Payment mode section */}
           {!isZeroInvoice && (
             <div
               style={{
@@ -372,7 +384,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
             </div>
           )}
 
-          {/* For zero invoice → still show signature area, but without payment info */}
           {isZeroInvoice && (
             <div
               style={{
