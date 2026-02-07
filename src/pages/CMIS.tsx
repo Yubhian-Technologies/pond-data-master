@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
   Card,
@@ -73,6 +73,9 @@ interface Asset {
 
 const CMIS = () => {
   const { session } = useUserSession();
+
+  // Tab / section switch
+  const [activeSection, setActiveSection] = useState<"overview" | "payments" | "assets">("overview");
 
   // Payments state
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -452,27 +455,190 @@ const CMIS = () => {
               <p className="text-muted-foreground">Manage laboratory expenses, assets, and payments</p>
             </div>
 
-            <Card className="mb-12 shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <CardTitle className="text-2xl">Payments</CardTitle>
-                      <CardDescription>Track and manage lab payments</CardDescription>
+            {/* Overview Cards - Shown only in overview mode */}
+            {activeSection === "overview" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                {/* Payments Card */}
+                <Card 
+                  className="shadow-lg hover:shadow-xl transition-all cursor-pointer border-cyan-200"
+                  onClick={() => setActiveSection("payments")}
+                >
+                  <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <CardTitle className="text-2xl">Payments</CardTitle>
+                          <CardDescription>Track and manage lab payments</CardDescription>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Total Amount</p>
+                        <p className="text-xl font-bold text-emerald-700">
+                          ₹{totalPayments.toLocaleString("en-IN")}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <Button className="w-full gap-2 bg-cyan-500 hover:bg-cyan-600">
+                      <Eye className="w-4 h-4" /> View All Payments
+                    </Button>
+                  </CardContent>
+                </Card>
 
-                  <div className="flex items-center gap-6">
+                {/* Assets Card */}
+                <Card 
+                  className="shadow-lg hover:shadow-xl transition-all cursor-pointer border-indigo-200"
+                  onClick={() => setActiveSection("assets")}
+                >
+                  <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <CardTitle className="text-2xl">Lab Equipment & Inventory</CardTitle>
+                          <CardDescription>Manage lab assets and particulars</CardDescription>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Total Asset Value</p>
+                        <p className="text-xl font-bold text-indigo-700">
+                          ₹{totalAssetsValue.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <Button className="w-full gap-2 bg-cyan-600 hover:bg-cyan-700">
+                      <Eye className="w-4 h-4" /> View All Assets
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Payments Section */}
+            {activeSection === "payments" && (
+              <Card className="mb-12 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 flex flex-row items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <CardTitle className="text-2xl">Payments</CardTitle>
+                    <CardDescription>Track and manage lab payments</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Amount</p>
                       <p className="text-xl font-bold text-emerald-700">
                         ₹{totalPayments.toLocaleString("en-IN")}
                       </p>
                     </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveSection("overview")}
+                    >
+                      Back to Overview
+                    </Button>
+                  </div>
+                </CardHeader>
 
+                <CardContent>
+                  <div className="mb-6 flex flex-wrap items-center gap-4 mt-5">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by particulars, payee, or invoice..."
+                        className="pl-10"
+                        value={paymentSearch}
+                        onChange={(e) => setPaymentSearch(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Input type="date" value={paymentStartDate} onChange={(e) => setPaymentStartDate(e.target.value)} />
+                      <Input type="date" value={paymentEndDate} onChange={(e) => setPaymentEndDate(e.target.value)} />
+                    </div>
+                    <Button onClick={exportPaymentsToExcel} variant="outline" className="gap-2">
+                      <Download className="w-4 h-4" />
+                      Export Excel
+                    </Button>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-blue-50">
+                          <TableHead>S.No</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>To Pay</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Invoice ID</TableHead>
+                          <TableHead>File</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredPayments.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                              No payments recorded yet
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredPayments.map((payment, index) => (
+                            <TableRow key={payment.id} className="hover:bg-blue-50/50 transition-colors">
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell>{payment.date}</TableCell>
+                              <TableCell>{payment.particulars}</TableCell>
+                              <TableCell>{payment.toPay}</TableCell>
+                              <TableCell className="font-medium">₹{payment.amount.toLocaleString()}</TableCell>
+                              <TableCell>{payment.invoiceId}</TableCell>
+                              <TableCell>
+                                {payment.fileUrl ? (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => window.open(payment.fileUrl!, "_blank")}
+                                      className="gap-1"
+                                    >
+                                      <Eye className="w-3 h-3" />
+                                      View File
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteFile(payment.id)}
+                                    >
+                                      <X className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditPayment(payment)}
+                                    className="gap-1 text-black"
+                                  >
+                                    Upload File
+                                  </Button>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="sm" onClick={() => handleEditPayment(payment)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Add Payment Button at bottom too */}
+                  <div className="mt-6 flex justify-end">
                     <Dialog open={openPaymentDialog} onOpenChange={setOpenPaymentDialog}>
                       <DialogTrigger asChild>
-                        <Button className="gap-2 bg-cyan-500 hover:bg-cyan-600 whitespace-nowrap">
+                        <Button className="gap-2 bg-cyan-500 hover:bg-cyan-600">
                           <Plus className="w-4 h-4" />
                           Add Payment
                         </Button>
@@ -485,6 +651,7 @@ const CMIS = () => {
                           </DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handlePaymentSubmit} className="space-y-4 mt-4">
+                          {/* ... same payment form as before ... */}
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                               <Label className="text-sm">Date *</Label>
@@ -534,127 +701,111 @@ const CMIS = () => {
                       </DialogContent>
                     </Dialog>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6 flex flex-wrap items-center gap-4 mt-5">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by particulars, payee, or invoice..."
-                      className="pl-10"
-                      value={paymentSearch}
-                      onChange={(e) => setPaymentSearch(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Input type="date" value={paymentStartDate} onChange={(e) => setPaymentStartDate(e.target.value)} />
-                    <Input type="date" value={paymentEndDate} onChange={(e) => setPaymentEndDate(e.target.value)} />
-                  </div>
-                  <Button onClick={exportPaymentsToExcel} variant="outline" className="gap-2">
-                    <Download className="w-4 h-4" />
-                    Export Excel
-                  </Button>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-blue-50">
-                        <TableHead>S.No</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>To Pay</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Invoice ID</TableHead>
-                        <TableHead>File</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredPayments.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                            No payments recorded yet
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredPayments.map((payment, index) => (
-                          <TableRow key={payment.id} className="hover:bg-blue-50/50 transition-colors">
-                            <TableCell>{index + 1}</TableCell>
-                            <TableCell>{payment.date}</TableCell>
-                            <TableCell>{payment.particulars}</TableCell>
-                            <TableCell>{payment.toPay}</TableCell>
-                            <TableCell className="font-medium">₹{payment.amount.toLocaleString()}</TableCell>
-                            <TableCell>{payment.invoiceId}</TableCell>
-                            <TableCell>
-                              {payment.fileUrl ? (
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => window.open(payment.fileUrl!, "_blank")}
-                                    className="gap-1"
-                                  >
-                                    <Eye className="w-3 h-3" />
-                                    View File
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-white hover:bg-white"
-                                    onClick={() => handleDeleteFile(payment.id)}
-                                  >
-                                    <X className="w-4 h-4 text-red-600" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditPayment(payment)}
-                                  className="gap-1 text-black "
-                                >
-                                  Upload File
-                                </Button>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="sm" onClick={() => handleEditPayment(payment)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Assets Section */}
-            <Card className="shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <CardTitle className="text-2xl">Lab Equipment & Inventory</CardTitle>
-                      <CardDescription>Manage lab assets and particulars</CardDescription>
-                    </div>
+            {activeSection === "assets" && (
+              <Card className="shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 flex flex-row items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <CardTitle className="text-2xl">Lab Equipment & Inventory</CardTitle>
+                    <CardDescription>Manage lab assets and particulars</CardDescription>
                   </div>
-
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total Asset Value</p>
                       <p className="text-xl font-bold text-indigo-700">
                         ₹{totalAssetsValue.toLocaleString("en-IN")}
                       </p>
                     </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveSection("overview")}
+                    >
+                      Back to Overview
+                    </Button>
+                  </div>
+                </CardHeader>
 
+                <CardContent>
+                  <div className="mb-6 flex flex-wrap items-center gap-4 mt-5">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search assets by name or description..."
+                        className="pl-10"
+                        value={assetSearch}
+                        onChange={(e) => setAssetSearch(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Input type="date" value={assetStartDate} onChange={(e) => setAssetStartDate(e.target.value)} />
+                      <Input type="date" value={assetEndDate} onChange={(e) => setAssetEndDate(e.target.value)} />
+                    </div>
+                    <Button onClick={exportAssetsToExcel} variant="outline" className="gap-2">
+                      <Download className="w-4 h-4" />
+                      Export Excel
+                    </Button>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-blue-50">
+                          <TableHead>S.No</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Value</TableHead>
+                          <TableHead>Acquired Date</TableHead>
+                          <TableHead>Working Condition</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAssets.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              No assets recorded yet
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredAssets.map((asset, index) => (
+                            <TableRow key={asset.id} className="hover:bg-green-50/50 transition-colors">
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell className="font-medium">{asset.name}</TableCell>
+                              <TableCell>{asset.description || "N/A"}</TableCell>
+                              <TableCell>₹{asset.value.toLocaleString()}</TableCell>
+                              <TableCell>{asset.acquiredDate}</TableCell>
+                              <TableCell>
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  asset.workingCondition === "Working" 
+                                    ? "bg-green-100 text-green-800" 
+                                    : asset.workingCondition === "Under Maintenance"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}>
+                                  {asset.workingCondition}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="sm" onClick={() => handleEditAsset(asset)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Add Asset Button at bottom */}
+                  <div className="mt-6 flex justify-end">
                     <Dialog open={openAssetDialog} onOpenChange={setOpenAssetDialog}>
                       <DialogTrigger asChild>
-                        <Button className="gap-2 bg-cyan-600 hover:bg-cyan-700 whitespace-nowrap">
+                        <Button className="gap-2 bg-cyan-600 hover:bg-cyan-700">
                           <Plus className="w-4 h-4" />
                           Add Asset
                         </Button>
@@ -667,6 +818,7 @@ const CMIS = () => {
                           </DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleAssetSubmit} className="space-y-6 mt-6">
+                          {/* ... same asset form as before ... */}
                           <div className="space-y-2">
                             <Label>Name *</Label>
                             <Input placeholder="Enter asset name" value={assetFormData.name} onChange={(e) => setAssetFormData({ ...assetFormData, name: e.target.value })} required />
@@ -708,80 +860,9 @@ const CMIS = () => {
                       </DialogContent>
                     </Dialog>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6 flex flex-wrap items-center gap-4 mt-5">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search assets by name or description..."
-                      className="pl-10"
-                      value={assetSearch}
-                      onChange={(e) => setAssetSearch(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Input type="date" value={assetStartDate} onChange={(e) => setAssetStartDate(e.target.value)} />
-                    <Input type="date" value={assetEndDate} onChange={(e) => setAssetEndDate(e.target.value)} />
-                  </div>
-                  <Button onClick={exportAssetsToExcel} variant="outline" className="gap-2">
-                    <Download className="w-4 h-4" />
-                    Export Excel
-                  </Button>
-                </div>
-                <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-blue-50">
-                        <TableHead>S.No</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Value</TableHead>
-                        <TableHead>Acquired Date</TableHead>
-                        <TableHead>Working Condition</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAssets.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                            No assets recorded yet
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredAssets.map((asset, index) => (
-                          <TableRow key={asset.id} className="hover:bg-green-50/50 transition-colors">
-                            <TableCell>{index + 1}</TableCell>
-                            <TableCell className="font-medium">{asset.name}</TableCell>
-                            <TableCell>{asset.description || "N/A"}</TableCell>
-                            <TableCell>₹{asset.value.toLocaleString()}</TableCell>
-                            <TableCell>{asset.acquiredDate}</TableCell>
-                            <TableCell>
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                asset.workingCondition === "Working" 
-                                  ? "bg-green-100 text-green-800" 
-                                  : asset.workingCondition === "Under Maintenance"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}>
-                                {asset.workingCondition}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="sm" onClick={() => handleEditAsset(asset)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
