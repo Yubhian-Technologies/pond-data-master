@@ -80,6 +80,21 @@ export default function SoilForm({
     cmisBy: technicianName,
   });
 
+  const [checkedBy, setCheckedBy] = useState(technicianName);  // ← NEW: Checked by name
+
+  const SAMPLE_FIELDS_ORDER: (keyof Sample)[] = [
+    "pondNo",
+    "pH",
+    "ec",
+    "caco3",
+    "soilTexture",
+    "organicCarbon",
+    "availableNitrogen",
+    "availablePhosphorus",
+    "redoxPotential",
+    "remarks",
+  ];
+
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [localInvoice, setLocalInvoice] = useState<any>(null);
@@ -95,11 +110,9 @@ export default function SoilForm({
       try {
         const invoicesRef = collection(db, "locations", locationId, "invoices");
 
-        // Try by 'invoiceId' field first (new invoices)
         let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
         let querySnapshot = await getDocs(q);
 
-        // Fallback to old 'id' field (legacy invoices)
         if (querySnapshot.empty) {
           q = query(invoicesRef, where("id", "==", invoiceId));
           querySnapshot = await getDocs(q);
@@ -210,6 +223,7 @@ export default function SoilForm({
             cmisBy: headerData.technicianName || technicianName,
             sampleDate: headerData.sampleDate || localInvoice.dateOfCulture || today,
           }));
+          setCheckedBy(headerData.checkedBy || technicianName || "");  // ← Load saved checkedBy if exists
         }
 
         // Load all soil samples
@@ -275,6 +289,7 @@ export default function SoilForm({
         reportTime: formData.reportTime,
         technicianName: technicianName,
         sampleDate: formData.sampleDate,
+        checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← Save checkedBy here too (optional redundancy)
       }, { merge: true });
 
       // Save all samples
@@ -288,10 +303,11 @@ export default function SoilForm({
 
       await Promise.all(savePromises);
 
-      // Mark as completed – use real docId
+      // Mark as completed + save checkedBy to invoice
       const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
       await updateDoc(invoiceRef, {
         "reportsProgress.soil": "completed",
+        checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← Save to invoice (main place)
       });
 
     } catch (err) {
@@ -423,24 +439,42 @@ export default function SoilForm({
             </h3>
             <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {Object.entries(sample).map(([key, value]) => (
-                  <div key={key}>
-                    <label className="block text-xs font-medium mb-1 capitalize">
-                      {key.replace(/([A-Z])/g, ' $1').trim()}
-                    </label>
-                    <input
-                      type="text"
-                      value={value}
-                      onChange={(e) => handleSampleChange(index, key as keyof Sample, e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                ))}
+                {SAMPLE_FIELDS_ORDER.map((key) => {
+                  const value = sample[key] || ''; 
+                  return (
+                    <div key={key}>
+                      <label className="block text-xs font-medium mb-1 capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </label>
+                      <input
+                        type="text"
+                        value={value}
+                        onChange={(e) => handleSampleChange(index, key, e.target.value)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         );
       })}
+
+      {/* NEW: Checked by input field */}
+      <div className="mb-12 max-w-md mx-auto">
+        <label className="block text-xl font-bold mb-4 text-gray-800">
+          Checked by
+        </label>
+        <input
+          type="text"
+          value={checkedBy}
+          onChange={(e) => setCheckedBy(e.target.value)}
+          placeholder="Enter name of the person who checked the report"
+          required
+          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+        />
+      </div>
 
       {/* Final Submit Button */}
       <div className="flex justify-center mt-8">

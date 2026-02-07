@@ -101,6 +101,7 @@ export default function WaterForm({
   });
 
   const [remarksAndRecommendations, setRemarksAndRecommendations] = useState("");
+  const [checkedBy, setCheckedBy] = useState("");  // ← NEW: Checked by name
 
   const emptyPond: Pond = {
     id: 1,
@@ -263,7 +264,7 @@ export default function WaterForm({
           "locations",
           locationId,
           "invoices",
-          localInvoice.docId,  // ← Use real docId here!
+          localInvoice.docId,
           "water_reports"
         );
         const snapshot = await getDocs(waterReportsRef);
@@ -400,6 +401,7 @@ export default function WaterForm({
         sampleCollectionTime: formData.sampleCollectionTime,
         reportDate: formData.reportDate,
         reportTime: formData.reportTime,
+        checkedBy: checkedBy.trim() || "N/A",  // ← NEW: save checkedBy to invoice
       });
 
       onSubmit();
@@ -493,8 +495,6 @@ export default function WaterForm({
                   { key: "pondNo", label: "Pond No." },
                   { key: "pH", label: "pH" },
                   { key: "salinity", label: "Salinity (PPT)" },
-                  { key: "dissolvedOxygen", label: "DO (ppm)" },
-                  { key: "totalDissolvedMatter", label: "TDM (ppm)" },
                   { key: "co3", label: "CO₃" },
                   { key: "hco3", label: "HCO₃" },
                   { key: "alkalinity", label: "Alkalinity" },
@@ -510,6 +510,8 @@ export default function WaterForm({
                   { key: "nitrate", label: "Nitrate" },
                   { key: "iron", label: "Iron" },
                   { key: "chlorine", label: "Chlorine" },
+                  { key: "dissolvedOxygen", label: "DO (ppm)" },
+                  { key: "totalDissolvedMatter", label: "TDM (ppm)" },
                 ] as const).map(({ key, label }) => (
                   <div key={key}>
                     <label className="block text-xs font-medium mb-1">{label}</label>
@@ -550,7 +552,7 @@ export default function WaterForm({
               <h4 className="text-xl font-bold mb-4 text-green-800">Useful Plankton (cells/ml or org/ml)</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {([
-                  "phacus", "chlorella", "desmids", "scenedesmus",
+                  "chlorella","phacus", "desmids", "scenedesmus",
                   "copepod", "rotifer", "nauplius", "brachionus",
                   "spirulina",
                   "chaetoceros", "skeletonema", "rhizosolenia",
@@ -619,6 +621,21 @@ export default function WaterForm({
           placeholder="Enter overall remarks and recommendations for all samples..."
           rows={6}
           className="w-full border border-gray-400 rounded px-4 py-3 text-sm focus:border-blue-600 focus:outline-none resize-vertical"
+        />
+      </div>
+
+      {/* NEW: Checked by input field */}
+      <div className="mb-12 max-w-md mx-auto">
+        <label className="block text-xl font-bold mb-4 text-gray-800">
+          Checked by
+        </label>
+        <input
+          type="text"
+          value={checkedBy}
+          onChange={(e) => setCheckedBy(e.target.value)}
+          placeholder="Enter name of the person who checked the report"
+          required
+          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
         />
       </div>
 

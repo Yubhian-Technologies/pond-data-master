@@ -83,6 +83,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
   const [samples, setSamples] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [checkedByName, setCheckedByName] = useState<string>("");
 
   const handlePrint = () => window.print();
 
@@ -168,6 +169,8 @@ const SoilReport: React.FC<SoilReportProps> = ({
         sampleTime,
         reportTime,
       }));
+      
+      setCheckedByName(data.checkedBy || "________________");
 
       // Fetch REAL formatted farmerId from farmer document (overrides temp value)
       if (data.farmerId) {
@@ -370,7 +373,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
               <span className="font-semibold">Reported by :</span> {formData.reportedBy}
             </div>
             <div className="px-2 py-2 text-xs font-medium" style={{ width: '50%' }}>
-              Checked by: ______________________
+              Checked by: {checkedByName}
             </div>
           </div>
         </div>

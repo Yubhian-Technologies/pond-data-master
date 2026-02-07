@@ -46,7 +46,7 @@ const Samples = () => {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology";
+  type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology" ;
   const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology","wssv"];
 
   const [open, setOpen] = useState(false);
@@ -201,33 +201,39 @@ const Samples = () => {
   };
 
   const isReportFullyCompleted = (sample: any) => {
-    if (!sample.reportsProgress) return false;
-    if (!sample.sampleType || !Array.isArray(sample.sampleType)) return false;
+  if (!sample.reportsProgress) return false;
+  if (!sample.sampleType || !Array.isArray(sample.sampleType)) return false;
 
-    const activeTypes = sample.sampleType
-      .map((s: any) => {
-        if (typeof s === "string") return s.toLowerCase().trim();
-        if (s && typeof s === "object" && s.type) return s.type.toString().toLowerCase().trim();
-        return null;
-      })
-      .filter((type: string | null): type is string => type !== null && type !== "" && type !== "pl_pcr")
-      .filter((type: string, index: number) => {
-        const originalEntry = sample.sampleType[index];
-        let count = 0;
-        if (typeof originalEntry === "object" && originalEntry.count !== undefined) {
-          count = Number(originalEntry.count);
-        } else {
-          const match = sample.sampleType.find((t: any) =>
-            (typeof t === "object" ? t.type?.toLowerCase() : t?.toLowerCase()) === type
-          );
-          count = typeof match === "object" ? Number(match?.count || 0) : 0;
-        }
-        return count > 0;
-      });
+  const activeTypes = sample.sampleType
+    .map((s: any) => {
+      if (typeof s === "string") return s.toLowerCase().trim();
+      if (s && typeof s === "object" && s.type) return s.type.toString().toLowerCase().trim();
+      return null;
+    })
+    .filter((type: string | null): type is string => 
+      type !== null && 
+      type !== "" && 
+      type !== "pl_pcr" && 
+      type !== "wssv"          // ← Add this line: ignore WSSV completely
+    )
+    .filter((type: string, index: number) => {
+      const originalEntry = sample.sampleType[index];
+      let count = 0;
+      if (typeof originalEntry === "object" && originalEntry.count !== undefined) {
+        count = Number(originalEntry.count);
+      } else {
+        const match = sample.sampleType.find((t: any) =>
+          (typeof t === "object" ? t.type?.toLowerCase() : t?.toLowerCase()) === type
+        );
+        count = typeof match === "object" ? Number(match?.count || 0) : 0;
+      }
+      return count > 0;
+    });
 
-    if (activeTypes.length === 0) return true;
-    return activeTypes.every((type: string) => sample.reportsProgress[type] === "completed");
-  };
+  if (activeTypes.length === 0) return true;
+
+  return activeTypes.every((type: string) => sample.reportsProgress[type] === "completed");
+};
 
   const filteredInvoices = useMemo(() => {
   let result = invoices;

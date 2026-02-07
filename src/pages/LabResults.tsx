@@ -31,6 +31,7 @@ export default function LabResults() {
   const navigate = useNavigate();
 
   const [currentType, setCurrentType] = useState<string | null>(null);
+  const [checkedByName, setCheckedByName] = useState<string>("");
   const [step, setStep] = useState("loading");
   const [searchParams] = useSearchParams();
   const isEditMode = searchParams.get("mode") === "edit";
@@ -68,6 +69,7 @@ export default function LabResults() {
       const fullData = { ...docData, docId };
       setInvoice(fullData);
       startFlow(fullData);
+      setCheckedByName(docData.checkedBy || "______________________");
     } else {
       console.error("Invoice not found even in fallback query");
       setStep("error");
@@ -90,6 +92,7 @@ export default function LabResults() {
       (!pl || progress.pl === "completed") &&
       (!pcr || progress.pcr === "completed") &&
       (!micro || progress.microbiology === "completed");
+      // WSSV is intentionally ignored here
 
     if (isEditMode) {
       if (soil) { setCurrentType("soil"); setStep("soilForm"); return; }
@@ -136,6 +139,9 @@ export default function LabResults() {
   };
 
   const handleTypeClick = (type: string) => {
+    // Prevent WSSV from doing anything
+    if (type.toLowerCase() === "wssv") return;
+
     setCurrentType(type);
     if (isEditMode) {
       setStep(type + "Form");
@@ -237,7 +243,7 @@ export default function LabResults() {
           </div>
           <div>
             <p className="font-semibold">Checked by:</p>
-            <p className="mt-8">______________________</p>
+            <p className="mt-8 font-semibold">{checkedByName}</p>
           </div>
         </div>
       </div>
@@ -324,7 +330,9 @@ export default function LabResults() {
                 const type = s.type.toLowerCase();
                 const completed = invoice?.reportsProgress?.[type] === "completed";
                 const count = s.count || 0;
-                if (count === 0) return null;
+
+                // Skip WSSV button completely
+                if (type === "wssv" || count === 0) return null;
 
                 return (
                   <button

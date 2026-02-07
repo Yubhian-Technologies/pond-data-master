@@ -47,6 +47,7 @@ export default function MicrobiologyReport({
   const [data, setData] = useState<MicrobiologyData | null>(null);
   const [technicianName, setTechnicianName] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [checkedByName, setCheckedByName] = useState<string>("");
   const [locationDetails, setLocationDetails] = useState<{
     address: string;
     email: string;
@@ -80,6 +81,7 @@ export default function MicrobiologyReport({
         if (!snap.empty) {
           const docSnap = snap.docs[0];
           setRealInvoiceDocId(docSnap.id);
+          
           console.log("MicrobiologyReport - Found real docId:", docSnap.id);
         } else {
           console.error("MicrobiologyReport - Invoice document not found for:", invoiceId);
@@ -154,6 +156,16 @@ export default function MicrobiologyReport({
         }
 
         setTechnicianName(techName);
+        const invoiceRef = doc(db, "locations", locationId, "invoices", realInvoiceDocId);
+const invoiceSnap = await getDoc(invoiceRef);
+
+if (invoiceSnap.exists()) {
+  const invoiceData = invoiceSnap.data();
+  setCheckedByName(invoiceData.checkedBy || "______________________");
+} else {
+  setCheckedByName("______________________");
+}
+
       } catch (e) {
         console.error("Error fetching microbiology report:", e);
         setData(null);
@@ -225,7 +237,7 @@ export default function MicrobiologyReport({
         <div className="flex justify-between items-start mb-8 border-b-4 border-black pb-6">
           <img src={ADC} alt="ADC Logo" className="w-32" />
           <div className="text-center flex-1">
-            <h1 className="text-2xl font-bold text-blue-700">
+            <h1 className="text-xl font-bold text-blue-700">
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h1>
             <p className="text-sm text-black font-semibold">
@@ -325,7 +337,7 @@ export default function MicrobiologyReport({
             </div>
             <div>
               <p className="font-semibold">Checked by:</p>
-              <p className="mt-8">______________________</p>
+              <p className="mt-8  font-semibold">{checkedByName}</p>
             </div>
           </div>
         </div>

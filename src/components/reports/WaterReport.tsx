@@ -125,6 +125,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
   const [ponds, setPonds] = useState<Pond[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkedByName, setCheckedByName] = useState<string>("");
   const [locationDetails, setLocationDetails] = useState({
     address: "",
     email: "",
@@ -206,6 +207,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
             reportDate: invoiceData.reportDate || new Date().toISOString().split("T")[0],
             technicianName: invoiceData.technicianName || "",
           });
+          setCheckedByName(invoiceData.checkedBy || "________________");
         }
 
         // Water samples
@@ -626,7 +628,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
         {/* Footer Signatures */}
         <div className="flex justify-between items-center border-t border-black pt-4">
           <p className="font-bold text-xs">Reported by: {formData.technicianName || "________________"}</p>
-          <p className="font-bold text-xs">Checked by: ________________</p>
+          <p className="font-bold text-xs">Checked by: {checkedByName}</p>
         </div>
 
         <div className="mt-2 text-[9px] italic text-gray-600 leading-tight">

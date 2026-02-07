@@ -1,4 +1,4 @@
-import React, { useEffect, useState,useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { 
   collection, 
   doc, 
@@ -6,9 +6,12 @@ import {
   getDocs, 
   query, 
   setDoc, 
+  updateDoc, 
   where 
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
+import { useNavigate } from "react-router-dom";
+import { useUserSession } from "../../contexts/UserSessionContext";  // ← Added
 
 interface FarmerInfo {
   farmerName: string;
@@ -46,32 +49,24 @@ export default function PCRForm({
   locationId,
   onSubmit,
 }: PCRFormProps) {
+  const { session } = useUserSession();  // ← Added
+  const technicianName = session?.technicianName || "";  // ← Added
+
   const today = new Date().toISOString().split("T")[0];
 
   const [localInvoice, setLocalInvoice] = useState<any>(null);
 
- // ... your existing code ...
-
-const totalSamples = useMemo(() => {
-  const count = Number(
-    localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.count || 0
-  );
-  console.log("PCR totalSamples calculated:", {
-    rawSampleType: localInvoice?.sampleType,
-    foundPCR: localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr"),
-    count
-  });
-  return count;
-}, [localInvoice]);
-
-useEffect(() => {
-  setFarmerInfo(prev => ({
-    ...prev,
-    noOfSamples: totalSamples
-  }));
-}, [totalSamples]);
-
-
+  const totalSamples = useMemo(() => {
+    const count = Number(
+      localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.count || 0
+    );
+    console.log("PCR totalSamples calculated:", {
+      rawSampleType: localInvoice?.sampleType,
+      foundPCR: localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr"),
+      count
+    });
+    return count;
+  }, [localInvoice]);
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
     farmerName: "",
@@ -90,6 +85,8 @@ useEffect(() => {
   const [uploading, setUploading] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [checkedBy, setCheckedBy] = useState(technicianName);  // ← NEW: Checked by
+
   const PATHOGEN_NAME_MAP: Record<string, string> = {
     pl_ehp: "PL EHP",
     soil_ehp: "Soil EHP",
@@ -99,7 +96,7 @@ useEffect(() => {
     pl_ihhnv: "IHHNV",
   };
 
-  // Fetch invoice using query (matches LabResults and InvoicePage logic)
+  // Fetch invoice
   useEffect(() => {
     if (!locationId || !invoiceId) {
       console.warn("Missing locationId or invoiceId for PCRForm fetch");
@@ -110,11 +107,9 @@ useEffect(() => {
       try {
         const invoicesRef = collection(db, "locations", locationId, "invoices");
 
-        // Try by 'invoiceId' field first (new invoices)
         let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
         let querySnapshot = await getDocs(q);
 
-        // Fallback to old 'id' field (legacy invoices)
         if (querySnapshot.empty) {
           q = query(invoicesRef, where("id", "==", invoiceId));
           querySnapshot = await getDocs(q);
@@ -142,6 +137,13 @@ useEffect(() => {
   }, [locationId, invoiceId]);
 
   useEffect(() => {
+    setFarmerInfo(prev => ({
+      ...prev,
+      noOfSamples: totalSamples
+    }));
+  }, [totalSamples]);
+
+  useEffect(() => {
     const loadFarmerFromMaster = async () => {
       if (!localInvoice?.farmerId || !locationId) return;
 
@@ -154,7 +156,7 @@ useEffect(() => {
 
           setFarmerInfo(prev => ({
             ...prev,
-            farmerId: farmer.farmerId || "",   // ← Correct UID
+            farmerId: farmer.farmerId || "",   
             farmerName: farmer.name || prev.farmerName,
             mobile: farmer.phone || prev.mobile,
             village: farmer.city || prev.village
@@ -170,7 +172,7 @@ useEffect(() => {
     }
   }, [localInvoice?.farmerId, locationId]);
 
-  // Auto-calculate difference between sampleCollectionTime and reportDate
+  // Auto-calculate difference
   useEffect(() => {
     if (farmerInfo.sampleCollectionTime && farmerInfo.reportDate) {
       const collectionDate = new Date(farmerInfo.sampleCollectionTime);
@@ -195,6 +197,7 @@ useEffect(() => {
         setLoading(true);
 
         const loadedSamples: SamplePCRData[] = [];
+        let firstCheckedBy = technicianName;  // Default fallback
 
         for (let i = 1; i <= totalSamples; i++) {
           const pcrDocRef = doc(
@@ -202,7 +205,7 @@ useEffect(() => {
             "locations",
             locationId,
             "invoices",
-            localInvoice.docId,  // ← Use real docId here!
+            localInvoice.docId,
             "pcr_reports",
             `sample_${i}`
           );
@@ -220,6 +223,11 @@ useEffect(() => {
 
             if (data.gelImageUrl) {
               setGelImages((prev) => ({ ...prev, [i]: data.gelImageUrl }));
+            }
+
+            // Load checkedBy from first saved sample (simple approach)
+            if (i === 1 && data.checkedBy) {
+              firstCheckedBy = data.checkedBy;
             }
           } else {
             const selectedForThisSample = localInvoice?.samplePathogens?.[i] || [];
@@ -240,6 +248,7 @@ useEffect(() => {
         }
 
         setSamplesData(loadedSamples);
+        setCheckedBy(firstCheckedBy);  // Apply loaded value
       } catch (err) {
         console.error("Error loading PCR data:", err);
       } finally {
@@ -250,7 +259,7 @@ useEffect(() => {
     if (localInvoice) {
       loadAllData();
     }
-  }, [localInvoice, invoiceId, locationId, totalSamples]);
+  }, [localInvoice, invoiceId, locationId, totalSamples, technicianName]);
 
   const handleBasicInput = (sampleIndex: number, field: keyof SamplePCRData, value: string) => {
     setSamplesData((prev) => {
@@ -326,7 +335,7 @@ useEffect(() => {
           "locations",
           locationId,
           "invoices",
-          localInvoice.docId,  // ← Use real docId!
+          localInvoice.docId,
           "pcr_reports",
           `sample_${sampleNum}`
         );
@@ -339,10 +348,18 @@ useEffect(() => {
           pathogens: sample.pathogens,
           gelImageUrl: gelImages[sampleNum] || "",
           updatedAt: new Date().toISOString(),
+          checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← NEW
         }, { merge: true });
       });
 
       await Promise.all(savePromises);
+
+      // Also save checkedBy to main invoice
+      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
+      await updateDoc(invoiceRef, {
+        checkedBy: checkedBy.trim() || technicianName || "N/A",
+      });
+
       onSubmit();
     } catch (err) {
       console.error("Error saving PCR reports:", err);
@@ -559,6 +576,21 @@ useEffect(() => {
           </section>
         );
       })}
+
+      {/* NEW: Checked by input */}
+      <div className="mb-12 max-w-md mx-auto">
+        <label className="block text-xl font-bold mb-4 text-gray-800">
+          Checked by
+        </label>
+        <input
+          type="text"
+          value={checkedBy}
+          onChange={(e) => setCheckedBy(e.target.value)}
+          placeholder="Enter name of the person who checked the report"
+          required
+          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+        />
+      </div>
 
       <div className="text-center mt-12">
         <button

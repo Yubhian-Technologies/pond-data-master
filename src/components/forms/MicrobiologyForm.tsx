@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { 
   collection, 
   doc, 
@@ -6,9 +6,11 @@ import {
   getDocs, 
   query, 
   setDoc, 
+  updateDoc, 
   where 
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
+import { useUserSession } from "../../contexts/UserSessionContext";  // ← Added
 
 interface FarmerInfo {
   farmerName: string;
@@ -29,6 +31,9 @@ export default function MicrobiologyForm({
   locationId,
   onSubmit,
 }: MicrobiologyFormProps) {
+  const { session } = useUserSession();  // ← Added
+  const technicianName = session?.technicianName || "";  // ← Added
+
   const today = new Date().toISOString().split("T")[0];
 
   const [localInvoice, setLocalInvoice] = useState<any>(null);
@@ -65,6 +70,8 @@ export default function MicrobiologyForm({
   const [farmerUID, setFarmerUID] = useState<string>("");
 
   const [sampleType, setSampleType] = useState<string>("Microbiology");
+
+  const [checkedBy, setCheckedBy] = useState(technicianName);  // ← NEW: Checked by
 
   const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.microbiology || {};
 
@@ -126,7 +133,7 @@ export default function MicrobiologyForm({
       try {
         setLoading(true);
 
-        // ALWAYS pre-fill from farmer master (runs on first load)
+        // ALWAYS pre-fill from farmer master
         let loadedFarmerId = "";
         if (localInvoice?.farmerId) {
           const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
@@ -136,7 +143,6 @@ export default function MicrobiologyForm({
             loadedFarmerId = farmerData.farmerId || "";
             setFarmerUID(loadedFarmerId);
 
-            // Pre-fill name, village, mobile, date
             setFarmerInfo(prev => ({
               ...prev,
               farmerName: farmerData.name || prev.farmerName || "",
@@ -148,13 +154,13 @@ export default function MicrobiologyForm({
           }
         }
 
-        // Load saved microbiology report (overrides pre-fill if exists)
+        // Load saved microbiology report (overrides if exists)
         const reportRef = doc(
           db,
           "locations",
           locationId,
           "invoices",
-          localInvoice.docId,  // ← Fixed: use real docId
+          localInvoice.docId,
           "microbiologyReports",
           "data"
         );
@@ -186,8 +192,12 @@ export default function MicrobiologyForm({
           });
 
           setMicrobiologyData(normalized);
+
+          // ← NEW: Load checkedBy if saved
+          if (data.checkedBy) {
+            setCheckedBy(data.checkedBy);
+          }
         } else {
-          // First time - keep pre-filled values
           setMicrobiologyData(emptyMicrobiologyData);
         }
       } catch (error) {
@@ -233,9 +243,16 @@ export default function MicrobiologyForm({
           totalSamples,
           sampleType,
           updatedAt: new Date().toISOString(),
+          checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← NEW
         },
         { merge: true }
       );
+
+      // Also save to invoice document
+      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
+      await updateDoc(invoiceRef, {
+        checkedBy: checkedBy.trim() || technicianName || "N/A",
+      });
 
       onSubmit();
     } catch (error) {
@@ -395,6 +412,21 @@ export default function MicrobiologyForm({
           </table>
         </div>
       </section>
+
+      {/* NEW: Checked by input */}
+      <div className="mb-12 max-w-md mx-auto">
+        <label className="block text-xl font-bold mb-4 text-gray-800">
+          Checked by
+        </label>
+        <input
+          type="text"
+          value={checkedBy}
+          onChange={(e) => setCheckedBy(e.target.value)}
+          placeholder="Enter name of the person who checked the report"
+          required
+          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+        />
+      </div>
 
       <div className="text-center">
         <button

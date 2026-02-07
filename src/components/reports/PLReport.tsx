@@ -64,6 +64,7 @@ export default function PLReport({
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo | null>(null);
   const [plData, setPlData] = useState<PLData | null>(null);
   const [sampleType, setSampleType] = useState<string>("PL (Post Larvae)");
+  const [checkedByName, setCheckedByName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [locationDetails, setLocationDetails] = useState<{
     address: string;
@@ -208,6 +209,16 @@ export default function PLReport({
             farmerId: "-",
           });
         }
+
+const invoiceRef = doc(db, "locations", locationId, "invoices", realInvoiceDocId);
+const invoiceSnap = await getDoc(invoiceRef);
+
+if (invoiceSnap.exists()) {
+  const invoiceData = invoiceSnap.data();
+  setCheckedByName(invoiceData.checkedBy || "______________________");
+} else {
+  setCheckedByName("______________________");
+}
       } catch (err) {
         console.error("Error fetching PL report:", err);
       } finally {
@@ -441,7 +452,7 @@ export default function PLReport({
                 </div>
                 <div>
                   <p className="font-semibold">Checked by:</p>
-                  <p className="mt-8">______________________</p>
+                  <p className="mt-8">{checkedByName}</p>
                 </div>
               </div>
               <div className="text-center text-xs text-gray-700">

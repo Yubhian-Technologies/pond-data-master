@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { 
   collection, 
   doc, 
@@ -6,10 +6,12 @@ import {
   getDocs, 
   query, 
   setDoc, 
+  updateDoc, 
   where 
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import { useNavigate } from "react-router-dom";
+import { useUserSession } from "../../contexts/UserSessionContext";  // ← Added import
 
 interface FarmerInfo {
   farmerName: string;
@@ -33,8 +35,11 @@ export default function PLForm({
   locationId,
   onSubmit,
 }: PLFormProps) {
-  const today = new Date().toISOString().split("T")[0];
-  const currentTime = new Date().toTimeString().slice(0, 5);
+  const { session } = useUserSession();  // ← Added
+  const technicianName = session?.technicianName || "";  // ← Added
+
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const currentTime = useMemo(() => new Date().toTimeString().slice(0, 5), []);
 
   /* ---------- helpers ---------- */
   const createEmptyArray = (length: number) =>
@@ -44,12 +49,7 @@ export default function PLForm({
     Array.from({ length }, (_, i) => arr[i] ?? "");
 
   const [localInvoice, setLocalInvoice] = useState<any>(null);
-
-  // Get total PL sample count from invoice
-  const totalSamples =
-    Number(
-      localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pl")?.count || 1
-    );
+  const [totalSamples, setTotalSamples] = useState(1);
 
   /* ---------- empty structure ---------- */
   const emptyPLData = {
@@ -93,141 +93,55 @@ export default function PLForm({
   // Read-only display field
   const [farmerUID, setFarmerUID] = useState<string>("");
 
+  const [checkedBy, setCheckedBy] = useState(technicianName);  // ← NEW: Checked by
+
+  // Fetch invoice
   useEffect(() => {
-  if (!invoiceId || !locationId) return;
+    if (!invoiceId || !locationId) return;
 
-  const fetchInvoice = async () => {
-    try {
-      const invoicesRef = collection(db, "locations", locationId, "invoices");
-
-      // Try new invoices
-      let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
-      let snap = await getDocs(q);
-
-      // Fallback to old invoices
-      if (snap.empty) {
-        q = query(invoicesRef, where("id", "==", invoiceId));
-        snap = await getDocs(q);
-      }
-
-      if (!snap.empty) {
-        const docSnap = snap.docs[0];
-        setLocalInvoice({ ...docSnap.data(), docId: docSnap.id });
-        console.log("PLForm loaded invoice:", docSnap.id);
-      } else {
-        console.error("PLForm invoice not found:", invoiceId);
-      }
-    } catch (err) {
-      console.error("PLForm invoice fetch error:", err);
-    }
-  };
-
-  fetchInvoice();
-}, [invoiceId, locationId]);
-
-
- // Pre-fill from invoice + load saved report data
-useEffect(() => {
-  const loadData = async () => {
-    if (!localInvoice) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Compute dates/times INSIDE the effect (stable!)
-      const today = new Date().toISOString().split("T")[0];
-      const currentTime = new Date().toTimeString().slice(0, 5);
-
-      // Step 1: Always pre-fill from invoice/farmer master
-      let loadedFarmerId = "";
-      if (localInvoice?.farmerId) {
-        const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
-        const farmerSnap = await getDoc(farmerRef);
-        if (farmerSnap.exists()) {
-          const farmerData = farmerSnap.data();
-          loadedFarmerId = farmerData.farmerId || "";
-          setFarmerUID(loadedFarmerId);
-
-          setFarmerInfo(prev => ({
-            ...prev,
-            farmerName: farmerData.name || prev.farmerName || "",
-            village: farmerData.city || prev.village || "",
-            mobile: farmerData.phone || prev.mobile || "",
-            sampleDate: localInvoice.dateOfCulture || today,
-            farmerId: loadedFarmerId,
-          }));
-        }
-      }
-
-      // Step 2: Load saved PL report data (overrides if exists)
-      const plReportRef = doc(
-        db,
-        "locations",
-        locationId,
-        "invoices",
-        localInvoice.docId,
-        "plReports",
-        "data"
-      );
-
-      const snap = await getDoc(plReportRef);
-
-      if (snap.exists()) {
-        const data = snap.data() || {};
-
-        if (data.farmerInfo) {
-          setFarmerInfo({
-            farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
-            village: data.farmerInfo.village || farmerInfo.village,
-            mobile: data.farmerInfo.mobile || farmerInfo.mobile,
-            sampleDate: data.farmerInfo.sampleDate || localInvoice?.dateOfCulture || today,
-            sampleTime: data.farmerInfo.sampleTime || "",
-            reportDate: data.farmerInfo.reportDate || today,
-            reportTime: data.farmerInfo.reportTime || currentTime,
-            farmerId: data.farmerInfo.farmerId || loadedFarmerId || "",
-          });
-        }
-
-        if (data.sampleType) {
-          setSampleType(data.sampleType);
-        }
-
-        const savedPlData = data.plData || {};
-        const normalized: any = {};
-
-        Object.keys(emptyPLData).forEach((key) => {
-          normalized[key] = normalizeArray(savedPlData[key], totalSamples);
-        });
-
-        setPlData(normalized);
-      }
-
-    } catch (error) {
-      console.error("Error loading PL data:", error);
-      setPlData(emptyPLData);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  loadData();
-}, [localInvoice, locationId]);  
-
-  // Pre-fill from invoice + load saved report data
-  useEffect(() => {
-    const loadData = async () => {
-      if (!localInvoice) {
-        setLoading(false);
-        return;
-      }
-
+    const fetchInvoice = async () => {
       try {
-        setLoading(true);
+        const invoicesRef = collection(db, "locations", locationId, "invoices");
 
-        // Step 1: Always pre-fill from invoice (runs on first load)
+        let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
+        let snap = await getDocs(q);
+
+        if (snap.empty) {
+          q = query(invoicesRef, where("id", "==", invoiceId));
+          snap = await getDocs(q);
+        }
+
+        if (!snap.empty) {
+          const docSnap = snap.docs[0];
+          setLocalInvoice({ ...docSnap.data(), docId: docSnap.id });
+          console.log("PLForm loaded invoice:", docSnap.id);
+        } else {
+          console.error("PLForm invoice not found:", invoiceId);
+        }
+      } catch (err) {
+        console.error("PLForm invoice fetch error:", err);
+      }
+    };
+
+    fetchInvoice();
+  }, [invoiceId, locationId]);
+
+  // Combined loading logic – determine count first, then load & normalize
+  useEffect(() => {
+    if (!localInvoice) return;
+
+    const plType = localInvoice.sampleType?.find(
+      (s: any) => s.type?.toLowerCase() === "pl"
+    );
+    const count = Number(plType?.count || 1);
+
+    // Set correct number of samples FIRST
+    setTotalSamples(count);
+
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // 1. Pre-fill farmer info from master
         let loadedFarmerId = "";
         if (localInvoice?.farmerId) {
           const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
@@ -237,8 +151,7 @@ useEffect(() => {
             loadedFarmerId = farmerData.farmerId || "";
             setFarmerUID(loadedFarmerId);
 
-            // Pre-fill basic info from farmer master + invoice
-            setFarmerInfo(prev => ({
+            setFarmerInfo((prev) => ({
               ...prev,
               farmerName: farmerData.name || prev.farmerName || "",
               village: farmerData.city || prev.village || "",
@@ -249,7 +162,7 @@ useEffect(() => {
           }
         }
 
-        // Step 2: Load saved PL report data (overrides pre-fill if exists)
+        // 2. Load saved PL report (if exists)
         const plReportRef = doc(
           db,
           "locations",
@@ -262,9 +175,12 @@ useEffect(() => {
 
         const snap = await getDoc(plReportRef);
 
+        let finalPlData = { ...emptyPLData };
+
         if (snap.exists()) {
           const data = snap.data() || {};
 
+          // Override farmer info if saved
           if (data.farmerInfo) {
             setFarmerInfo({
               farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
@@ -282,26 +198,46 @@ useEffect(() => {
             setSampleType(data.sampleType);
           }
 
+          // IMPORTANT: use the correct 'count' here (not totalSamples state yet)
           const savedPlData = data.plData || {};
           const normalized: any = {};
 
           Object.keys(emptyPLData).forEach((key) => {
-            normalized[key] = normalizeArray(savedPlData[key], totalSamples);
+            normalized[key] = normalizeArray(savedPlData[key] || [], count);
           });
 
-          setPlData(normalized);
+          finalPlData = normalized;
+
+          // ← NEW: Load checkedBy if saved in PL report data
+          if (data.checkedBy) {
+            setCheckedBy(data.checkedBy);
+          }
+        } else {
+          // No saved data → create fresh empty arrays with correct length
+          const fresh: any = {};
+          Object.keys(emptyPLData).forEach((key) => {
+            fresh[key] = createEmptyArray(count);
+          });
+          finalPlData = fresh;
         }
+
+        setPlData(finalPlData);
 
       } catch (error) {
         console.error("Error loading PL data:", error);
-        setPlData(emptyPLData);
+        // Fallback: at least show correct number of empty fields
+        const fallback: any = {};
+        Object.keys(emptyPLData).forEach((key) => {
+          fallback[key] = createEmptyArray(count);
+        });
+        setPlData(fallback);
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [localInvoice, locationId, today, currentTime]);
+  }, [localInvoice, locationId]);
 
   /* ---------- Update individual cell ---------- */
   const updateColumn = (field: string, index: number, value: string) => {
@@ -338,9 +274,16 @@ useEffect(() => {
           totalSamples,
           sampleType,
           updatedAt: new Date().toISOString(),
+          checkedBy: checkedBy.trim() || technicianName || "N/A",  // ← NEW: save checkedBy here
         },
         { merge: true }
       );
+
+      // Also save to invoice document (consistent with other forms)
+      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
+      await updateDoc(invoiceRef, {
+        checkedBy: checkedBy.trim() || technicianName || "N/A",
+      });
 
       onSubmit();
     } catch (error) {
@@ -506,6 +449,21 @@ useEffect(() => {
           </div>
         ))}
       </section>
+
+      {/* NEW: Checked by input */}
+      <div className="mb-10 max-w-md mx-auto">
+        <label className="block text-xl font-bold mb-4 text-gray-800">
+          Checked by
+        </label>
+        <input
+          type="text"
+          value={checkedBy}
+          onChange={(e) => setCheckedBy(e.target.value)}
+          placeholder="Enter name of the person who checked the report"
+          required
+          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+        />
+      </div>
 
       {/* Submit Button */}
       <section className="text-center">

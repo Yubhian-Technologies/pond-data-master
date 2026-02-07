@@ -350,7 +350,7 @@ export default function PCRReport({
 
     return (
       <div className="mt-12">
-        <h3 className="text-2xl font-bold text-center mb-8 text-gray-800">
+        <h3 className="text-xl font-bold text-center mb-8 text-gray-800">
           Report Images
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -367,7 +367,7 @@ export default function PCRReport({
                 <img
                   src={r.gelImageUrl}
                   alt={`Gel Image - Sample ${r.sampleCode}`}
-                  className="w-full h-auto object-contain"
+                  className="w-[50%] h-auto object-contain"
                 />
               </div>
             ))}
@@ -391,6 +391,7 @@ export default function PCRReport({
         @media print {
           #report {
             padding: 4px !important;
+            
             margin: 0 !important;
             box-shadow: none !important;
           }
