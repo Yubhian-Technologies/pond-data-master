@@ -579,144 +579,165 @@ export default function LabResults() {
         </>
       )}
 
-      {isViewingReports && (
+     {isViewingReports && (
   <div className="mb-8 print:hidden">
-    {/* Only show buttons if the active report is pathology */}
-    <div className="flex gap-10 items-start justify-center">
-      {(activeEnvReport === "pathology" || activeEnvReport === "water") && (
-      <div className="flex justify-center gap-4 mb-6" id="print-buttons">
+    <div className="flex flex-col items-center justify-center gap-6">
+      
+      {/* 1. BUTTONS ROW: Decides what shows based on the active tab */}
+      <div className="flex justify-center gap-4" id="print-buttons">
+        
+        {/* PATHOLOGY TAB: Show Both Download and Print */}
+        {activeEnvReport === "pathology" && (
+          <>
+            <button
+              onClick={handleDownloadJpeg}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+            >
+              <Download size={20} />
+              Download Full Report as JPEG
+            </button>
+
+            <button
+              onClick={handlePrintCapture}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+            >
+              <Printer size={20} />
+              Print Report
+            </button>
+          </>
+        )}
+
+        {/* WATER TAB: Show ONLY Download JPEG */}
+        {activeEnvReport === "water" && (
+          <button
+            onClick={handleDownloadJpeg}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+          >
+            <Download size={20} />
+            Download Full Report as JPEG
+          </button>
+        )}
+
+        {/* SOIL & MICRO TAB: Show ONLY Download JPEG (Optional, keeps UI consistent)
+        {(activeEnvReport === "soil" || activeEnvReport === "microbiology") && (
+          <button
+            onClick={handleDownloadJpeg}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+          >
+            <Download size={20} />
+            Download JPEG
+          </button>
+        )} */}
+      </div>
+
+      {/* 2. NAVIGATION ROW (The Tabs) */}
+      <div className="overflow-x-auto pb-4 w-full" id="view-mode-nav">
+        <div className="flex gap-4 justify-center min-w-max px-4">
+          <button
+            onClick={() => navigate("/samples")}
+            className="px-5 py-1.5 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+          >
+            BACK
+          </button>
+
+          {hasSoil && (
+            <button
+              onClick={() => setActiveEnvReport("soil")}
+              className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                activeEnvReport === "soil"
+                  ? "bg-green-700 text-white border-green-900"
+                  : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+              }`}
+            >
+              SOIL REPORT
+            </button>
+          )}
+          {hasWater && (
+            <button
+              onClick={() => setActiveEnvReport("water")}
+              className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                activeEnvReport === "water"
+                  ? "bg-green-700 text-white border-green-900"
+                  : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+              }`}
+            >
+              WATER REPORT
+            </button>
+          )}
+          {hasMicro && (
+            <button
+              onClick={() => setActiveEnvReport("microbiology")}
+              className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                activeEnvReport === "microbiology"
+                  ? "bg-green-700 text-white border-green-900"
+                  : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+              }`}
+            >
+              MICROBIOLOGY REPORT
+            </button>
+          )}
+          {hasPathology && (
+            <button
+              onClick={() => setActiveEnvReport("pathology")}
+              className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                activeEnvReport === "pathology"
+                  ? "bg-green-700 text-white border-green-900"
+                  : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+              }`}
+            >
+              PL/PCR REPORT
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* DIRECT VIEW (Immediately after generating) */}
+{!isViewingReports && (
+  <div className="flex justify-center gap-4 mb-6 print:hidden" id="print-buttons">
+    {/* PATHOLOGY: Show Both Buttons */}
+    {(step === "pathologyReport" || step === "plReport" || step === "pcrReport") && (
+      <>
         <button
           onClick={handleDownloadJpeg}
           className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
         >
-          <Download size={20} />
-          Download Full Report as JPEG
+          <Download size={20} /> Download Full Report as JPEG
         </button>
-
-        
-      </div>
-    )}
-    {(activeEnvReport === "pathology" ) && (
-      <div className="flex justify-center gap-4 mb-6" id="print-buttons">
         <button
           onClick={handlePrintCapture}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md transition"
         >
-          <Download size={20} />
-          Print Report
+          <Printer size={20} /> Print Report
         </button>
-
-        
-      </div>
+      </>
     )}
-    </div>
 
-     <div className="overflow-x-auto pb-4" id="view-mode-nav">
-            <div className="flex gap-4 justify-center min-w-max px-4">
-              <button
-                onClick={() => navigate("/samples")}
-                className="px-5 py-1.5 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
-              >
-                BACK
-              </button>
+    {/* WATER: Only Download Button */}
+    {step === "waterReport" && (
+      <button
+        onClick={handleDownloadJpeg}
+        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+      >
+        <Download size={20} /> Download Full Report as JPEG
+      </button>
+    )}
 
-              {hasSoil && (
-                <button
-                  onClick={() => setActiveEnvReport("soil")}
-                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                    activeEnvReport === "soil"
-                      ? "bg-green-700 text-white border-green-900"
-                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                  }`}
-                >
-                  SOIL REPORT
-                </button>
-              )}
-              {hasWater && (
-                <button
-                  onClick={() => setActiveEnvReport("water")}
-                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                    activeEnvReport === "water"
-                      ? "bg-green-700 text-white border-green-900"
-                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                  }`}
-                >
-                  WATER REPORT
-                </button>
-              )}
-              {hasMicro && (
-                <button
-                  onClick={() => setActiveEnvReport("microbiology")}
-                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                    activeEnvReport === "microbiology"
-                      ? "bg-green-700 text-white border-green-900"
-                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                  }`}
-                >
-                  MICROBIOLOGY REPORT
-                </button>
-              )}
-              {hasPathology && (
-                <button
-                  onClick={() => setActiveEnvReport("pathology")}
-                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                    activeEnvReport === "pathology"
-                      ? "bg-green-700 text-white border-green-900"
-                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                  }`}
-                >
-                  PL/PCR REPORT
-                </button>
-              )}
-            </div>
-          </div>
+    {/* SOIL/MICRO: If you want buttons here, add them similarly */}
+    {/* {(step === "soilReport" || step === "microbiologyReport") && (
+       <button
+       onClick={handleDownloadJpeg}
+       className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+     >
+       <Download size={20} /> Download JPEG
+     </button>
+    )} */}
   </div>
 )}
 
-      {/* Replace the existing condition with this specific one */}
-{/* Change the condition to include soil, water, and micro */}
-{(!isViewingReports && (
-  step === "pathologyReport" || 
-  step === "plReport" || 
-  step === "pcrReport" || 
-  step === "waterReport" 
-  
-)) && (
-  <div className="flex justify-center gap-4 mb-6 print:hidden" id="print-buttons">
-    <button
-      onClick={handleDownloadJpeg}
-      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
-    >
-      <Download size={20} />
-      Download Full Report as JPEG
-    </button>
 
-    <button
-      onClick={handlePrintCapture}
-      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md transition"
-    >
-      <Printer size={20} />
-      Print Report
-    </button>
-  </div>
-)}
-{(!isViewingReports && (
-   
-  step === "waterReport" 
-  
-)) && (
-  <div className="flex justify-center gap-4 mb-6 print:hidden" id="print-buttons">
-    
-
-    <button
-      onClick={handlePrintCapture}
-      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md transition"
-    >
-      <Printer size={20} />
-      Print Report
-    </button>
-  </div>
-)}
 
       <div ref={reportRef} className="bg-white">
         {step === "soilForm" && hasSoil && <SoilForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("soil"); setStep("soilReport"); }} />}
