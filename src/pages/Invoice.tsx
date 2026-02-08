@@ -141,7 +141,7 @@ const InvoicePage = () => {
     return samplesWithPcrTests.size;
   }, [perSampleTests.pcr]);
 
-  // Auto-update charged count when actual PL changes (initial + when user adds/removes tests)
+  // Auto-update charged count when actual PL changes
   useEffect(() => {
     setChargedPlCount(actualPlCount);
   }, [actualPlCount]);
@@ -182,12 +182,13 @@ const InvoicePage = () => {
   const toggleTest = (sampleType: string, sampleIndex: number, testId: string) => {
     setPerSampleTests((prev) => {
       const newSets = [...(prev[sampleType] || [])];
-      const set = newSets[sampleIndex];
+      const set = new Set(newSets[sampleIndex]);
       if (set.has(testId)) {
         set.delete(testId);
       } else {
         set.add(testId);
       }
+      newSets[sampleIndex] = set;
       return { ...prev, [sampleType]: newSets };
     });
   };
@@ -213,7 +214,7 @@ const InvoicePage = () => {
     } = {};
     let subtotal = 0;
 
-    // PCR tests - full count always
+    // 1. PCR tests - full count always
     if (actualPcrCount > 0) {
       const pcrTestCount: { [testId: string]: number } = {};
       perSampleTests.pcr.forEach((set) => {
@@ -234,7 +235,7 @@ const InvoicePage = () => {
         .filter(Boolean) as any;
     }
 
-    // PL tests - billing uses chargedPlCount
+    // 2. PL tests - billing logic with check if BOTH PL and PCR are selected
     if (actualPlCount > 0) {
       const plTestCount: { [testId: string]: number } = {};
       perSampleTests.pl.forEach((set) => {
@@ -245,14 +246,16 @@ const InvoicePage = () => {
         }
       });
 
-      // Calculate billed quantity proportionally
-      const ratio = actualPlCount > 0 ? chargedPlCount / actualPlCount : 0;
+      // LOGIC: Only apply proportional billing if both PL and PCR tests are actually selected
+      const isComboActive = actualPlCount > 0 && actualPcrCount > 0;
+      const effectiveChargedCount = isComboActive ? chargedPlCount : actualPlCount;
+      const ratio = actualPlCount > 0 ? effectiveChargedCount / actualPlCount : 0;
 
       groupedItems["pl"] = Object.entries(plTestCount)
         .map(([testId, qty]) => {
           const test = availableTests.find((t) => t.id === testId && t.sampleType === "pl");
           if (!test) return null;
-          const billedQty = Math.floor(qty * ratio); // or Math.round if you prefer
+          const billedQty = Math.floor(qty * ratio); 
           const itemTotal = billedQty * test.price;
           subtotal += itemTotal;
           return { name: test.name, quantity: billedQty, price: test.price, total: itemTotal };
@@ -260,7 +263,7 @@ const InvoicePage = () => {
         .filter(Boolean) as any;
     }
 
-    // Other sample types - unchanged
+    // 3. Other sample types
     sampleSummary.forEach((s) => {
       if (s.type === "pl" || s.type === "pcr") return;
       const testCount: { [testId: string]: number } = {};
@@ -419,9 +422,8 @@ const InvoicePage = () => {
       isZeroInvoice: isZeroInvoice,
       note: isZeroInvoice ? "Lab Equipment Testing - Zero Charge" : null,
       perSampleSelectedTests,
-      // Optional: save the billing adjustment for records
       plActualCount: actualPlCount,
-      plChargedCount: chargedPlCount,
+      plChargedCount: (actualPlCount > 0 && actualPcrCount > 0) ? chargedPlCount : actualPlCount,
     };
 
     try {
@@ -630,8 +632,8 @@ const InvoicePage = () => {
                           </div>
                         ))}
 
-                        {/* ── New PL charge control ── */}
-                        {actualPlCount > 0 && (
+                        {/* Charge for PL samples only shows if BOTH PL and PCR tests are actually selected */}
+                        {actualPlCount > 0 && actualPcrCount > 0 && (
                           <div className="space-y-2 border-t pt-4">
                             <Label htmlFor="charged-pl-count">
                               Charge for how many PL samples?
@@ -656,14 +658,14 @@ const InvoicePage = () => {
                               </span>
                             </div>
                             {chargedPlCount < actualPlCount && (
-                              <p className="text-xs text-amber-600">
-                                {actualPlCount - chargedPlCount} PL sample(s) free
+                              <p className="text-xs text-amber-600 font-medium">
+                                {actualPlCount - chargedPlCount} PL sample(s) free (Combo)
                               </p>
                             )}
                           </div>
                         )}
 
-                        <div className="space-y-2">
+                        <div className="space-y-2 pt-4">
                           <div className="flex justify-between text-base">
                             <span>Subtotal</span>
                             <span>₹{subtotal.toFixed(2)}</span>
@@ -711,7 +713,7 @@ const InvoicePage = () => {
                           )}
 
                           <Separator className="my-3" />
-                          <div className="flex justify-between font-bold text-lg">
+                          <div className="flex justify-between font-bold text-lg text-blue-700">
                             <span>Final Total Amount</span>
                             <span>₹{grandTotal.toFixed(2)}</span>
                           </div>
