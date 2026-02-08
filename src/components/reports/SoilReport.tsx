@@ -91,7 +91,38 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
   const handlePrint = () => window.print();
 
-  
+  const handleDownloadJpeg = async () => {
+    if (!reportRef.current) return;
+    const element = reportRef.current;
+
+    try {
+      // 1. Add temporary padding and fixed width for a clean landscape capture
+      const originalPadding = element.style.padding;
+      const originalWidth = element.style.width;
+      
+      element.style.padding = "40px"; 
+      element.style.width = "1200px"; // Ensures consistency in the image
+
+      const canvas = await html2canvas(element, {
+        scale: 2, // High resolution
+        useCORS: true, 
+        backgroundColor: "#ffffff",
+        scrollY: -window.scrollY, // Prevents offset if page is scrolled
+      });
+
+      // 2. Revert styles back immediately
+      element.style.padding = originalPadding;
+      element.style.width = originalWidth;
+
+      const image = canvas.toDataURL("image/jpeg", 1.0);
+      const link = document.createElement("a");
+      link.href = image;
+      link.download = `Soil_Report_${invoiceId}.jpg`;
+      link.click();
+    } catch (err) {
+      console.error("JPEG Capture Error:", err);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -260,6 +291,12 @@ const SoilReport: React.FC<SoilReportProps> = ({
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
         >
           <Printer size={20} /> Print Report (PDF)
+        </button>
+        <button
+          onClick={handleDownloadJpeg}
+          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+        >
+          <Printer size={20} /> Download JPEG
         </button>
 
         

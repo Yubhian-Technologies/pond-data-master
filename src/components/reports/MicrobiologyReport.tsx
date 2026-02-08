@@ -214,7 +214,36 @@ export default function MicrobiologyReport({
   const handlePrint = () => {
     window.print();
   };
+  const handleDownloadJpeg = async () => {
+  if (!reportRef.current) return;
+  const element = reportRef.current;
 
+  try {
+    // 1. Add temporary padding to the element for the capture
+    const originalPadding = element.style.padding;
+    element.style.padding = "40px"; // Adjust this value for more/less border space
+
+    const canvas = await html2canvas(element, {
+      scale: 2, // High quality
+      useCORS: true, 
+      backgroundColor: "#ffffff",
+      // Ensures the canvas captures the full height even if scrolled
+      scrollY: -window.scrollY, 
+      windowWidth: element.scrollWidth + 100, // Adds extra horizontal room
+    });
+
+    // 2. Revert the element's style back to original immediately after capture
+    element.style.padding = originalPadding;
+
+    const image = canvas.toDataURL("image/jpeg", 0.9);
+    const link = document.createElement("a");
+    link.href = image;
+    link.download = `Micro-Report_${invoiceId}.jpg`;
+    link.click();
+  } catch (err) {
+    console.error("JPEG Capture Error:", err);
+  }
+};
  
 
   if (loading) {
@@ -234,6 +263,12 @@ export default function MicrobiologyReport({
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 shadow"
         >
           <Printer size={20} /> Print Report
+        </button>
+        <button
+          onClick={handleDownloadJpeg}
+          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 shadow"
+        >
+          <Printer size={20} /> Download JPEG
         </button>
 
         

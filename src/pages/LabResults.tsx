@@ -25,7 +25,7 @@ import { db } from "./firebase";
 import { useUserSession } from "../contexts/UserSessionContext";
 import * as htmlToImage from 'html-to-image';
 import { saveAs } from 'file-saver';
-import { Download } from "lucide-react";
+import { Download, Printer } from "lucide-react";
 
 export default function LabResults() {
   const [invoice, setInvoice] = useState<any>(null);
@@ -197,34 +197,47 @@ export default function LabResults() {
 
   const showTopButtons = !isViewingReports;
 
-  const combinedPrintStyles = `
-  @media print {
-    .pl-page { 
-      ${hasPL && hasPCR ? 'page-break-after: always !important;' : ''} 
-    }
-    .pcr-page { 
-      ${hasPL && hasPCR ? 'page-break-before: always !important;' : ''} 
-    }
-    .pl-tight-bottom { 
-      margin-bottom: 1rem !important; 
-      padding-bottom: 0 !important; 
-    }
-    .signature-section {
-      page-break-before: avoid !important;
-      page-break-inside: avoid !important;
-    }
+ const combinedPrintStyles = `
+@media print, screen {
+  /* Force Borders on ALL Pathology tables (PL and PCR) */
+  #pl-report table, 
+  .pathology-table-container table {
+    border: 2px solid black !important;
+    border-collapse: collapse !important;
+  }
 
-    @page {
-      size: A4 portrait;
-      margin: 1cm;
-    }
+  #pl-report td, #pl-report th,
+  .pathology-table-container td, 
+  .pathology-table-container th {
+    border: 2px solid black !important; /* Thick black border for every cell */
+  }
 
-    table, img, div, section { 
-      page-break-inside: avoid !important; 
-    }
+  /* Ensure the farmer info table also gets borders */
+  .farmer-info-table td {
+    border: 1.5px solid black !important;
+  }
+}
 
-    .print\\:hidden { display: none !important; }
-  }
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  .break-before-page {
+    page-break-before: always !important;
+    break-before: page !important;
+    display: block !important;
+    clear: both !important;
+  }
+
+  /* Maintain the spacer height */
+  .print\:h-\\[150mm\\] {
+    height: 150mm !important;
+  }
+
+  body { margin: 0 !important; }
+}
 `;
 
   const renderSignatureAndNote = () => (
@@ -274,269 +287,304 @@ export default function LabResults() {
   );
 
   const renderPathologyReportContent = () => (
-    <>
+  <div className="flex flex-col">
+    {/* PAGE 1: DATA SECTION */}
+    <div className="block">
       {hasPL && (
-        <div className={hasPL && hasPCR ? "pl-page pl-tight-bottom" : ""}>
+        <div id="pl-report"> {/* ID ensures the PL styles hit */}
           <PLReport 
             invoiceId={invoiceId!} 
             locationId={session.locationId} 
             allSampleCount={plCount}
-            showSignature={false}
+            showSignature={false} 
           />
         </div>
       )}
 
       {hasPCR && (
-        <div className={hasPL && hasPCR ? "pcr-page" : ""}>
+        <div className={`pathology-table-container ${hasPL ? "mt-6" : ""}`}>
           <PCRReport
             invoiceId={invoiceId!}
             locationId={session.locationId}
             allSampleCount={pcrCount}
-            compact={hasPL && hasPCR}
+            compact={hasPL} 
             showAllSamples={true}
           />
         </div>
       )}
+    </div>
 
+    {/* THE BLOCKER */}
+    <div className="hidden print:block print:h-[150mm]"></div>
+
+    {/* PAGE 2: SIGNATURES */}
+    <div className="break-before-page bg-white pt-10">
       {renderSignatureAndNote()}
-    </>
-  );
+    </div>
+  </div>
+);
 
   const handleDownloadJpeg = async () => {
-  if (!reportRef.current) {
-    alert("Report not ready. Please wait or try again.");
-    return;
-  }
+    if (!reportRef.current) {
+      alert("Report not ready. Please wait or try again.");
+      return;
+    }
 
-  const element = reportRef.current;
+    const element = reportRef.current;
 
-  // ────────────────────────────────────────────────
-  // Find problematic containers (wide tables usually wrapped in overflow-x-auto)
-  // ────────────────────────────────────────────────
-  const scrollContainers = element.querySelectorAll('.overflow-x-auto');
+    const scrollContainers = element.querySelectorAll('.overflow-x-auto');
 
-  // Save original styles
-  const originalElementStyles = {
-    overflow: element.style.overflow,
-    width: element.style.width,
-    maxWidth: element.style.maxWidth,
-    position: element.style.position,
-  };
+    const originalElementStyles = {
+      overflow: element.style.overflow,
+      width: element.style.width,
+      maxWidth: element.style.maxWidth,
+      position: element.style.position,
+    };
 
-  const originalScrollStyles: { [key: string]: string }[] = [];
-
-  scrollContainers.forEach((container) => {
-    const el = container as HTMLElement;
-    originalScrollStyles.push({
-      overflowX: el.style.overflowX,
-      overflow: el.style.overflow,
-      width: el.style.width,
-      maxWidth: el.style.maxWidth,
-    });
-  });
-
-  try {
-    // ────────────────────────────────────────────────
-    // Force full visibility — remove scrollbars & constraints
-    // ────────────────────────────────────────────────
-    element.style.overflow = 'hidden';
-    element.style.width = 'auto';
-    element.style.maxWidth = 'none';
-    element.style.position = 'relative';
+    const originalScrollStyles: { [key: string]: string }[] = [];
 
     scrollContainers.forEach((container) => {
       const el = container as HTMLElement;
-      el.style.overflowX = 'visible';
-      el.style.overflow = 'visible';
-      el.style.width = 'auto';
-      el.style.maxWidth = 'none';
+      originalScrollStyles.push({
+        overflowX: el.style.overflowX,
+        overflow: el.style.overflow,
+        width: el.style.width,
+        maxWidth: el.style.maxWidth,
+      });
     });
 
-    await new Promise(r => setTimeout(r, 500)); 
+    try {
+      element.style.overflow = 'hidden';
+      element.style.width = 'auto';
+      element.style.maxWidth = 'none';
+      element.style.position = 'relative';
 
-    const fullWidth = Math.max(element.scrollWidth, 794); // min A4 width ~794px @96dpi
-    const fullHeight = element.scrollHeight;
+      scrollContainers.forEach((container) => {
+        const el = container as HTMLElement;
+        el.style.overflowX = 'visible';
+        el.style.overflow = 'visible';
+        el.style.width = 'auto';
+        el.style.maxWidth = 'none';
+      });
 
-    const dataUrl = await htmlToImage.toJpeg(element, {
-      quality: 0.92,
-      backgroundColor: '#ffffff',
-      canvasWidth: fullWidth * 1.5,
-      canvasHeight: fullHeight * 1.5,
-      pixelRatio: 1.5,
-      filter: (node) => {
-        if (!(node instanceof HTMLElement)) return true;
-        const style = window.getComputedStyle(node);
-        // Hide anything that looks like a scrollbar or hidden
-        return !(
-          style.display === 'none' ||
-          style.visibility === 'hidden' ||
-          node.classList.contains('print:hidden') ||
-          node.id === 'print-buttons' ||
-          node.id === 'view-mode-nav' ||
-          // Extra safety: hide typical scrollbar pseudo-elements if rendered as nodes
-          node.classList.contains('scrollbar') ||
-          node.classList.contains('::-webkit-scrollbar')
-        );
-      }
-    });
+      await new Promise(r => setTimeout(r, 500)); 
 
-    saveAs(dataUrl, `Lab-Report_${invoiceId || 'report'}.jpg`);
-  } catch (err) {
-    console.error("JPEG download failed:", err);
-    alert("Failed to generate JPEG.\nTry using Print → Save as PDF instead.");
-  } finally {
-    // ────────────────────────────────────────────────
-    // Restore ALL original styles
-    // ────────────────────────────────────────────────
-    element.style.overflow = originalElementStyles.overflow || '';
-    element.style.width = originalElementStyles.width || '';
-    element.style.maxWidth = originalElementStyles.maxWidth || '';
-    element.style.position = originalElementStyles.position || '';
+      const fullWidth = Math.max(element.scrollWidth, 794);
+      const fullHeight = element.scrollHeight;
 
-    scrollContainers.forEach((container, index) => {
+      const dataUrl = await htmlToImage.toJpeg(element, {
+        quality: 0.92,
+        backgroundColor: '#ffffff',
+        canvasWidth: fullWidth * 1.5,
+        canvasHeight: fullHeight * 1.5,
+        pixelRatio: 1.5,
+        filter: (node) => {
+          if (!(node instanceof HTMLElement)) return true;
+          const style = window.getComputedStyle(node);
+          return !(
+            style.display === 'none' ||
+            style.visibility === 'hidden' ||
+            node.classList.contains('print:hidden') ||
+            node.id === 'print-buttons' ||
+            node.id === 'view-mode-nav' ||
+            node.classList.contains('scrollbar') ||
+            node.classList.contains('::-webkit-scrollbar')
+          );
+        }
+      });
+
+      saveAs(dataUrl, `Lab-Report_${invoiceId || 'report'}.jpg`);
+    } catch (err) {
+      console.error("JPEG download failed:", err);
+      alert("Failed to generate JPEG.\nTry using Print → Save as PDF instead.");
+    } finally {
+      element.style.overflow = originalElementStyles.overflow || '';
+      element.style.width = originalElementStyles.width || '';
+      element.style.maxWidth = originalElementStyles.maxWidth || '';
+      element.style.position = originalElementStyles.position || '';
+
+      scrollContainers.forEach((container, index) => {
+        const el = container as HTMLElement;
+        const orig = originalScrollStyles[index];
+        if (orig) {
+          el.style.overflowX = orig.overflowX || '';
+          el.style.overflow = orig.overflow || '';
+          el.style.width = orig.width || '';
+          el.style.maxWidth = orig.maxWidth || '';
+        }
+      });
+    }
+  };
+
+  // ────────────────────────────────────────────────
+  // Print button: captures entire report like JPEG, then prints
+  // ────────────────────────────────────────────────
+  const handlePrintCapture = async () => {
+    if (!reportRef.current) {
+      alert("Report not ready. Please wait or try again.");
+      return;
+    }
+
+    const element = reportRef.current;
+
+    const scrollContainers = element.querySelectorAll('.overflow-x-auto');
+
+    const originalElementStyles = {
+      overflow: element.style.overflow,
+      width: element.style.width,
+      maxWidth: element.style.maxWidth,
+      position: element.style.position,
+    };
+
+    const originalScrollStyles: { [key: string]: string }[] = [];
+
+    scrollContainers.forEach((container) => {
       const el = container as HTMLElement;
-      const orig = originalScrollStyles[index];
-      if (orig) {
-        el.style.overflowX = orig.overflowX || '';
-        el.style.overflow = orig.overflow || '';
-        el.style.width = orig.width || '';
-        el.style.maxWidth = orig.maxWidth || '';
-      }
+      originalScrollStyles.push({
+        overflowX: el.style.overflowX,
+        overflow: el.style.overflow,
+        width: el.style.width,
+        maxWidth: el.style.maxWidth,
+      });
     });
-  }
-};
+
+    try {
+      element.style.overflow = 'hidden';
+      element.style.width = 'auto';
+      element.style.maxWidth = 'none';
+      element.style.position = 'relative';
+
+      scrollContainers.forEach((container) => {
+        const el = container as HTMLElement;
+        el.style.overflowX = 'visible';
+        el.style.overflow = 'visible';
+        el.style.width = 'auto';
+        el.style.maxWidth = 'none';
+      });
+
+      await new Promise(r => setTimeout(r, 500));
+
+      const fullWidth = Math.max(element.scrollWidth, 794);
+      const fullHeight = element.scrollHeight;
+
+      const dataUrl = await htmlToImage.toPng(element, {
+        quality: 1.0,
+        backgroundColor: '#ffffff',
+        canvasWidth: fullWidth * 2,
+        canvasHeight: fullHeight * 2,
+        pixelRatio: 2,
+        filter: (node) => {
+          if (!(node instanceof HTMLElement)) return true;
+          const style = window.getComputedStyle(node);
+          return !(
+            style.display === 'none' ||
+            style.visibility === 'hidden' ||
+            node.classList.contains('print:hidden') ||
+            node.id === 'print-buttons' ||
+            node.id === 'view-mode-nav'
+          );
+        }
+      });
+
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Lab Report - ${invoiceId || 'report'}</title>
+              <style>
+                body { margin: 0; padding: 0; background: white; }
+                img { width: 210mm; max-width: 100%; height: auto; display: block; margin: 0 auto; }
+                @page { size: A4 portrait; margin: 10mm; }
+                @media print {
+                  img { width: 100%; height: auto; }
+                }
+              </style>
+            </head>
+            <body onload="window.print(); setTimeout(() => window.close(), 1000);">
+              <img src="${dataUrl}" alt="Full Lab Report" />
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      } else {
+        alert("Popup blocked. Please allow popups for this site and try again.");
+      }
+    } catch (err) {
+      console.error("Print capture failed:", err);
+      alert("Failed to prepare report for printing.\nTry Ctrl+P instead.");
+    } finally {
+      element.style.overflow = originalElementStyles.overflow || '';
+      element.style.width = originalElementStyles.width || '';
+      element.style.maxWidth = originalElementStyles.maxWidth || '';
+      element.style.position = originalElementStyles.position || '';
+
+      scrollContainers.forEach((container, index) => {
+        const el = container as HTMLElement;
+        const orig = originalScrollStyles[index];
+        if (orig) {
+          el.style.overflowX = orig.overflowX || '';
+          el.style.overflow = orig.overflow || '';
+          el.style.width = orig.width || '';
+          el.style.maxWidth = orig.maxWidth || '';
+        }
+      });
+    }
+  };
 
   return (
-  <div className="p-6 max-w-7xl mx-auto relative pb-24">
-    <style>{combinedPrintStyles}</style>
+    <div className="p-6 max-w-7xl mx-auto relative pb-24">
+      <style>{combinedPrintStyles}</style>
 
-    {/* Top navigation / type selection buttons — only in entry/edit mode */}
-    {showTopButtons && (
-      <>
-        <div className="overflow-x-auto pb-4 mb-8 print:hidden">
-          <div className="flex gap-4 justify-center min-w-max px-4">
-            <button
-              onClick={() => navigate("/samples")}
-              className="px-3 py-2 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
-            >
-              BACK TO SAMPLES
-            </button>
+      {showTopButtons && (
+        <>
+          <div className="overflow-x-auto pb-4 mb-8 print:hidden">
+            <div className="flex gap-4 justify-center min-w-max px-4">
+              <button
+                onClick={() => navigate("/samples")}
+                className="px-3 py-2 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                BACK TO SAMPLES
+              </button>
 
-            {invoice.sampleType?.map((s: any) => {
-              const type = s.type.toLowerCase();
-              const completed = invoice?.reportsProgress?.[type] === "completed";
-              const count = s.count || 0;
+              {invoice.sampleType?.map((s: any) => {
+                const type = s.type.toLowerCase();
+                const completed = invoice?.reportsProgress?.[type] === "completed";
+                const count = s.count || 0;
 
-              if (type === "wssv" || count === 0) return null;
+                if (type === "wssv" || count === 0) return null;
 
-              return (
-                <button
-                  key={type}
-                  onClick={() => handleTypeClick(type)}
-                  className={`px-3 py-2 rounded-xl border-4 font-bold text-md transition-all shadow-lg whitespace-nowrap ${
-                    completed
-                      ? "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                      : currentType === type
-                      ? "bg-yellow-400 border-yellow-600 text-gray-900 ring-4 ring-yellow-300"
-                      : "bg-yellow-300 hover:bg-yellow-400 border-yellow-600 text-gray-800"
-                  }`}
-                >
-                  {s.type.toUpperCase()} ({count}) - {completed ? "Completed" : "Pending"}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={type}
+                    onClick={() => handleTypeClick(type)}
+                    className={`px-3 py-2 rounded-xl border-4 font-bold text-md transition-all shadow-lg whitespace-nowrap ${
+                      completed
+                        ? "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                        : currentType === type
+                        ? "bg-yellow-400 border-yellow-600 text-gray-900 ring-4 ring-yellow-300"
+                        : "bg-yellow-300 hover:bg-yellow-400 border-yellow-600 text-gray-800"
+                    }`}
+                  >
+                    {s.type.toUpperCase()} ({count}) - {completed ? "Completed" : "Pending"}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        <p className="text-center text-gray-600 mb-8 text-lg print:hidden">
-          Click a button to enter results for <strong>all samples</strong> of that type on one page.
-        </p>
-      </>
-    )}
+          <p className="text-center text-gray-600 mb-8 text-lg print:hidden">
+            Click a button to enter results for <strong>all samples</strong> of that type on one page.
+          </p>
+        </>
+      )}
 
-    {/* ────────────────────────────────────────────────
-        REPORT VIEWING MODE HEADER CONTROLS
-        Download button + immediately below it: report selector buttons
-    ──────────────────────────────────────────────── */}
-    {isViewingReports && (
-      <div className="mb-8 print:hidden">
-        {/* Download button first */}
-        <div className="flex justify-center mb-6" id="print-buttons">
-          <button
-            onClick={handleDownloadJpeg}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
-          >
-            <Download size={20} />
-            Download Full Report as JPEG
-          </button>
-        </div>
-
-        {/* Right below it: the report type selector buttons + BACK */}
-        <div className="overflow-x-auto pb-4" id="view-mode-nav">
-          <div className="flex gap-4 justify-center min-w-max px-4">
-            <button
-              onClick={() => navigate("/samples")}
-              className="px-5 py-1.5 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
-            >
-              BACK
-            </button>
-
-            {hasSoil && (
-              <button
-                onClick={() => setActiveEnvReport("soil")}
-                className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                  activeEnvReport === "soil"
-                    ? "bg-green-700 text-white border-green-900"
-                    : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                }`}
-              >
-                SOIL REPORT
-              </button>
-            )}
-            {hasWater && (
-              <button
-                onClick={() => setActiveEnvReport("water")}
-                className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                  activeEnvReport === "water"
-                    ? "bg-green-700 text-white border-green-900"
-                    : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                }`}
-              >
-                WATER REPORT
-              </button>
-            )}
-            {hasMicro && (
-              <button
-                onClick={() => setActiveEnvReport("microbiology")}
-                className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                  activeEnvReport === "microbiology"
-                    ? "bg-green-700 text-white border-green-900"
-                    : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                }`}
-              >
-                MICROBIOLOGY REPORT
-              </button>
-            )}
-            {hasPathology && (
-              <button
-                onClick={() => setActiveEnvReport("pathology")}
-                className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
-                  activeEnvReport === "pathology"
-                    ? "bg-green-700 text-white border-green-900"
-                    : "bg-green-600 text-white hover:bg-green-700 border-green-800"
-                }`}
-              >
-                PL/PCR REPORT
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* Download button in non-viewReports report preview steps (after form submit) */}
-    {(!isViewingReports && (step === "pathologyReport" || step.includes("Report"))) && (
-      <div className="flex justify-center mb-6 print:hidden" id="print-buttons">
+      {isViewingReports && (
+  <div className="mb-8 print:hidden">
+    {/* Only show buttons if the active report is pathology */}
+    <div className="flex gap-10 items-start justify-center">
+      {(activeEnvReport === "pathology" || activeEnvReport === "water") && (
+      <div className="flex justify-center gap-4 mb-6" id="print-buttons">
         <button
           onClick={handleDownloadJpeg}
           className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
@@ -544,31 +592,149 @@ export default function LabResults() {
           <Download size={20} />
           Download Full Report as JPEG
         </button>
+
+        
       </div>
     )}
+    {(activeEnvReport === "pathology" ) && (
+      <div className="flex justify-center gap-4 mb-6" id="print-buttons">
+        <button
+          onClick={handlePrintCapture}
+          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+        >
+          <Download size={20} />
+          Print Report
+        </button>
 
-    {/* The actual report content — this is captured for JPEG */}
-    <div ref={reportRef} className="bg-white">
-      {/* Forms */}
-      {step === "soilForm" && hasSoil && <SoilForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("soil"); setStep("soilReport"); }} />}
-      {step === "waterForm" && hasWater && <WaterForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("water"); setStep("waterReport"); }} />}
-      {step === "plForm" && hasPL && <PLForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pl"); checkPathologyCompletion("pl"); }} />}
-      {step === "pcrForm" && hasPCR && <PCRForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pcr"); checkPathologyCompletion("pcr"); }} />}
-      {step === "microbiologyForm" && hasMicro && <MicrobiologyForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("microbiology"); setStep("microbiologyReport"); }} />}
-
-      {/* Single report previews */}
-      {step === "soilReport" && <SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} />}
-      {step === "waterReport" && <WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} />}
-      {step === "microbiologyReport" && <MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} />}
-
-      {/* Pathology combined view */}
-      {(step === "pathologyReport" || (isViewingReports && activeEnvReport === "pathology")) && renderPathologyReportContent()}
-
-      {/* Individual reports when switching tabs in view mode */}
-      {isViewingReports && activeEnvReport === "soil" && <SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} />}
-      {isViewingReports && activeEnvReport === "water" && <WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} />}
-      {isViewingReports && activeEnvReport === "microbiology" && <MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} />}
+        
+      </div>
+    )}
     </div>
+
+     <div className="overflow-x-auto pb-4" id="view-mode-nav">
+            <div className="flex gap-4 justify-center min-w-max px-4">
+              <button
+                onClick={() => navigate("/samples")}
+                className="px-5 py-1.5 rounded-xl font-bold text-md transition-all shadow-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                BACK
+              </button>
+
+              {hasSoil && (
+                <button
+                  onClick={() => setActiveEnvReport("soil")}
+                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                    activeEnvReport === "soil"
+                      ? "bg-green-700 text-white border-green-900"
+                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                  }`}
+                >
+                  SOIL REPORT
+                </button>
+              )}
+              {hasWater && (
+                <button
+                  onClick={() => setActiveEnvReport("water")}
+                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                    activeEnvReport === "water"
+                      ? "bg-green-700 text-white border-green-900"
+                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                  }`}
+                >
+                  WATER REPORT
+                </button>
+              )}
+              {hasMicro && (
+                <button
+                  onClick={() => setActiveEnvReport("microbiology")}
+                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                    activeEnvReport === "microbiology"
+                      ? "bg-green-700 text-white border-green-900"
+                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                  }`}
+                >
+                  MICROBIOLOGY REPORT
+                </button>
+              )}
+              {hasPathology && (
+                <button
+                  onClick={() => setActiveEnvReport("pathology")}
+                  className={`px-3 py-1.5 rounded-xl border-4 font-bold text-md transition-all shadow-lg ${
+                    activeEnvReport === "pathology"
+                      ? "bg-green-700 text-white border-green-900"
+                      : "bg-green-600 text-white hover:bg-green-700 border-green-800"
+                  }`}
+                >
+                  PL/PCR REPORT
+                </button>
+              )}
+            </div>
+          </div>
   </div>
-);
+)}
+
+      {/* Replace the existing condition with this specific one */}
+{/* Change the condition to include soil, water, and micro */}
+{(!isViewingReports && (
+  step === "pathologyReport" || 
+  step === "plReport" || 
+  step === "pcrReport" || 
+  step === "waterReport" 
+  
+)) && (
+  <div className="flex justify-center gap-4 mb-6 print:hidden" id="print-buttons">
+    <button
+      onClick={handleDownloadJpeg}
+      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+    >
+      <Download size={20} />
+      Download Full Report as JPEG
+    </button>
+
+    <button
+      onClick={handlePrintCapture}
+      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+    >
+      <Printer size={20} />
+      Print Report
+    </button>
+  </div>
+)}
+{(!isViewingReports && (
+   
+  step === "waterReport" 
+  
+)) && (
+  <div className="flex justify-center gap-4 mb-6 print:hidden" id="print-buttons">
+    
+
+    <button
+      onClick={handlePrintCapture}
+      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+    >
+      <Printer size={20} />
+      Print Report
+    </button>
+  </div>
+)}
+
+      <div ref={reportRef} className="bg-white">
+        {step === "soilForm" && hasSoil && <SoilForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("soil"); setStep("soilReport"); }} />}
+        {step === "waterForm" && hasWater && <WaterForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("water"); setStep("waterReport"); }} />}
+        {step === "plForm" && hasPL && <PLForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pl"); checkPathologyCompletion("pl"); }} />}
+        {step === "pcrForm" && hasPCR && <PCRForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("pcr"); checkPathologyCompletion("pcr"); }} />}
+        {step === "microbiologyForm" && hasMicro && <MicrobiologyForm invoiceId={invoiceId!} locationId={session.locationId} onSubmit={() => { updateProgress("microbiology"); setStep("microbiologyReport"); }} />}
+
+        {step === "soilReport" && <SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} />}
+        {step === "waterReport" && <WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} />}
+        {step === "microbiologyReport" && <MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} />}
+
+        {(step === "pathologyReport" || (isViewingReports && activeEnvReport === "pathology")) && renderPathologyReportContent()}
+
+        {isViewingReports && activeEnvReport === "soil" && <SoilReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={soilCount} />}
+        {isViewingReports && activeEnvReport === "water" && <WaterReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={waterCount} />}
+        {isViewingReports && activeEnvReport === "microbiology" && <MicrobiologyReport invoiceId={invoiceId!} locationId={session.locationId} allSampleCount={microCount} />}
+      </div>
+    </div>
+  );
 }

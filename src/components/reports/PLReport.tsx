@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   doc, 
   getDoc, 
@@ -10,10 +10,7 @@ import {
 import { db } from "../../pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
-import { Printer, Download } from "lucide-react";
 import { useUserSession } from "@/contexts/UserSessionContext";
-import * as htmlToImage from 'html-to-image';
-import { saveAs } from 'file-saver';
 
 interface FarmerInfo {
   farmerName: string;
@@ -77,7 +74,6 @@ export default function PLReport({
   });
 
   const [realInvoiceDocId, setRealInvoiceDocId] = useState<string | null>(null);
-  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchRealDocId = async () => {
@@ -111,9 +107,6 @@ export default function PLReport({
 
     fetchRealDocId();
   }, [invoiceId, locationId]);
-  const handlePrint = () => {
-    window.print();
-  };
 
   useEffect(() => {
     const fetchPLReport = async () => {
@@ -257,10 +250,6 @@ export default function PLReport({
     fetchLocationDetails();
   }, [locationId]);
 
-  
-
-  
-
   if (loading) return <p className="text-center py-8 text-lg">Loading Report...</p>;
   if (!plData || !farmerInfo) return <p className="text-center py-8 text-red-600 text-xl">No PL report found.</p>;
 
@@ -286,214 +275,172 @@ export default function PLReport({
   ];
 
   return (
-    <>
-      <style>{`
-        @media print {
-          #pl-report, #notes-section {
-            padding: 8px !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            border-radius: 0 !important;
-          }
-          h1 { font-size: 1.6rem !important; }
-          h2 { font-size: 1.3rem !important; }
-          p, td, th, span { font-size: 0.7rem !important; line-height: 1.2 !important; }
-          .px-4 { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
-          .py-2 { padding-top: 0.3rem !important; padding-bottom: 0.3rem !important; }
-          .mb-4, .mb-8, .mb-12 { margin-bottom: 0.5rem !important; }
-          img.w-40 { width: 100px !important; }
-          table td, table th { padding: 0.2rem 0.3rem !important; }
-          .text-xs { font-size: 0.6rem !important; }
-          table, div, section { page-break-inside: avoid !important; }
-          @page { size: A4 portrait; margin: 0.8cm 1cm; }
-
-          .print\\:hidden { display: none !important; }
-          .screen-only { display: none !important; }
-          #notes-section { page-break-before: always; margin-top: 0 !important; padding-top: 0 !important; }
-        }
-        .print-only { display: none; }
-      `}</style>
-
-      <div className="flex gap-4 mb-6 print:hidden">
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
-        >
-          <Printer size={20} /> Print Report
-        </button>
-
-       
+    <div className="rounded-lg p-8 bg-white" id="pl-report">
+      <div className="flex justify-between items-start mb-8 border-b-2 border-black">
+        <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
+        <div className="text-center flex-1">
+          <h1 className="text-3xl font-bold text-blue-700">
+            WATERBASE AQUA DIAGNOSTIC CENTER
+          </h1>
+          <p className="text-sm text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
+          <p className="text-sm text-black">
+            Contact No: {locationDetails.contactNumber || "Loading..."} | 
+            Mail Id: {locationDetails.email || "Loading..."}
+          </p>
+          <p className="text-sm text-black">
+            GSTIN: - 37AABCT0601L1ZJ
+          </p>
+        </div>
+        <img src={AV} alt="AV Logo" className="w-40 object-contain" />
       </div>
 
-      <div ref={reportRef} className="rounded-lg p-8 bg-white" id="pl-report">
-        <div className="flex justify-between items-start mb-8 border-b-2 border-black">
-          <img src={ADC} alt="ADC Logo" className="w-40 object-contain" />
-          <div className="text-center flex-1">
-            <h1 className="text-3xl font-bold text-blue-700">
-              WATERBASE AQUA DIAGNOSTIC CENTER
-            </h1>
-            <p className="text-sm text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
-            <p className="text-sm text-black">
-              Contact No: {locationDetails.contactNumber || "Loading..."} | 
-              Mail Id: {locationDetails.email || "Loading..."}
+      <div className="w-full mb-12">
+        <table className="w-full border-2 border-gray-800 text-sm table-fixed">
+          <tbody>
+            <tr>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer Name</td>
+              <td className="border px-4 py-2">{farmerInfo.farmerName}</td>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">Address</td>
+              <td className="border px-4 py-2">{farmerInfo.address}</td>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Date</td>
+              <td className="border px-4 py-2">{farmerInfo.sampleDate}</td>
+            </tr>
+            <tr>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">Report Id</td>
+              <td className="border px-4 py-2">{invoiceId || '-'}</td>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">Mobile</td>
+              <td className="border px-4 py-2">{farmerInfo.mobile}</td>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">Report Date</td>
+              <td className="border px-4 py-2">{farmerInfo.reportDate}</td>
+            </tr>
+            <tr>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer ID</td>
+              <td className="border px-4 py-2">{farmerInfo.farmerId || '-'}</td>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">No. of Samples</td>
+              <td className="border px-4 py-2">{allSampleCount}</td>
+              <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Type</td>
+              <td className="border px-4 py-2">{sampleType}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="text-center m-5">
+        <h2 className="text-2xl font-bold text-red-600 mt-3">
+          Post Larvae General Observation Report
+        </h2>
+      </div>
+
+      <div className="flex justify-center overflow-x-auto">
+        <table className="inline-table border-2 border-gray-800 text-xs whitespace-nowrap">
+          <thead>
+            <tr className="bg-blue-100">
+              <th className="border px-4 py-2 font-semibold">TEST CODE</th>
+              {plData.testCode.map((code, i) => (
+                <th key={i} className="border px-4 py-2 font-semibold">
+                  Tank - {code}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {plRows.map((row) => (
+              <React.Fragment key={row.key}>
+                <tr
+                  className={row.key === "totalScore" ? "bg-blue-100" : ""}
+                >
+                  <td 
+                    className={`border px-4 py-2 font-semibold ${
+                      row.key === "totalScore" 
+                        ? "bg-blue-100" 
+                        : "bg-gray-50"
+                    }`}
+                  >
+                    {row.label}
+                  </td>
+                  {plData[row.key].map((val, i) => (
+  <td 
+    key={i} 
+    // Increased vertical padding to py-5 to physically stretch the table
+    className={`border px-4 py-3 text-center font-medium text-sm ${
+      row.key === "totalScore" ? "bg-blue-100" : ""  
+    }`}
+  >
+    {val || "-"}
+  </td>
+))}
+                </tr>
+
+                {row.key === "shg" && (
+                  <tr className="bg-blue-200">
+                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                      Necrosis
+                    </td>
+                  </tr>
+                )}
+                {row.key === "necMuscle" && (
+                  <tr className="bg-blue-200">
+                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                      Fouling
+                    </td>
+                  </tr>
+                )}
+                {row.key === "foulAbdomen" && (
+                  <tr className="bg-blue-200">
+                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                      Stress Test
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showSignature && (
+        <>
+          <div className="mt-20 border-t-2 border-black pt-8">
+            <div className="flex justify-between text-sm px-10 mb-10">
+              <div>
+                <p className="font-semibold">Reported by:</p>
+                <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
+              </div>
+              <div>
+                <p className="font-semibold">Checked by:</p>
+                <p className="mt-8">{checkedByName}</p>
+              </div>
+            </div>
+            <div className="text-center text-xs text-gray-700">
+              <p>
+                <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
+              </p>
+            </div>
+          </div>
+
+          <div className="text-sm text-gray-800 mt-8">
+            <p className="font-bold mb-2 text-red-600">Note:</p>
+            <p className="mb-4">
+              PL: Post Larve, MGR: Muscle Gut Ratio, SHG: Swollen Hind Gut, HP: Hepatopancreas, F: Full, S: Shrunken,
+              FBI: Filamentous Bacterial Infection, PZ: Protozoal Infection, Infection Level: Light: &lt;10%, Moderate: 10 to 30%, Heavy:40%
             </p>
-            <p className="text-sm text-black">
-              GSTIN: - 37AABCT0601L1ZJ
+
+            <p className="font-bold mb-2 text-red-600">PL Quality Selection - Scoring</p>
+            <p className="mb-4">
+              <span className="text-red-600 font-bold">Rostral Spines:</span> 15 Points (&gt;4 Spines), Average Length: 10 points(&gt;11mm), Size Variation: 10 points (&lt;10%), Muscle Gut Ratio: 15 points (&gt;4:1
+              Spine ), Hepatopancreas: 15 points (Full), Necrosis: 10 points (Absent) Fouling: 10 points (Absent), Swollen Hind Gut: 15 points (Absent)
+            </p>
+
+            <p className="mt-6">
+              <span className="text-red-600 font-bold">Note:</span> The samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose. Not
             </p>
           </div>
-          <img src={AV} alt="AV Logo" className="w-40 object-contain" />
-        </div>
 
-        <div className="w-full mb-12">
-          <table className="w-full border-2 border-gray-800 text-sm table-fixed">
-            <tbody>
-              <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer Name</td>
-                <td className="border px-4 py-2">{farmerInfo.farmerName}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Address</td>
-                <td className="border px-4 py-2">{farmerInfo.address}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Date</td>
-                <td className="border px-4 py-2">{farmerInfo.sampleDate}</td>
-              </tr>
-              <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Report Id</td>
-                <td className="border px-4 py-2">{invoiceId || '-'}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Mobile</td>
-                <td className="border px-4 py-2">{farmerInfo.mobile}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Report Date</td>
-                <td className="border px-4 py-2">{farmerInfo.reportDate}</td>
-              </tr>
-              <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer ID</td>
-                <td className="border px-4 py-2">{farmerInfo.farmerId || '-'}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">No. of Samples</td>
-                <td className="border px-4 py-2">{allSampleCount}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Type</td>
-                <td className="border px-4 py-2">{sampleType}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="text-center m-5">
-          <h2 className="text-2xl font-bold text-red-600 mt-3">
-            Post Larvae General Observation Report
-          </h2>
-        </div>
-
-        <div 
-          className="flex justify-center overflow-x-auto"
-          style={{ overflowX: 'hidden', maxWidth: '100%' }}  // ← added to help jpeg capture
-        >
-          <table className="inline-table border-2 border-gray-800 text-xs whitespace-nowrap">
-            <thead>
-              <tr className="bg-blue-100">
-                <th className="border px-4 py-2 font-semibold">TEST CODE</th>
-                {plData.testCode.map((code, i) => (
-                  <th key={i} className="border px-4 py-2 font-semibold">
-                    Tank - {code}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {plRows.map((row) => (
-                <React.Fragment key={row.key}>
-                  <tr
-                    className={row.key === "totalScore" ? "bg-blue-100" : ""}
-                  >
-                    <td 
-                      className={`border px-4 py-2 font-semibold ${
-                        row.key === "totalScore" 
-                          ? "bg-blue-100" 
-                          : "bg-gray-50"
-                      }`}
-                    >
-                      {row.label}
-                    </td>
-                    {plData[row.key].map((val, i) => (
-                      <td 
-                        key={i} 
-                        className={`border px-4 py-2 text-center ${
-                          row.key === "totalScore" ? "bg-blue-100" : ""  
-                        }`}
-                      >
-                        {val || "-"}
-                      </td>
-                    ))}
-                  </tr>
-
-                  {row.key === "shg" && (
-                    <tr className="bg-blue-200">
-                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                        Necrosis
-                      </td>
-                    </tr>
-                  )}
-                  {row.key === "necMuscle" && (
-                    <tr className="bg-blue-200">
-                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                        Fouling
-                      </td>
-                    </tr>
-                  )}
-                  {row.key === "foulAbdomen" && (
-                    <tr className="bg-blue-200">
-                      <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
-                        Stress Test
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {showSignature && (
-          <>
-            <div className="mt-20 border-t-2 border-black pt-8">
-              <div className="flex justify-between text-sm px-10 mb-10">
-                <div>
-                  <p className="font-semibold">Reported by:</p>
-                  <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
-                </div>
-                <div>
-                  <p className="font-semibold">Checked by:</p>
-                  <p className="mt-8">{checkedByName}</p>
-                </div>
-              </div>
-              <div className="text-center text-xs text-gray-700">
-                <p>
-                  <strong>Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.
-                </p>
-              </div>
-            </div>
-
-            <div className="text-sm text-gray-800 mt-8">
-              <p className="font-bold mb-2 text-red-600">Note:</p>
-              <p className="mb-4">
-                PL: Post Larve, MGR: Muscle Gut Ratio, SHG: Swollen Hind Gut, HP: Hepatopancreas, F: Full, S: Shrunken,
-                FBI: Filamentous Bacterial Infection, PZ: Protozoal Infection, Infection Level: Light: &lt;10%, Moderate: 10 to 30%, Heavy:40%
-              </p>
-
-              <p className="font-bold mb-2 text-red-600">PL Quality Selection - Scoring</p>
-              <p className="mb-4">
-                <span className="text-red-600 font-bold">Rostral Spines:</span> 15 Points (&gt;4 Spines), Average Length: 10 points(&gt;11mm), Size Variation: 10 points (&lt;10%), Muscle Gut Ratio: 15 points (&gt;4:1
-                Spine ), Hepatopancreas: 15 points (Full), Necrosis: 10 points (Absent) Fouling: 10 points (Absent), Swollen Hind Gut: 15 points (Absent)
-              </p>
-
-              <p className="mt-6">
-                <span className="text-red-600 font-bold">Note:</span> The samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose. Not
-              </p>
-            </div>
-
-            <div className="text-center mt-20">
-              <p className="text-red-600 font-bold">TWL ADC committed for Complete farming Solutions</p>
-            </div>
-          </>
-        )}
-      </div>
-    </>
+          <div className="text-center mt-20">
+            <p className="text-red-600 font-bold">TWL ADC committed for Complete farming Solutions</p>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

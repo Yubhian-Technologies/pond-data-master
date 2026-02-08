@@ -1,5 +1,3 @@
-// src/components/reports/PCRReport.tsx
-
 import React, { useEffect, useState } from "react";
 import { 
   doc, 
@@ -12,7 +10,6 @@ import {
 import { db } from "@/pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
-import { Printer } from "lucide-react";
 import { useUserSession } from "@/contexts/UserSessionContext";
 
 interface PCRReportProps {
@@ -260,90 +257,90 @@ export default function PCRReport({
   const isSingleSample = reports.length === 1;
 
   const ResultTable = () => {
-  const isSingleSample = reports.length === 1;
-
-  return (
-    <div className="overflow-x-auto mb-4">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-red-700 m-4">
-          RT-qPCR Analysis
-        </h2>
-      </div>
-      <table className="w-full border-2 border-gray-800 text-sm">
-        <thead className="bg-blue-100">
-          <tr>
-            <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Code</th>
-            <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Type</th>
-
-            {isSingleSample ? (
-              <>
-                <th rowSpan={2} className="border px-4 py-2 align-middle font-bold">
-                  {"Pathogen"}
-                </th>
-                <th className="border px-4 py-2">Result</th>
-                <th className="border px-4 py-2">C.T</th>
-              </>
-            ) : (
-              allPathogens.map((p) => (
-                <th key={p} colSpan={2} className="border px-4 py-2 text-center">
-                  {p}
-                </th>
-              ))
-            )}
-          </tr>
-
-          {!isSingleSample && (
+    return (
+      <div className="overflow-x-auto mb-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-700 m-4">
+            RT-qPCR Analysis
+          </h2>
+        </div>
+        <table className="w-full border-2 border-gray-800 text-sm">
+          <thead className="bg-blue-100">
             <tr>
-              {allPathogens.map((p) => (
-                <React.Fragment key={p}>
-                  <th className="border px-4 py-2">Result</th>
-                  <th className="border px-4 py-2">C.T</th>
-                </React.Fragment>
-              ))}
-            </tr>
-          )}
-        </thead>
-
-        <tbody>
-          {reports.map((r, idx) => (
-            <tr key={idx} className="hover:bg-gray-50">
-              <td className="border px-4 py-2 text-center font-semibold">{r.sampleCode}</td>
-              <td className="border px-4 py-2 text-center">{r.sampleType}</td>
+              <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Code</th>
+              <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Type</th>
 
               {isSingleSample ? (
                 <>
-                  <td className="border px-4 py-2 text-center font-medium">
-                    {allPathogens[0]}
-                  </td>
-                  <td className="border px-4 py-2 text-center font-bold text-red-600">
-                    {r.pathogens[0]?.result || "-"}
-                  </td>
-                  <td className="border px-4 py-2 text-center font-bold text-red-600">
-                    {r.pathogens[0]?.ctValue || "-"}
-                  </td>
+                  <th rowSpan={2} className="border px-4 py-2 align-middle font-bold">
+                    {"Pathogen"}
+                  </th>
+                  <th className="border px-4 py-2">Result</th>
+                  <th className="border px-4 py-2">C.T</th>
                 </>
               ) : (
-                allPathogens.map((p) => {
-                  const found = r.pathogens.find((x: any) => x.name === p);
-                  return (
-                    <React.Fragment key={p}>
-                      <td className="border px-4 py-2 text-center font-bold text-red-600">
-                        {found?.result || "-"}
-                      </td>
-                      <td className="border px-4 py-2 text-center font-bold text-red-600">
-                        {found?.ctValue || "-"}
-                      </td>
-                    </React.Fragment>
-                  );
-                })
+                allPathogens.map((p) => (
+                  <th key={p} colSpan={2} className="border px-4 py-2 text-center">
+                    {p}
+                  </th>
+                ))
               )}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
+
+            {!isSingleSample && (
+              <tr>
+                {allPathogens.map((p) => (
+                  <React.Fragment key={p}>
+                    <th className="border px-4 py-2">Result</th>
+                    <th className="border px-4 py-2">C.T</th>
+                  </React.Fragment>
+                ))}
+              </tr>
+            )}
+          </thead>
+
+          
+<tbody>
+  {reports.map((r, idx) => (
+    <tr key={idx} className="hover:bg-gray-50">
+      {/* Changed py-2 to py-10 to stretch the row height */}
+      <td className="border px-4 py-5 text-center font-semibold">{r.sampleCode}</td>
+      <td className="border px-4 py-5 text-center">{r.sampleType}</td>
+
+      {isSingleSample ? (
+        <>
+          <td className="border px-4 py-5 text-center font-medium">
+            {allPathogens[0]}
+          </td>
+          <td className="border px-4 py-5 text-center font-bold text-red-600">
+            {r.pathogens[0]?.result || "-"}
+          </td>
+          <td className="border px-4 py-5 text-center font-bold text-red-600">
+            {r.pathogens[0]?.ctValue || "-"}
+          </td>
+        </>
+      ) : (
+        allPathogens.map((p) => {
+          const found = r.pathogens.find((x: any) => x.name === p);
+          return (
+            <React.Fragment key={p}>
+              <td className="border px-4 py-5 text-center font-bold text-red-600">
+                {found?.result || "-"}
+              </td>
+              <td className="border px-4 py-5 text-center font-bold text-red-600">
+                {found?.ctValue || "-"}
+              </td>
+            </React.Fragment>
+          );
+        })
+      )}
+    </tr>
+  ))}
+</tbody>
+        </table>
+      </div>
+    );
+  };
 
   const GelImagesSection = () => {
     if (!reports.some((r) => r.gelImageUrl)) return null;
@@ -367,7 +364,7 @@ export default function PCRReport({
                 <img
                   src={r.gelImageUrl}
                   alt={`Gel Image - Sample ${r.sampleCode}`}
-                  className="w-[50%] h-auto object-contain"
+                  className="w-[50%] h-auto object-contain mx-auto"
                 />
               </div>
             ))}
@@ -386,97 +383,58 @@ export default function PCRReport({
   }
 
   return (
-    <>
-      <style>{`
-        @media print {
-          #report {
-            padding: 4px !important;
-            
-            margin: 0 !important;
-            box-shadow: none !important;
-          }
-          h1 { font-size: 1.8rem !important; }
-          h2 { font-size: 1.3rem !important; }
-          h3 { font-size: 1.4rem !important; }
-          p, td, th, span { font-size: 0.75rem !important; line-height: 1.3 !important; }
-          .px-8 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-          .py-4 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
-          .mb-8, .mb-10, .mt-12, .mt-16 { margin-bottom: 1rem !important; margin-top: 1rem !important; }
-          img.h-28 { height: 3.5rem !important; }
-          table td, table th { padding: 0.25rem !important; }
-          .grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-3 {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-            gap: 0.5rem !important;
-          }
-          table, div, section { page-break-inside: avoid !important; }
-          @page { size: A4 portrait; margin: 0.5cm; }
-          .print\\:hidden { display: none !important; }
-        }
-      `}</style>
-
-      <div className="p-8 rounded-lg" id="report">
-        <div className="print:hidden mb-8 text-right">
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg shadow-md transition"
-          >
-            <Printer size={24} />
-            Print Report
-          </button>
+    <div className="p-8 rounded-lg bg-white">
+      <div className="flex justify-between items-center border-b-4 border-blue-700 pb-8 mb-8">
+        <img src={ADC} alt="ADC Logo" className="h-28" />
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-blue-800">
+            WATERBASE AQUA DIAGNOSTIC CENTER
+          </h1>
+          <p className="text-sm text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
+          <p className="text-sm text-black">
+            Contact No: {locationDetails.contactNumber || "Loading..."} | 
+            Mail Id: {locationDetails.email || "Loading..."}
+          </p>
+          <p className="text-sm text-black">
+            GSTIN: - 37AABCT0601L1ZJ
+          </p>
         </div>
-
-        <div className="flex justify-between items-center border-b-4 border-blue-700 pb-8 mb-8">
-          <img src={ADC} alt="ADC Logo" className="h-28" />
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-blue-800">
-              WATERBASE AQUA DIAGNOSTIC CENTER
-            </h1>
-            <p className="text-sm text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
-            <p className="text-sm text-black">
-              Contact No: {locationDetails.contactNumber || "Loading..."} | 
-              Mail Id: {locationDetails.email || "Loading..."}
-            </p>
-            <p className="text-sm text-black">
-              GSTIN: - 37AABCT0601L1ZJ
-            </p>
-          </div>
-          <img src={AV} alt="AV Logo" className="h-28" />
-        </div>
-
-        {farmerInfo && (
-          <table className="w-full mb-10 border-2 border-gray-800 text-sm">
-            <tbody>
-              <tr>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Farmer Name</td>
-                <td className="border px-6 py-3">{farmerInfo.farmerName || "-"}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Address</td>
-                <td className="border px-6 py-3">{farmerInfo.address || "-"}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Sample Collected</td>
-                <td className="border px-6 py-3">{farmerInfo.sampleCollectionTime || "-"}</td>
-              </tr>
-              <tr>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
-                <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Farmer ID</td>
-                <td className="border px-6 py-3">{farmerInfo.farmerId || "-"}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Report Date</td>
-                <td className="border px-6 py-3">{farmerInfo.reportDate || "-"}</td>
-              </tr>
-              <tr>
-                <td className="border px-6 py-3 font-bold bg-gray-100">Report Id</td>
-                <td className="border px-6 py-3">{invoiceId || '-'}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">No of samples</td>
-                <td className="border px-6 py-3">{farmerInfo.noOfSamples || allSampleCount || "-"}</td>
-                <td className="border px-6 py-3 font-bold bg-gray-100">DOC</td>
-                <td className="border px-6 py-3">{farmerInfo.docDifference || "-"}</td>
-              </tr>
-            </tbody>
-          </table>
-        )}
-
-        <ResultTable />
-        <GelImagesSection />
+        <img src={AV} alt="AV Logo" className="h-28" />
       </div>
-    </>
+
+      {farmerInfo && (
+        <table className="w-full mb-10 border-2 border-gray-800 text-sm">
+          <tbody>
+            <tr>
+              <td className="border px-6 py-3 font-bold bg-gray-100">Farmer Name</td>
+              <td className="border px-6 py-3">{farmerInfo.farmerName || "-"}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">Address</td>
+              <td className="border px-6 py-3">{farmerInfo.address || "-"}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">Sample Collected</td>
+              <td className="border px-6 py-3">{farmerInfo.sampleCollectionTime || "-"}</td>
+            </tr>
+            <tr>
+              <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
+              <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">Farmer ID</td>
+              <td className="border px-6 py-3">{farmerInfo.farmerId || "-"}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">Report Date</td>
+              <td className="border px-6 py-3">{farmerInfo.reportDate || "-"}</td>
+            </tr>
+            <tr>
+              <td className="border px-6 py-3 font-bold bg-gray-100">Report Id</td>
+              <td className="border px-6 py-3">{invoiceId || '-'}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">No of samples</td>
+              <td className="border px-6 py-3">{farmerInfo.noOfSamples || allSampleCount || "-"}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">DOC</td>
+              <td className="border px-6 py-3">{farmerInfo.docDifference || "-"}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      <ResultTable />
+      <GelImagesSection />
+    </div>
   );
 }

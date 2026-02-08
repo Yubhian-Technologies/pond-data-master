@@ -451,7 +451,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                     <td className="p-0.5 text-center">{p.totalDissolvedMatter}</td>
                   </tr>
                 ))}
-                <tr className="border-t border-black font-bold bg-gray-50 text-[11px] text-red-600">
+                <tr className="border-t border-black font-bold bg-gray-50 text-[11px] text-red-600 optimum-row">
                   <td className="border-r border-black p-0.5">Optimum</td>
                   <td className="border-r border-black p-0.5 text-center">7.5-8.5</td>
                   <td className="border-r border-black p-0.5 text-center">15-20</td>
@@ -487,7 +487,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                 <tr className="bg-gray-100 font-bold">
                   <td className="border-b border-black text-center " colSpan={3}>Vibrio CFU /ml</td>
                 </tr>
-                <tr className="bg-gray-100 text-[8px] font-bold">
+                <tr className="bg-gray-100 text-[7.5px] font-bold">
                   <td className="border-r border-black p-0.5 text-center">Yellow <br />Colonies <br /> <span className="text-[9px]">పసుపు కాలనీలు</span></td>
                   <td className="border-r border-black p-0.5 text-center">Green <br />Colonies <br /><span className="text-[9px]">పచ్చ కాలనీలు</span></td>
                   <td className="p-0.5 text-center">TPC <br /><span className="text-[8px]">Total Plate Count</span></td>
@@ -496,12 +496,12 @@ const WaterReport: React.FC<WaterReportProps> = ({
               <tbody>
                 {ponds.map(p => (
                   <tr key={p.id} className="border-t border-black">
-                    <td className="border-r border-black p-0.5 text-center">{p.yellowColonies}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.greenColonies}</td>
-                    <td className="p-0.5 text-center">{p.tpc}</td>
+                    <td className="border-r border-black p-[3px] text-center">{p.yellowColonies}</td>
+                    <td className="border-r border-black p-[3px] text-center">{p.greenColonies}</td>
+                    <td className="p-[3px] text-center">{p.tpc}</td>
                   </tr>
                 ))}
-                <tr className="border-t border-black font-bold text-[12px]  text-red-600 bg-gray-50">
+                <tr className="border-t border-black font-bold text-[13px]  text-red-600 bg-gray-50 optimum-row">
                   <td className="border-r border-black p-0.5 text-center">&lt;300</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;50</td>
                   <td className="p-0.5 text-center">&lt;300</td>
@@ -650,14 +650,35 @@ const WaterReport: React.FC<WaterReportProps> = ({
             left: 0;
             top: 0;
             width: 100%;
+            
             padding: 0;
-            margin: 0;
+            margin: auto;
           }
           .print\\:hidden { display: none !important; }
           table { width: 100% !important; border-collapse: collapse !important; }
           tr { page-break-inside: avoid; }
         }
       `}</style>
+      <style>{`
+  /* Force tables to align perfectly */
+  #report table {
+    border-collapse: collapse !important;
+    table-layout: fixed !important; /* Forces columns to stay consistent */
+    width: 100% !important;
+  }
+
+  /* Force uniform row height for BOTH Optimum level rows */
+  .optimum-row, .optimum-row td {
+    height: 40px !important; /* Fixed height to force alignment */
+    max-height: 45px !important;
+    vertical-align: middle !important;
+    font-weight: bold !important;
+    font-size: 11px !important;
+    padding: 0 !important;
+  }
+
+  
+`}</style>
     </>
   );
 };
