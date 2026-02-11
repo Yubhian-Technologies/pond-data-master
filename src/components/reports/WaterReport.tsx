@@ -335,7 +335,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
         
       </div>
 
-      <div ref={reportRef} id="report" className="bg-white p-4 max-w-[1200px] mx-auto">
+      <div ref={reportRef} id="report" className="bg-white  max-w-full ">
         {/* Header */}
         <div className="flex justify-between items-start mb-2 border-b-2 border-black pb-2">
           <div className="w-32 h-24 flex items-center justify-center">
@@ -396,32 +396,32 @@ const WaterReport: React.FC<WaterReportProps> = ({
             <table className="w-full text-[11px] border-collapse">
               <thead>
                 <tr className="bg-gray-100 font-bold">
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[9px]"></span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[8px]"></span></td>
                   <td className="border-r border-black p-0.5 text-center w-12" rowSpan={3}>pH<br/></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Salinity<br/><span className="text-[9px]">సాలినిటీ</span></td>
-                  <td className="border-r border-black p-0.5 text-center" colSpan={3}>Alkalinity(PPM as Caco3)<br/><span className="text-[9px]">ఆల్కలినిటీ</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[9px]">మొత్తం కఠినత</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Salinity<br/><span className="text-[8px]">సెలినిటీ</span></td>
+                  <td className="border-r border-black p-0.5 text-center" colSpan={3}>Alkalinity(PPM as Caco3)<br/><span className="text-[8px]">ఆల్కలినిటీ</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[8px]">మొత్తం కఠినత</span></td>
                   <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/><span className="text-[9px]">అమ్మోనియా</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Unionized NH₃<br/><span className="text-[9px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/><span className="text-[8px]">అమ్మోనియా</span></td>
+                  <td className="border-r border-black p-0.5 text-center text-[9px]" rowSpan={3}>Unionized NH₃<br/><span className="text-[7px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
                   
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₂<br/><span className="text-[9px]">నైట్రైట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₃<br/><span className="text-[9px]">నైట్రేట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/><span className="text-[9px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Fe<br/><span className="text-[9px]">ఇనుము</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Cl<br/><span className="text-[9px]">క్లోరిన్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>DO<br/><span className="text-[9px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
-                  <td className="p-0.5 text-center" rowSpan={3}>TOM<br/><span className="text-[9px]">Total Organic Matter</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₂<br/><span className="text-[8px]">నైట్రైట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₃<br/><span className="text-[8px]">నైట్రేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/><span className="text-[8px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Fe<br/><span className="text-[8px]">ఇనుము</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Cl<br/><span className="text-[8px]">క్లోరిన్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>DO<br/><span className="text-[8px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
+                  <td className="p-0.5 text-center" rowSpan={3}>TOM<br/><span className="text-[8px]">Total Organic Matter</span></td>
                 </tr>
                 <tr className="bg-gray-100 border-t border-black text-[10px]">
-                  <td className="border-r border-black p-0.5 text-center font-bold">CO₃<br/><span className="text-[9px]">కార్బొనేట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">HCO₃<br/><span className="text-[9px]">బైకార్బొనేట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Total <br/><span className="text-[9px]">మొత్తం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Ca++<br/><span className="text-[9px]">కాల్షియం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Mg++<br/><span className="text-[9px]">మెగ్నీషియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">CO₃<br/><span className="text-[8px]">కార్బొనేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">HCO₃<br/><span className="text-[8px]">బైకార్బొనేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Total <br/><span className="text-[8px]">మొత్తం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Ca++<br/><span className="text-[8px]">కాల్షియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Mg++<br/><span className="text-[7px]">మెగ్నీషియం</span></td>
                   
-                  <td className="border-r border-black p-0.5 text-center font-bold">K++<br/><span className="text-[9px]">పొటాషియం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Na++<br/><span className="text-[9px]">సోడియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">K++<br/><span className="text-[7px]">పొటాషియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Na++<br/><span className="text-[8px]">సోడియం</span></td>
                 </tr>
               </thead>
               <tbody>
@@ -515,14 +515,14 @@ const WaterReport: React.FC<WaterReportProps> = ({
         <div className="border border-black mb-4">
           <h3 className="text-center font-bold bg-white text-red-500 py-1 text-xs border-b border-black uppercase">PLANKTON ANALYSIS</h3>
           <div className="overflow-hidden">
-            <table className="w-full border-collapse text-[10px]">
+            <table className="w-full border-collapse table-fixed text-[10px]">
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border-r border-b border-black p-1 w-10">Pond</th>
                   <th className="border-r border-b border-black p-0.5 text-green-700 text-[11px]" colSpan={12}>USEFUL PLANKTON - ఉపయోగకరమైన ప్లవకములు</th>
-                  <th className="border-b border-black p-0.5 text-red-700 text-[11px]" colSpan={14}>HARMFUL PLANKTON - హానికరమైన ప్లవకములు</th>
+                  <th className="border-b border-black p-0.5 text-red-700 text-[11px]" colSpan={13}>HARMFUL PLANKTON - హానికరమైన ప్లవకములు</th>
                 </tr>
-                <tr className="bg-gray-50 text-[10px] border-b border-black">
+                <tr className="bg-gray-50 text-[10px] p-1 border-b border-black">
                   <th className="border-r border-black"></th>
                   <th className="border-r border-black" colSpan={4}>Green alge</th>
                   <th className="border-r border-black" colSpan={4}>Zooplankton</th>
@@ -564,12 +564,13 @@ const WaterReport: React.FC<WaterReportProps> = ({
                     { img: favella, name: "Favella" },
                   ].map((item, idx) => (
                     <th
-                      key={idx}
-                      className={`border-b border-black ${idx === 24 ? "" : "border-r"} p-1 text-center`}
-                    >
-                      <img className="w-6 h-6 mx-auto" src={item.img} alt={item.name} />
-                      <div className="text-[7px] mt-1 leading-tight">{item.name}</div>
-                    </th>
+  key={idx}
+  className={`border-b border-black ${idx === 24 ? "" : "border-r"} p-1.5 text-center align-top`}
+  style={{ minWidth: "65px" }} // adjust this as needed
+>
+  <img className="w-8 h-8 p-0.5 mx-auto" src={item.img} alt={item.name} />
+  <div className="text-[7px] mt-1 leading-tight">{item.name}</div>
+</th>
                   ))}
                 </tr>
               </thead>
@@ -649,10 +650,10 @@ const WaterReport: React.FC<WaterReportProps> = ({
             position: absolute;
             left: 0;
             top: 0;
-            width: 100%;
+            width: 100vw;
             
             padding: 0;
-            margin: auto;
+            margin:0 auto;
           }
           .print\\:hidden { display: none !important; }
           table { width: 100% !important; border-collapse: collapse !important; }
