@@ -417,7 +417,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[8px]">మొత్తం కఠినత</span></td>
                   <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/>(ppm) <br /><span className="text-[8px]">అమ్మోనియా</span></td>
-                  <td className="border-r border-black p-0.5 text-center text-[9px]" rowSpan={3}>Un-ionized NH₃<br/>(ppm) <br /><span className="text-[7px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
+                  <td className="border-r border-black p-0.5 text-center text-[9px]" rowSpan={3}>Un-ionized NH₃<br/>(ppm) <br /><span className="text-[7px]">అన్ అయోనైజ్డ్</span></td>
                   
                   <td className="border-r border-black text-[8.5px] p-0.5 text-center" rowSpan={3}>Nitrite <br />(NO₂)<br/>(ppm) <br /><span className="text-[8px]">నైట్రైట్</span></td>
                   <td className="border-r border-black text-[8.5px] p-0.5 text-center" rowSpan={3}>Nitrate <br />(NO₃)<br/>(ppm) <br /><span className="text-[8px]">నైట్రేట్</span></td>

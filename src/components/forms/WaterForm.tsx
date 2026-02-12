@@ -473,14 +473,14 @@ export default function WaterForm({
         {[
           { label: "Farmer Name", name: "farmerName" },
           { label: "Mobile", name: "mobile" },
-          { label: "S.D/D.O.C", name: "sdDoc" },
+          // { label: "S.D/D.O.C", name: "sdDoc" },
           { label: "Farmer UID", name: "farmerUID" },
           { label: "Source of Water", name: "sourceOfWater" },
           { label: "Farmer Address", name: "farmerAddress" },
           { label: "Sample Date", name: "sampleDate", type: "date" },
           { label: "Sample Collection Time", name: "sampleCollectionTime", type: "time" },
-          { label: "Report Date", name: "reportDate", type: "date" },
-          { label: "Report Time", name: "reportTime", type: "time" },
+          // { label: "Report Date", name: "reportDate", type: "date" },
+          // { label: "Report Time", name: "reportTime", type: "time" },
           { label: "No. of Samples", value: totalSamples, disabled: true },
         ].map((field) => (
           <div key={field.name || field.label}>
