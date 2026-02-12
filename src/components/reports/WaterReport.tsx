@@ -697,12 +697,23 @@ const WaterReport: React.FC<WaterReportProps> = ({
   
 `}</style>
 <style>{`
-@media print {
+/* This applies to screen viewing on larger monitors (desktops) */
+@media screen and (min-width: 1367px) {
+  .bacteriology-print thead th,
+  .bacteriology-print thead td,
+  .bacteriology-print thead span {
+    font-size: 10px !important;
+  }
+    .bacteriology-print thead span {
+    font-size: 10px !important;
+  }
+}
 
+@media print {
   .bacteriology-print,
   .bacteriology-print td,
   .bacteriology-print th {
-    font-size: 8.8px !important;           /* ← main data – very common sweet spot */
+    font-size: 8.8px !important;           /* main data */
   }
 
   /* Headers - keep slightly larger */
@@ -718,25 +729,19 @@ const WaterReport: React.FC<WaterReportProps> = ({
     font-size: 11px !important;
   }
 
-  /* Optimum row – make it noticeable but not huge */
-  // .bacteriology-print .optimum-row,
-  // .bacteriology-print .optimum-row td {
-  //   font-size: 10.5px !important;
-  //   font-weight: bold !important;
-  // }
-    .bacteriology-print tbody td {
-    padding: 4.5px 2px !important;      /* ↑↑↑ more vertical space + some horizontal */
+  .bacteriology-print tbody td {
+    padding: 4.5px 2px !important;
     line-height: 1.15 !important;
     vertical-align: middle !important;
   }
 
-  /* Better spacing in small font */
   .bacteriology-print td,
   .bacteriology-print th {
-    padding: 2px 1px !important;          /* ← helps a lot */
+    padding: 2px 1px !important;
     line-height: 1.1 !important;
   }
-}`}</style>
+}
+`}</style>
     </>
   );
 };

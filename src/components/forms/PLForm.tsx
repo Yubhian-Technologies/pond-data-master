@@ -102,12 +102,13 @@ export default function PLForm({
     necRostrum: ['Absent'],
     necGill: ['Absent'],
     necMuscle: ['Absent'],
-    foulAppend: ['Absent'],     // ← Added: same behavior as necrosis
-    foulGill: ['Absent'],       // ← Added
-    foulAbdomen: ['Absent'],    // ← Added
+    foulAppend: ['Absent'],
+    foulGill: ['Absent'],
+    foulAbdomen: ['Absent'],
     salinityPercent: ['100%', '90%', '80%'],
     sizeVariation: ['<5%', '<10%'],
-    totalScore: Array.from({ length: 11 }, (_, i) => (90 + i).toString()),
+    totalScore: Array.from({ length: 11 }, (_, i) => (90 + i+"%").toString()),
+    // NEW: MGR and MGR% will be handled separately below
   };
 
   const hasOthers: Record<string, boolean> = {
@@ -117,15 +118,22 @@ export default function PLForm({
     necRostrum: true,
     necGill: true,
     necMuscle: true,
-    foulAppend: true,           // ← Added: enable "Others" for foulings
-    foulGill: true,             // ← Added
-    foulAbdomen: true,          // ← Added
+    foulAppend: true,
+    foulGill: true,
+    foulAbdomen: true,
     salinityPercent: true,
     sizeVariation: true,
     totalScore: true,
+    // MGR and MGR% will have Others → handled in render
   };
 
   const [customModes, setCustomModes] = useState<Record<string, boolean[]>>({});
+
+  // MGR specific dropdown values
+  const mgrOptions = ["4:1"];
+
+  // MGR% specific dropdown values
+  const mgrPercentOptions = ["100", "90", "80"];
 
   // Fetch invoice
   useEffect(() => {
@@ -146,9 +154,6 @@ export default function PLForm({
         if (!snap.empty) {
           const docSnap = snap.docs[0];
           setLocalInvoice({ ...docSnap.data(), docId: docSnap.id });
-          console.log("PLForm loaded invoice:", docSnap.id);
-        } else {
-          console.error("PLForm invoice not found:", invoiceId);
         }
       } catch (err) {
         console.error("PLForm invoice fetch error:", err);
@@ -172,7 +177,7 @@ export default function PLForm({
     const loadData = async () => {
       setLoading(true);
       try {
-        // Pre-fill farmer info
+        // Pre-fill farmer info (unchanged)
         let loadedFarmerId = "";
         if (localInvoice?.farmerId) {
           const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
@@ -193,7 +198,7 @@ export default function PLForm({
           }
         }
 
-        // Load saved PL report
+        // Load saved PL report (unchanged structure)
         const plReportRef = doc(
           db,
           "locations",
@@ -250,7 +255,7 @@ export default function PLForm({
 
         setPlData(finalPlData);
 
-        // Initialize custom modes
+        // Initialize custom modes for fields that support "Others"
         const initModes: Record<string, boolean[]> = {};
         Object.keys(fieldOptions).forEach((key) => {
           initModes[key] = Array(count).fill(false);
@@ -260,6 +265,21 @@ export default function PLForm({
             }
           });
         });
+
+        // Also initialize for MGR and MGR%
+        initModes.mgr = Array(count).fill(false);
+        initModes.mgrPercent = Array(count).fill(false);
+        finalPlData.mgr.forEach((val: string, idx: number) => {
+          if (val && !mgrOptions.includes(val)) {
+            initModes.mgr[idx] = true;
+          }
+        });
+        finalPlData.mgrPercent.forEach((val: string, idx: number) => {
+          if (val && !mgrPercentOptions.includes(val)) {
+            initModes.mgrPercent[idx] = true;
+          }
+        });
+
         setCustomModes(initModes);
 
       } catch (error) {
@@ -275,7 +295,7 @@ export default function PLForm({
     };
 
     loadData();
-  }, [localInvoice, locationId]);
+  }, [localInvoice, locationId, today, currentTime]);
 
   const updateColumn = (field: string, index: number, value: string) => {
     setPlData((prev: any) => {
@@ -363,7 +383,7 @@ export default function PLForm({
         PL Health Check Report – All Samples ({totalSamples})
       </h1>
 
-      {/* Farmer Information */}
+      {/* Farmer Information - unchanged */}
       <section className="mb-10 bg-gray-50 p-5 rounded-lg">
         <h2 className="text-lg font-semibold mb-4 text-gray-800">Farmer Information</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -469,6 +489,67 @@ export default function PLForm({
             >
               {plData[row.key].map((value: string, i: number) => {
                 const fieldKey = row.key as string;
+
+                // ── Special handling for MGR and MGR% ───────────────────────
+                if (fieldKey === "mgr" || fieldKey === "mgrPercent") {
+                  const options = fieldKey === "mgr" ? mgrOptions : mgrPercentOptions;
+                  const isCustom = customModes[fieldKey]?.[i] ?? false;
+
+                  return (
+                    <div key={i} className="flex flex-col">
+                      <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
+                      {isCustom ? (
+                        <div>
+                          <input
+                            className="w-full border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter custom value"
+                            value={value}
+                            onChange={(e) => updateColumn(fieldKey, i, e.target.value)}
+                          />
+                          <button
+                            className="text-xs text-blue-600 underline mt-1 block mx-auto"
+                            onClick={() => {
+                              const newModes = { ...customModes };
+                              newModes[fieldKey] = [...(newModes[fieldKey] || [])];
+                              newModes[fieldKey][i] = false;
+                              setCustomModes(newModes);
+                              updateColumn(fieldKey, i, ""); // reset when switching back
+                            }}
+                          >
+                            Select from options
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          className="w-full border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={value}
+                          onChange={(e) => {
+                            const newVal = e.target.value;
+                            if (newVal === "Others") {
+                              const newModes = { ...customModes };
+                              newModes[fieldKey] = [...(newModes[fieldKey] || [])];
+                              newModes[fieldKey][i] = true;
+                              setCustomModes(newModes);
+                              updateColumn(fieldKey, i, value || ""); // keep current if any
+                            } else {
+                              updateColumn(fieldKey, i, newVal);
+                            }
+                          }}
+                        >
+                          <option value="">Select...</option>
+                          {options.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                          <option value="Others">Others</option>
+                        </select>
+                      )}
+                    </div>
+                  );
+                }
+
+                // ── Original logic for other fields ─────────────────────────
                 if (fieldOptions[fieldKey]) {
                   const isCustom = customModes[fieldKey]?.[i] ?? false;
                   return (
@@ -489,7 +570,7 @@ export default function PLForm({
                               newModes[fieldKey] = [...newModes[fieldKey]];
                               newModes[fieldKey][i] = false;
                               setCustomModes(newModes);
-                              updateColumn(fieldKey, i, ''); // reset to empty when switching back
+                              updateColumn(fieldKey, i, ''); 
                             }}
                           >
                             Select from options
@@ -523,29 +604,29 @@ export default function PLForm({
                       )}
                     </div>
                   );
-                } else {
-                  // Normal text input
-                  return (
-                    <div key={i} className="flex flex-col">
-                      <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
-                      <input
-                        className="border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder={`S${i + 1}`}
-                        value={value}
-                        onChange={(e) =>
-                          updateColumn(row.key as string, i, e.target.value)
-                        }
-                      />
-                    </div>
-                  );
                 }
+
+                // Normal text input for remaining fields
+                return (
+                  <div key={i} className="flex flex-col">
+                    <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
+                    <input
+                      className="border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder={`S${i + 1}`}
+                      value={value}
+                      onChange={(e) =>
+                        updateColumn(row.key as string, i, e.target.value)
+                      }
+                    />
+                  </div>
+                );
               })}
             </div>
           </div>
         ))}
       </section>
 
-      {/* Checked by input */}
+      {/* Checked by input - unchanged */}
       <div className="mb-10 max-w-md mx-auto">
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by
@@ -560,7 +641,7 @@ export default function PLForm({
         />
       </div>
 
-      {/* Submit Button */}
+      {/* Submit Button - unchanged */}
       <section className="text-center">
         <button
           onClick={handleSave}
