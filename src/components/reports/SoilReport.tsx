@@ -32,15 +32,6 @@ interface FormData {
   checkedBy: string;
 }
 
-interface FarmerData {
-  address?: string;
-  soilType?: string;
-  sourceOfSoil?: string;
-  phone?: string;
-  city?: string;
-  state?: string;
-}
-
 interface SoilReportProps {
   invoiceId?: string;
   locationId?: string;
@@ -88,6 +79,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
   const [samples, setSamples] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [checkedByName, setCheckedByName] = useState<string>("");
+  const [remarks, setRemarks] = useState<string>(""); // ← new state for shared remarks
 
   const handlePrint = () => window.print();
 
@@ -96,21 +88,19 @@ const SoilReport: React.FC<SoilReportProps> = ({
     const element = reportRef.current;
 
     try {
-      // 1. Add temporary padding and fixed width for a clean landscape capture
       const originalPadding = element.style.padding;
       const originalWidth = element.style.width;
       
       element.style.padding = "40px"; 
-      element.style.width = "1200px"; // Ensures consistency in the image
+      element.style.width = "1200px";
 
       const canvas = await html2canvas(element, {
-        scale: 2, // High resolution
+        scale: 2,
         useCORS: true, 
         backgroundColor: "#ffffff",
-        scrollY: -window.scrollY, // Prevents offset if page is scrolled
+        scrollY: -window.scrollY,
       });
 
-      // 2. Revert styles back immediately
       element.style.padding = originalPadding;
       element.style.width = originalWidth;
 
@@ -129,7 +119,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
       try {
         if (!invoiceId || !locationId) return;
 
-        // Fetch report data (soil-specific fields)
+        // Fetch report data (soil-specific fields + remarks)
         const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
         const reportSnap = await getDoc(reportRef);
 
@@ -140,6 +130,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
         let sampleTime = "-";
         let reportTime = new Date().toTimeString().slice(0, 5);
         let savedSampleDate = "";
+        let savedRemarks = ""; // ← added
 
         if (reportSnap.exists()) {
           const data = reportSnap.data();
@@ -150,9 +141,12 @@ const SoilReport: React.FC<SoilReportProps> = ({
           sampleTime = data?.sampleTime || "-";
           reportTime = data?.reportTime || reportTime;
           savedSampleDate = data?.sampleDate || "";
+          savedRemarks = data?.remarks || ""; // ← load shared remarks
         }
 
-        // Fetch invoice data — supports both new and old invoices
+        setRemarks(savedRemarks);
+
+        // Fetch invoice data
         const invoicesRef = collection(db, "locations", locationId, "invoices");
         let q = query(invoicesRef, where("invoiceId", "==", invoiceId));
         let snapshot = await getDocs(q);
@@ -282,6 +276,16 @@ const SoilReport: React.FC<SoilReportProps> = ({
   if (samples.length === 0 && formData.farmerName === "") {
     return <p className="text-center py-12 text-red-600 text-xl">No soil report data found for this invoice.</p>;
   }
+  const formatDateDDMMYYYY = (dateStr: string | undefined): string => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).replace(/\//g, '-');
+};
 
   return (
     <>
@@ -298,8 +302,6 @@ const SoilReport: React.FC<SoilReportProps> = ({
         >
           <Printer size={20} /> Download JPEG
         </button>
-
-        
       </div>
 
       <div ref={reportRef} className="bg-white" id="report">
@@ -328,74 +330,73 @@ const SoilReport: React.FC<SoilReportProps> = ({
           </h2>
         </div>
 
-       <div className="grid grid-cols-6 gap-0 text-sm mb-6 border border-black">
-  {/* Row 1 */}
-  <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
-    Farmer Name
-  </div>
-  <div className="col-span-1 border-r border-black p-1 break-words whitespace-normal">
-    {formData.farmerName || "-"}
-  </div>
+        <div className="grid grid-cols-6 gap-0 text-sm mb-6 border border-black">
+          {/* Row 1 */}
+          <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
+            Farmer Name
+          </div>
+          <div className="col-span-1 border-r border-black p-1 break-words whitespace-normal">
+            {formData.farmerName || "-"}
+          </div>
 
-  <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
-    Mobile
-  </div>
-  <div className="col-span-1 border-r border-black p-1">
-    {formData.mobile || "-"}
-  </div>
+          <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
+            Mobile
+          </div>
+          <div className="col-span-1 border-r border-black p-1">
+            {formData.mobile || "-"}
+          </div>
 
-  <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
-    Sample Date
-  </div>
-  <div className="col-span-1 border-black p-1">
-    {formData.sampleDate || "-"}
-  </div>
+          <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
+            Sample Date
+          </div>
+          <div className="col-span-1 border-black p-1">
+            {formatDateDDMMYYYY(formData.sampleDate)}
+          </div>
 
-  {/* Row 2 */}
-  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-    Farmer UID
-  </div>
-  <div className="col-span-1 border-r border-t border-black p-1">
-    {formData.farmerUID || "-"}
-  </div>
+          {/* Row 2 */}
+          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+            Farmer UID
+          </div>
+          <div className="col-span-1 border-r border-t border-black p-1">
+            {formData.farmerUID || "-"}
+          </div>
 
-  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-    Farmer Address
-  </div>
-  <div className="col-span-1 border-r border-t border-black p-1 break-words whitespace-normal">
-    {formData.farmerAddress || "-"}
-  </div>
+          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+            Farmer Address
+          </div>
+          <div className="col-span-1 border-r border-t border-black p-1 break-words whitespace-normal">
+            {formData.farmerAddress || "-"}
+          </div>
 
-  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-    Sample Collection Time
-  </div>
-  <div className="col-span-1 border-t border-black p-1">
-    {formData.sampleCollectionTime || "-"}
-  </div>
+          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+            Sample Collection Time
+          </div>
+          <div className="col-span-1 border-t border-black p-1">
+          {formatDateDDMMYYYY(formData.sampleCollectionTime)}
+          </div>
 
-  {/* Row 3 */}
-  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-    Report Id
-  </div>
-  <div className="col-span-1 border-t border-black p-1">
-    {invoiceId || "-"}
-  </div>
-  
+          {/* Row 3 */}
+          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+            Report Id
+          </div>
+          <div className="col-span-1 border-t border-black p-1">
+            {invoiceId || "-"}
+          </div>
 
-  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-    Source of Soil
-  </div>
-  <div className="col-span-1 border-r border-t border-black p-1">
-    {formData.sourceOfSoil || "-"}
-  </div>
+          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+            Source of Soil
+          </div>
+          <div className="col-span-1 border-r border-t border-black p-1">
+            {formData.sourceOfSoil || "-"}
+          </div>
 
-  <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-    No. of Samples
-  </div>
-  <div className="col-span-1 border-r border-t border-black p-1">
-    {formData.noOfSamples || "-"}
-  </div>
-</div>
+          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
+            No. of Samples
+          </div>
+          <div className="col-span-1 border-r border-t border-black p-1">
+            {formData.noOfSamples || "-"}
+          </div>
+        </div>
 
         <table className="w-full mb-4 text-xs" style={{ border: '2px solid #1f2937' }}>
           <thead>
@@ -409,7 +410,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
               <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Available Nitrogen (mg/kg)</th>
               <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Available Phos-phorus (mg/kg)</th>
               <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Redox Potential (mV)</th>
-              <th className="px-2 py-2 font-bold">Remarks</th>
+              {/* Remarks column removed */}
             </tr>
           </thead>
           <tbody>
@@ -424,7 +425,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
                 <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.availableNitrogen || "-"}</td>
                 <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.availablePhosphorus || "-"}</td>
                 <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.redoxPotential || "-"}</td>
-                <td className="px-2 py-2 text-center">{sample.remarks || "-"}</td>
+                {/* No remarks cell here anymore */}
               </tr>
             ))}
             <tr style={{ backgroundColor: '#e5e7eb' }}>
@@ -437,10 +438,18 @@ const SoilReport: React.FC<SoilReportProps> = ({
               <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>50 - 75</td>
               <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>4 - 6</td>
               <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>Less than -150</td>
-              <td className="px-2 py-2 text-center"></td>
+              {/* No remarks optimum cell */}
             </tr>
           </tbody>
         </table>
+
+        {/* ────────────────────── Shared Remarks Section ────────────────────── */}
+        <div className="mb-6 border border-black p-4">
+          <h3 className="font-bold text-base mb-2 text-red-700 text-[10px]">Remarks & Recommendations:</h3>
+          <div className="text-sm whitespace-pre-wrap min-h-[30px]">
+            {remarks || "No remarks provided."}
+          </div>
+        </div>
 
         <div className="mb-4" style={{ border: '2px solid #1f2937' }}>
           <div className="text-xs px-2 py-1" style={{ borderBottom: '1px solid #1f2937' }}>
@@ -465,7 +474,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
   @media print {
     @page {
       size: A4 landscape;
-      margin: 1cm 1.2cm;           /* Slightly larger page margins overall */
+      margin: 1cm 1.2cm;
     }
 
     html, body {
@@ -499,24 +508,19 @@ const SoilReport: React.FC<SoilReportProps> = ({
       background: white !important;
     }
 
-    /* ────────────────────────────────────────────────
-       KEY CHANGES: Increased spacing between major sections
-    ──────────────────────────────────────────────── */
-
-    #report > div.mb-8,               /* Farmer info grid */
+    #report > div.mb-8,
     #report > div.mb-6,
-    #report > table.mb-4,             /* Soil analysis table */
-    #report > div.mb-4,               /* Note section */
-    #report > div.text-center {       /* Final footer text */
-      margin-bottom: 24px !important; /* ← increased from 12px to 24px */
+    #report > table.mb-4,
+    #report > div.mb-4,
+    #report > div.mb-6 + div.mb-4,  /* remarks section spacing */
+    #report > div.text-center {
+      margin-bottom: 24px !important;
     }
 
-    /* Extra spacing specifically between Farmer grid and Soil table */
     .grid.mb-6 + table.mb-4 {
       margin-top: 20px !important;
     }
 
-    /* Extra spacing before/after Note section */
     div[style*="border: '2px solid #1f2937'"] {
       margin-top: 20px !important;
       margin-bottom: 24px !important;
@@ -525,7 +529,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
     table {
       table-layout: fixed;
       width: 100% !important;
-      margin-bottom: 24px !important;  /* ← increased from 16px to 24px */
+      margin-bottom: 24px !important;
       font-size: 9.5px !important;
       border-collapse: collapse !important;
     }

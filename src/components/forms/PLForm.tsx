@@ -15,7 +15,7 @@ import { useUserSession } from "../../contexts/UserSessionContext";
 
 interface FarmerInfo {
   farmerName: string;
-  address: string;          // ← Changed from village to address
+  address: string;
   mobile: string;
   sampleDate: string;
   sampleTime: string;
@@ -76,7 +76,7 @@ export default function PLForm({
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
     farmerName: "",
-    address: "",          // ← Changed from village
+    address: "",
     mobile: "",
     sampleDate: today,
     sampleTime: "",
@@ -90,10 +90,42 @@ export default function PLForm({
 
   const [sampleType, setSampleType] = useState<string>("PL (Post Larvae)");
 
-  // Read-only display field
   const [farmerUID, setFarmerUID] = useState<string>("");
 
   const [checkedBy, setCheckedBy] = useState(technicianName);
+
+  // Dropdown options for special fields
+  const fieldOptions: Record<string, string[]> = {
+    hp: ['Full', 'Shrink'],
+    shg: ['Present', 'Absent'],
+    necAppend: ['Absent'],
+    necRostrum: ['Absent'],
+    necGill: ['Absent'],
+    necMuscle: ['Absent'],
+    foulAppend: ['Absent'],     // ← Added: same behavior as necrosis
+    foulGill: ['Absent'],       // ← Added
+    foulAbdomen: ['Absent'],    // ← Added
+    salinityPercent: ['100%', '90%', '80%'],
+    sizeVariation: ['<5%', '<10%'],
+    totalScore: Array.from({ length: 11 }, (_, i) => (90 + i).toString()),
+  };
+
+  const hasOthers: Record<string, boolean> = {
+    hp: false,
+    shg: false,
+    necAppend: true,
+    necRostrum: true,
+    necGill: true,
+    necMuscle: true,
+    foulAppend: true,           // ← Added: enable "Others" for foulings
+    foulGill: true,             // ← Added
+    foulAbdomen: true,          // ← Added
+    salinityPercent: true,
+    sizeVariation: true,
+    totalScore: true,
+  };
+
+  const [customModes, setCustomModes] = useState<Record<string, boolean[]>>({});
 
   // Fetch invoice
   useEffect(() => {
@@ -126,7 +158,7 @@ export default function PLForm({
     fetchInvoice();
   }, [invoiceId, locationId]);
 
-  // Combined loading logic – determine count first, then load & normalize
+  // Combined loading logic
   useEffect(() => {
     if (!localInvoice) return;
 
@@ -135,13 +167,12 @@ export default function PLForm({
     );
     const count = Number(plType?.count || 1);
 
-    // Set correct number of samples FIRST
     setTotalSamples(count);
 
     const loadData = async () => {
       setLoading(true);
       try {
-        // 1. Pre-fill farmer info from master
+        // Pre-fill farmer info
         let loadedFarmerId = "";
         if (localInvoice?.farmerId) {
           const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
@@ -154,7 +185,7 @@ export default function PLForm({
             setFarmerInfo((prev) => ({
               ...prev,
               farmerName: farmerData.name || prev.farmerName || "",
-              address: farmerData.address || prev.address || "",          // ← Changed: use address
+              address: farmerData.address || prev.address || "",
               mobile: farmerData.phone || prev.mobile || "",
               sampleDate: localInvoice.dateOfCulture || today,
               farmerId: loadedFarmerId,
@@ -162,7 +193,7 @@ export default function PLForm({
           }
         }
 
-        // 2. Load saved PL report (if exists)
+        // Load saved PL report
         const plReportRef = doc(
           db,
           "locations",
@@ -180,11 +211,10 @@ export default function PLForm({
         if (snap.exists()) {
           const data = snap.data() || {};
 
-          // Override farmer info if saved
           if (data.farmerInfo) {
             setFarmerInfo({
               farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
-              address: data.farmerInfo.address || farmerInfo.address,          // ← Changed
+              address: data.farmerInfo.address || farmerInfo.address,
               mobile: data.farmerInfo.mobile || farmerInfo.mobile,
               sampleDate: data.farmerInfo.sampleDate || localInvoice?.dateOfCulture || today,
               sampleTime: data.farmerInfo.sampleTime || "",
@@ -198,7 +228,6 @@ export default function PLForm({
             setSampleType(data.sampleType);
           }
 
-          // IMPORTANT: use the correct 'count' here
           const savedPlData = data.plData || {};
           const normalized: any = {};
 
@@ -208,12 +237,10 @@ export default function PLForm({
 
           finalPlData = normalized;
 
-          // Load checkedBy if saved
           if (data.checkedBy) {
             setCheckedBy(data.checkedBy);
           }
         } else {
-          // No saved data → create fresh empty arrays with correct length
           const fresh: any = {};
           Object.keys(emptyPLData).forEach((key) => {
             fresh[key] = createEmptyArray(count);
@@ -223,9 +250,20 @@ export default function PLForm({
 
         setPlData(finalPlData);
 
+        // Initialize custom modes
+        const initModes: Record<string, boolean[]> = {};
+        Object.keys(fieldOptions).forEach((key) => {
+          initModes[key] = Array(count).fill(false);
+          finalPlData[key].forEach((val: string, idx: number) => {
+            if (val && !fieldOptions[key].includes(val)) {
+              initModes[key][idx] = true;
+            }
+          });
+        });
+        setCustomModes(initModes);
+
       } catch (error) {
         console.error("Error loading PL data:", error);
-        // Fallback: at least show correct number of empty fields
         const fallback: any = {};
         Object.keys(emptyPLData).forEach((key) => {
           fallback[key] = createEmptyArray(count);
@@ -239,7 +277,6 @@ export default function PLForm({
     loadData();
   }, [localInvoice, locationId]);
 
-  /* ---------- Update individual cell ---------- */
   const updateColumn = (field: string, index: number, value: string) => {
     setPlData((prev: any) => {
       const copy = [...prev[field]];
@@ -248,7 +285,6 @@ export default function PLForm({
     });
   };
 
-  /* ---------- Save all data ---------- */
   const handleSave = async () => {
     if (!invoiceId || !locationId || !localInvoice?.docId) {
       alert("Cannot save: Invoice not loaded or missing ID");
@@ -279,7 +315,6 @@ export default function PLForm({
         { merge: true }
       );
 
-      // Also save to invoice document
       const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
       await updateDoc(invoiceRef, {
         checkedBy: checkedBy.trim() || technicianName || "N/A",
@@ -341,11 +376,11 @@ export default function PLForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>  {/* ← Changed from Village */}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
             <input
               className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
-              value={farmerInfo.address}                                           
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, address: e.target.value })}  
+              value={farmerInfo.address}
+              onChange={(e) => setFarmerInfo({ ...farmerInfo, address: e.target.value })}
             />
           </div>
           <div>
@@ -432,19 +467,79 @@ export default function PLForm({
                 gridTemplateColumns: `repeat(${totalSamples}, minmax(120px, 1fr))`,
               }}
             >
-              {plData[row.key].map((value: string, i: number) => (
-                <div key={i} className="flex flex-col">
-                  <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
-                  <input
-                    className="border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={`S${i + 1}`}
-                    value={value}
-                    onChange={(e) =>
-                      updateColumn(row.key as string, i, e.target.value)
-                    }
-                  />
-                </div>
-              ))}
+              {plData[row.key].map((value: string, i: number) => {
+                const fieldKey = row.key as string;
+                if (fieldOptions[fieldKey]) {
+                  const isCustom = customModes[fieldKey]?.[i] ?? false;
+                  return (
+                    <div key={i} className="flex flex-col">
+                      <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
+                      {isCustom ? (
+                        <div>
+                          <input
+                            className="w-full border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder={`Enter custom value`}
+                            value={value}
+                            onChange={(e) => updateColumn(fieldKey, i, e.target.value)}
+                          />
+                          <button
+                            className="text-xs text-blue-600 underline mt-1 block mx-auto"
+                            onClick={() => {
+                              const newModes = { ...customModes };
+                              newModes[fieldKey] = [...newModes[fieldKey]];
+                              newModes[fieldKey][i] = false;
+                              setCustomModes(newModes);
+                              updateColumn(fieldKey, i, ''); // reset to empty when switching back
+                            }}
+                          >
+                            Select from options
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          className="w-full border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={value}
+                          onChange={(e) => {
+                            const newVal = e.target.value;
+                            if (newVal === 'Others' && hasOthers[fieldKey]) {
+                              const newModes = { ...customModes };
+                              newModes[fieldKey] = [...newModes[fieldKey]];
+                              newModes[fieldKey][i] = true;
+                              setCustomModes(newModes);
+                              updateColumn(fieldKey, i, '');
+                            } else {
+                              updateColumn(fieldKey, i, newVal);
+                            }
+                          }}
+                        >
+                          <option value="">Select...</option>
+                          {fieldOptions[fieldKey].map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                          {hasOthers[fieldKey] && <option value="Others">Others</option>}
+                        </select>
+                      )}
+                    </div>
+                  );
+                } else {
+                  // Normal text input
+                  return (
+                    <div key={i} className="flex flex-col">
+                      <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
+                      <input
+                        className="border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder={`S${i + 1}`}
+                        value={value}
+                        onChange={(e) =>
+                          updateColumn(row.key as string, i, e.target.value)
+                        }
+                      />
+                    </div>
+                  );
+                }
+              })}
             </div>
           </div>
         ))}

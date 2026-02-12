@@ -110,9 +110,9 @@ export default function WaterForm({
     totalAmmonia: "", unionizedAmmonia: "", h2s: "", nitrite: "", nitrate: "", iron: "", chlorine: "",
     dissolvedOxygen: "", totalDissolvedMatter: "",
     yellowColonies: "", greenColonies: "", tpc: "",
-    phacus: "", chlorella: "", desmids: "", scenedesmus: "", copepod: "", rotifer: "", nauplius: "",
+    phacus: "", chlorella: "", desmids: "", scenedesmus: "",spirulina: "", copepod: "", rotifer: "", nauplius: "",
     brachionus: "",
-    spirulina: "", chaetoceros: "", skeletonema: "", rhizosolenia: "",
+     chaetoceros: "", skeletonema: "", rhizosolenia: "",
     anabaena: "", oscillatoria: "", microcystis: "",
     coscinodiscus: "", nitzchia: "", navicula: "",
     noctiluca: "", ceratium: "", dinophysis: "", gymnodinium: "",
@@ -214,11 +214,12 @@ export default function WaterForm({
     chlorella: "Chlorella",
     desmids: "Eudorina",
     scenedesmus: "Scenedesmus",
+    spirulina: "Spirulina",
     copepod: "Copepod",
     rotifer: "Rotifer",
     nauplius: "Nauplius",
     brachionus: "Brachionus",
-    spirulina: "Spirulina",
+    
     chaetoceros: "Chaetoceros",
     skeletonema: "Skeletonema",
     rhizosolenia: "Rhizosolenia",
@@ -237,9 +238,7 @@ export default function WaterForm({
     favella: "Favella",
   };
 
-  // ────────────────────────────────────────────────
-  // Load data + initialize ponds
-  // ────────────────────────────────────────────────
+  
   useEffect(() => {
     const loadData = async () => {
       if (!localInvoice || !locationId || !invoiceId) {
@@ -324,11 +323,12 @@ export default function WaterForm({
               chlorella: data.chlorella || "",
               desmids: data.desmids || "",
               scenedesmus: data.scenedesmus || "",
+               spirulina: data.spirulina || "",
               copepod: data.copepod || "",
               rotifer: data.rotifer || "",
               nauplius: data.nauplius || "",
               brachionus: data.brachionus || "",
-              spirulina: data.spirulina || "",
+             
               chaetoceros: data.chaetoceros || "",
               skeletonema: data.skeletonema || "",
               rhizosolenia: data.rhizosolenia || "",
@@ -540,7 +540,7 @@ export default function WaterForm({
           { key: "iron" as keyof Pond, label: "Iron" },
           { key: "chlorine" as keyof Pond, label: "Chlorine" },
           { key: "dissolvedOxygen" as keyof Pond, label: "DO (ppm)" },
-          { key: "totalDissolvedMatter" as keyof Pond, label: "TDM (ppm)" },
+          { key: "totalDissolvedMatter" as keyof Pond, label: "TOM (ppm)" },
         ].filter(item => item.key === "pondNo" || enabledFields.has(item.key));
 
         return (
@@ -614,8 +614,9 @@ export default function WaterForm({
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {([
                   "chlorella","phacus", "desmids", "scenedesmus",
-                  "copepod", "rotifer", "nauplius", "brachionus",
                   "spirulina",
+                  "copepod", "rotifer", "nauplius", "brachionus",
+                  
                   "chaetoceros", "skeletonema", "rhizosolenia",
                 ] as const).map((field) => {
                   let displayName = field.replace(/([A-Z])/g, " $1").trim();

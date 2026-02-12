@@ -236,6 +236,16 @@ export default function PCRReport({
 
     fetchLocationDetails();
   }, [locationId]);
+  const formatDateDDMMYYYY = (dateStr: string | undefined): string => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).replace(/\//g, '-');
+};
 
   if (loading) {
     return (
@@ -299,11 +309,9 @@ export default function PCRReport({
             )}
           </thead>
 
-          
-<tbody>
+          <tbody>
   {reports.map((r, idx) => (
     <tr key={idx} className="hover:bg-gray-50">
-      {/* Changed py-2 to py-10 to stretch the row height */}
       <td className="border px-4 py-5 text-center font-semibold">{r.sampleCode}</td>
       <td className="border px-4 py-5 text-center">{r.sampleType}</td>
 
@@ -312,23 +320,72 @@ export default function PCRReport({
           <td className="border px-4 py-5 text-center font-medium">
             {allPathogens[0]}
           </td>
-          <td className="border px-4 py-5 text-center font-bold text-red-600">
-            {r.pathogens[0]?.result || "-"}
+
+          {/* Result - colored based on value */}
+          <td className="border px-4 py-5 text-center font-bold">
+            {(() => {
+              const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
+              if (res === "negative" || res === "neg" || res === "-") {
+                return <span className="text-black">Negative</span>;
+              }
+              if (res === "positive" || res === "pos") {
+                return <span className="text-red-600">Positive</span>;
+              }
+              if (res === "suspect" || res.includes("sus")) {
+                return <span className="text-yellow-600">Suspect</span>;
+              }
+              return r.pathogens[0]?.result || "-";
+            })()}
           </td>
-          <td className="border px-4 py-5 text-center font-bold text-red-600">
-            {r.pathogens[0]?.ctValue || "-"}
+
+          {/* C.T - same color as result, blank when Negative */}
+          <td className="border px-4 py-5 text-center font-bold">
+            {(() => {
+              const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
+              const ctValue = r.pathogens[0]?.ctValue || "-";
+
+              if (res === "negative" || res === "neg" || res === "-") {
+                return <span className="text-black">-</span>;
+              }
+              if (res === "positive" || res === "pos") {
+                return <span className="text-red-600">{ctValue}</span>;
+              }
+              if (res === "suspect" || res.includes("sus")) {
+                return <span className="text-yellow-600">{ctValue}</span>;
+              }
+              return <span className="text-gray-700">{ctValue}</span>;
+            })()}
           </td>
         </>
       ) : (
         allPathogens.map((p) => {
           const found = r.pathogens.find((x: any) => x.name === p);
+          const res = (found?.result || "-").trim().toLowerCase();
+          const ctValue = found?.ctValue || "-";
+
+          let resultDisplay: React.ReactNode = found?.result || "-";
+          let ctDisplay: React.ReactNode = ctValue;
+
+          if (res === "negative" || res === "neg" || res === "-") {
+            resultDisplay = <span className="text-black">Negative</span>;
+            ctDisplay = <span className="text-black">-</span>;
+          } else if (res === "positive" || res === "pos") {
+            resultDisplay = <span className="text-red-600">Positive</span>;
+            ctDisplay = <span className="text-red-600">{ctValue}</span>;
+          } else if (res === "suspect" || res.includes("sus")) {
+            resultDisplay = <span className="text-yellow-600">Suspect</span>;
+            ctDisplay = <span className="text-yellow-600">{ctValue}</span>;
+          } else {
+            ctDisplay = <span className="text-gray-700">{ctValue}</span>;
+          }
+
           return (
             <React.Fragment key={p}>
-              <td className="border px-4 py-5 text-center font-bold text-red-600">
-                {found?.result || "-"}
+              <td className="border px-4 py-5 text-center font-bold">
+                {resultDisplay}
               </td>
-              <td className="border px-4 py-5 text-center font-bold text-red-600">
-                {found?.ctValue || "-"}
+              <td className="border px-4 py-5 text-center font-bold">
+                {ctDisplay}
               </td>
             </React.Fragment>
           );
@@ -411,7 +468,7 @@ export default function PCRReport({
               <td className="border px-6 py-3 font-bold bg-gray-100">Address</td>
               <td className="border px-6 py-3">{farmerInfo.address || "-"}</td>
               <td className="border px-6 py-3 font-bold bg-gray-100">Sample Collected</td>
-              <td className="border px-6 py-3">{farmerInfo.sampleCollectionTime || "-"}</td>
+              <td className="border px-6 py-3">{formatDateDDMMYYYY(farmerInfo.sampleCollectionTime)}</td>
             </tr>
             <tr>
               <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
@@ -419,7 +476,7 @@ export default function PCRReport({
               <td className="border px-6 py-3 font-bold bg-gray-100">Farmer ID</td>
               <td className="border px-6 py-3">{farmerInfo.farmerId || "-"}</td>
               <td className="border px-6 py-3 font-bold bg-gray-100">Report Date</td>
-              <td className="border px-6 py-3">{farmerInfo.reportDate || "-"}</td>
+              <td className="border px-6 py-3">{formatDateDDMMYYYY(farmerInfo.reportDate)}</td>
             </tr>
             <tr>
               <td className="border px-6 py-3 font-bold bg-gray-100">Report Id</td>

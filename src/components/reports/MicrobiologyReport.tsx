@@ -254,6 +254,17 @@ export default function MicrobiologyReport({
     return <p className="text-center py-8 text-red-600 text-xl">No microbiology report found.</p>;
   }
 
+  const formatDateDDMMYYYY = (dateStr: string | undefined): string => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).replace(/\//g, '-');
+};
+
   return (
     <>
       {/* Action Buttons - Hidden when printing / jpeg capture */}
@@ -303,7 +314,7 @@ export default function MicrobiologyReport({
 
         {/* Farmer Info Table */}
         <div className="flex justify-center mb-10 print:mb-8">
-          <table className="border-2 border-gray-800 text-sm w-full max-w-5xl print:text-xs">
+          <table className="border-2 border-gray-800 text-sm w-full max-w-full print:text-xs">
             <tbody>
               <tr>
                 <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer Name</td>
@@ -327,7 +338,7 @@ export default function MicrobiologyReport({
                 <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Sample Type</td>
                 <td className="border px-4 py-2 w-1/8">Microbiology</td>
                 <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Date</td>
-                <td className="border px-4 py-2 w-1/8">{farmerInfo?.date || "-"}</td>
+                <td className="border px-4 py-2 w-1/8">{formatDateDDMMYYYY(farmerInfo?.date)}</td>
               </tr>
             </tbody>
           </table>
@@ -342,7 +353,7 @@ export default function MicrobiologyReport({
 
         {/* Results Table */}
         <div className="flex justify-center overflow-x-auto mb-12 print:mb-8">
-          <table className="border-2 border-gray-800 text-sm w-full max-w-lg print:text-xs">
+          <table className="border-2 border-gray-800 text-sm w-full max-w-lg print:max-w-none print:w-full print:text-xs">
             <thead>
               <tr className="bg-blue-100">
                 <th 
@@ -418,7 +429,7 @@ export default function MicrobiologyReport({
         @media print {
           @page {
             size: A4 portrait;
-            margin: 0.4cm;
+            margin: 10mm 1mm 10mm 10mm;
           }
 
           html, body {

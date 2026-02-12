@@ -274,6 +274,17 @@ export default function PLReport({
     { label: "Total Score", key: "totalScore" },
   ];
 
+  const formatDateDDMMYYYY = (dateStr: string | undefined): string => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).replace(/\//g, '-');
+};
+
   return (
     <div className="rounded-lg p-8 bg-white" id="pl-report">
       <div className="flex justify-between items-start mb-8 border-b-2 border-black">
@@ -298,12 +309,12 @@ export default function PLReport({
         <table className="w-full border-2 border-gray-800 text-sm table-fixed">
           <tbody>
             <tr>
-              <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer Name</td>
+              <td className="font-semibold bg-blue-100 border px-2 py-1">Farmer Name</td>
               <td className="border px-4 py-2">{farmerInfo.farmerName}</td>
               <td className="font-semibold bg-blue-100 border px-4 py-2">Address</td>
               <td className="border px-4 py-2">{farmerInfo.address}</td>
               <td className="font-semibold bg-blue-100 border px-4 py-2">Sample Date</td>
-              <td className="border px-4 py-2">{farmerInfo.sampleDate}</td>
+              <td className="border px-4 py-2">{formatDateDDMMYYYY(farmerInfo.sampleDate)}</td>
             </tr>
             <tr>
               <td className="font-semibold bg-blue-100 border px-4 py-2">Report Id</td>
@@ -311,7 +322,7 @@ export default function PLReport({
               <td className="font-semibold bg-blue-100 border px-4 py-2">Mobile</td>
               <td className="border px-4 py-2">{farmerInfo.mobile}</td>
               <td className="font-semibold bg-blue-100 border px-4 py-2">Report Date</td>
-              <td className="border px-4 py-2">{farmerInfo.reportDate}</td>
+              <td className="border px-4 py-2">{formatDateDDMMYYYY(farmerInfo.reportDate)}</td>
             </tr>
             <tr>
               <td className="font-semibold bg-blue-100 border px-4 py-2">Farmer ID</td>
@@ -335,9 +346,9 @@ export default function PLReport({
         <table className="inline-table border-2 border-gray-800 text-xs whitespace-nowrap">
           <thead>
             <tr className="bg-blue-100">
-              <th className="border px-4 py-2 font-semibold">TEST CODE</th>
+              <th className="border px-2 py-1 font-semibold">TEST CODE</th>
               {plData.testCode.map((code, i) => (
-                <th key={i} className="border px-4 py-2 font-semibold">
+                <th key={i} className="border px-2 py-1 font-semibold">
                   Tank - {code}
                 </th>
               ))}
@@ -350,7 +361,7 @@ export default function PLReport({
                   className={row.key === "totalScore" ? "bg-blue-100" : ""}
                 >
                   <td 
-                    className={`border px-4 py-2 font-semibold ${
+                    className={`border px-2 py-1 font-semibold ${
                       row.key === "totalScore" 
                         ? "bg-blue-100" 
                         : "bg-gray-50"
@@ -362,7 +373,7 @@ export default function PLReport({
   <td 
     key={i} 
     // Increased vertical padding to py-5 to physically stretch the table
-    className={`border px-4 py-3 text-center font-medium text-sm ${
+    className={`border px-4 py-3 text-center font-medium text-xs ${
       row.key === "totalScore" ? "bg-blue-100" : ""  
     }`}
   >
@@ -373,21 +384,21 @@ export default function PLReport({
 
                 {row.key === "shg" && (
                   <tr className="bg-blue-200">
-                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                    <td className="border px-2 py-1 font-bold" colSpan={allSampleCount + 1}>
                       Necrosis
                     </td>
                   </tr>
                 )}
                 {row.key === "necMuscle" && (
                   <tr className="bg-blue-200">
-                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                    <td className="border px-2 py-1 font-bold" colSpan={allSampleCount + 1}>
                       Fouling
                     </td>
                   </tr>
                 )}
                 {row.key === "foulAbdomen" && (
                   <tr className="bg-blue-200">
-                    <td className="border px-4 py-2 font-bold" colSpan={allSampleCount + 1}>
+                    <td className="border px-2 py-1 font-bold" colSpan={allSampleCount + 1}>
                       Stress Test
                     </td>
                   </tr>

@@ -320,6 +320,17 @@ const WaterReport: React.FC<WaterReportProps> = ({
     fetchLocationDetails();
   }, [locationId]);
 
+  const formatDateDDMMYYYY = (dateStr: string | undefined): string => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).replace(/\//g, '-');
+};
+
   if (loading) return <p className="text-center py-12 text-xl">Loading Water Report...</p>;
 
   return (
@@ -358,42 +369,45 @@ const WaterReport: React.FC<WaterReportProps> = ({
           <h2 className="text-xl font-bold mt-1 text-red-600 uppercase">Water Quality Report</h2>
         </div>
 
-        {/* Farmer Info Grid */}
-        <div className="grid grid-cols-10 text-[11px] mb-3 border border-black border-collapse">
-          <div className="col-span-1 border-r border-black p-1 font-bold bg-gray-100">Farmer Name</div>
-          <div className="col-span-2 border-r border-black p-1">{formData.farmerName}</div>
-          <div className="col-span-1 border-r border-black p-1 font-bold bg-gray-100">Mobile</div>
-          <div className="col-span-1 border-r border-black p-1">{formData.mobile}</div>
-          <div className="col-span-1 border-r border-black p-1 font-bold bg-gray-100">S.D/D.O.C:</div>
-          <div className="col-span-1 border-r border-black p-1">{formData.sdDoc}</div>
-          <div className="col-span-2 border-r border-black p-1 font-bold bg-gray-100">Sample Collection Time</div>
-          <div className="col-span-1 p-1">{formData.sampleCollectionTime}</div>
+        <div className="w-full mb-8">
+        <table className="w-full border-2  border-gray-800 text-xs table-fixed">
+          <tbody>
+            <tr>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">Farmer Name</td>
+              <td className="border px-4 py-2">{formData.farmerName}</td>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">Mobile</td>
+              <td className="border px-4 py-2">{formData.mobile}</td>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">Sample Collection time</td>
+              <td className="border px-4 py-2">{formatDateDDMMYYYY(formData.sampleCollectionTime)}</td>
+            </tr>
+            <tr>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">Report Id</td>
+              <td className="border px-4 py-2">{invoiceId || '-'}</td>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">Source</td>
+              <td className="border px-4 py-2">{formData.sourceOfWater}</td>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">No. of samples</td>
+              <td className="border px-4 py-2">{formData.noOfSamples}</td>
+            </tr>
+            <tr>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">Farmer ID</td>
+              <td className="border px-4 py-2">{formData.farmerUID || '-'}</td>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">Address</td>
+              <td className="border px-4 py-2">{formData.farmerAddress}</td>
+              <td className="font-semibold bg-gray-100 border px-4 py-2">Sample Date</td>
+              <td className="border px-4 py-2">{formatDateDDMMYYYY(formData.sampleDate)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Farmer UID</div>
-          <div className="col-span-2 border-t border-r border-black p-1">{formData.farmerUID}</div>
-          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Address</div>
-          <div className="col-span-1 border-t border-r border-black p-1">{formData.farmerAddress}</div>
-          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Sample Date</div>
-          <div className="col-span-1 border-t border-r border-black p-1">{formData.sampleDate}</div>
-          <div className="col-span-2 border-t border-r border-black p-1 font-bold bg-gray-100">Source</div>
-          <div className="col-span-1 border-t border-black p-1">{formData.sourceOfWater}</div>
-
-          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Report Id</div>
-          <div className="col-span-2 border-t border-r border-black p-1">{invoiceId || "-"}</div>
-          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">No. of Samples</div>
-          <div className="col-span-1 border-t border-r border-black p-1">{formData.noOfSamples}</div>
-          <div className="col-span-1 border-t border-r border-black p-1 font-bold bg-gray-100">Report Date</div>
-          <div className="col-span-1 border-t border-r border-black p-1">{formData.reportDate}</div>
-          <div className="col-span-2 border-t border-r border-black p-1 font-bold bg-gray-100">Report Time</div>
-          <div className="col-span-1 border-t border-black p-1">{formData.reportTime}</div>
-        </div>
+      
 
         {/* ANALYSIS SECTION - PERFECTLY JOINED SIDE BY SIDE */}
         <div className="flex flex-row w-full mb-4 border border-black overflow-hidden">
           {/* WATER ANALYSIS */}
           <div className="flex-[8.5] border-r border-black">
-            <h4 className="text-center font-bold text-[12px] bg-gray-200 border-b border-black py-1 text-red-600">WATER ANALYSIS</h4>
-            <table className="w-full text-[11px] border-collapse">
+            <h4 className="text-center font-bold text-[12px] bg-gray-200 border-b border-black  text-red-600">WATER ANALYSIS</h4>
+            <table className="w-full text-[10px] border-collapse">
               <thead>
                 <tr className="bg-gray-100 font-bold">
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[8px]"></span></td>
@@ -402,16 +416,16 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center" colSpan={3}>Alkalinity(PPM as Caco3)<br/><span className="text-[8px]">ఆల్కలినిటీ</span></td>
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[8px]">మొత్తం కఠినత</span></td>
                   <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/><span className="text-[8px]">అమ్మోనియా</span></td>
-                  <td className="border-r border-black p-0.5 text-center text-[9px]" rowSpan={3}>Unionized NH₃<br/><span className="text-[7px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/>(ppm) <br /><span className="text-[8px]">అమ్మోనియా</span></td>
+                  <td className="border-r border-black p-0.5 text-center text-[9px]" rowSpan={3}>Un-ionized NH₃<br/>(ppm) <br /><span className="text-[7px]">యూనియనైజ్డ్ అమ్మోనియా</span></td>
                   
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₂<br/><span className="text-[8px]">నైట్రైట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>NO₃<br/><span className="text-[8px]">నైట్రేట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/><span className="text-[8px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Fe<br/><span className="text-[8px]">ఇనుము</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Cl<br/><span className="text-[8px]">క్లోరిన్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>DO<br/><span className="text-[8px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
-                  <td className="p-0.5 text-center" rowSpan={3}>TOM<br/><span className="text-[8px]">Total Organic Matter</span></td>
+                  <td className="border-r border-black text-[8.5px] p-0.5 text-center" rowSpan={3}>Nitrite <br />(NO₂)<br/>(ppm) <br /><span className="text-[8px]">నైట్రైట్</span></td>
+                  <td className="border-r border-black text-[8.5px] p-0.5 text-center" rowSpan={3}>Nitrate <br />(NO₃)<br/>(ppm) <br /><span className="text-[8px]">నైట్రేట్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/>(ppm) <br /><span className="text-[8px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Fe+<br/>(ppm) <br /><span className="text-[8px]">ఇనుము</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Chlorine<br/>(ppm) <br /><span className="text-[8px]">క్లోరిన్</span></td>
+                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>DO<br/>(ppm) <br /><span className="text-[8px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
+                  <td className="p-0.5 text-center" rowSpan={3}>TOM<br/>(ppm) <br /><span className="text-[8px]">Total Organic Matter</span></td>
                 </tr>
                 <tr className="bg-gray-100 border-t border-black text-[10px]">
                   <td className="border-r border-black p-0.5 text-center font-bold">CO₃<br/><span className="text-[8px]">కార్బొనేట్</span></td>
@@ -420,8 +434,8 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   <td className="border-r border-black p-0.5 text-center font-bold">Ca++<br/><span className="text-[8px]">కాల్షియం</span></td>
                   <td className="border-r border-black p-0.5 text-center font-bold">Mg++<br/><span className="text-[7px]">మెగ్నీషియం</span></td>
                   
-                  <td className="border-r border-black p-0.5 text-center font-bold">K++<br/><span className="text-[7px]">పొటాషియం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Na++<br/><span className="text-[8px]">సోడియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">K+<br/><span className="text-[7px]">పొటాషియం</span></td>
+                  <td className="border-r border-black p-0.5 text-center font-bold">Na+<br/><span className="text-[8px]">సోడియం</span></td>
                 </tr>
               </thead>
               <tbody>
@@ -481,24 +495,24 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
           {/* BACTERIOLOGY - FULLY BORDERED & ALIGNED */}
           <div className="flex-[1.5]">
-            <h4 className="text-center font-bold text-[12px] bg-gray-200 border-b border-black py-1 text-red-600">BACTERIOLOGY</h4>
-            <table className="w-full text-[10px] border-collapse">
+            <h4 className="text-center font-bold text-[10.7px] p-0.5 bg-gray-200 border-b border-black  text-red-600">BACTERIOLOGY</h4>
+            <table className="w-full text-[9px] border-collapse bacteriology-print">
               <thead>
                 <tr className="bg-gray-100 font-bold">
-                  <td className="border-b border-black text-center " colSpan={3}>Vibrio CFU /ml</td>
+                  <td className="border-b border-black text-center text-[11px]" colSpan={3}>Vibrio CFU /ml</td>
                 </tr>
-                <tr className="bg-gray-100 text-[7.5px] font-bold">
-                  <td className="border-r border-black p-0.5 text-center">Yellow <br />Colonies <br /> <span className="text-[9px]">పసుపు కాలనీలు</span></td>
-                  <td className="border-r border-black p-0.5 text-center">Green <br />Colonies <br /><span className="text-[9px]">పచ్చ కాలనీలు</span></td>
+                <tr className="bg-gray-100 text-[10px] font-bold">
+                  <td className="border-r border-black p-0.5 text-center bg-yellow-100">Yellow <br />Colonies <br /> <span className="text-[9px]">పసుపు కాలనీలు</span></td>
+                  <td className="border-r border-black p-0.5 text-center bg-green-100">Green <br />Colonies <br /><span className="text-[9px]">పచ్చ కాలనీలు</span></td>
                   <td className="p-0.5 text-center">TPC <br /><span className="text-[8px]">Total Plate Count</span></td>
                 </tr>
               </thead>
               <tbody>
                 {ponds.map(p => (
-                  <tr key={p.id} className="border-t border-black">
-                    <td className="border-r border-black p-[3px] text-center">{p.yellowColonies}</td>
-                    <td className="border-r border-black p-[3px] text-center">{p.greenColonies}</td>
-                    <td className="p-[3px] text-center">{p.tpc}</td>
+                  <tr key={p.id} className="border-t border-black ">
+                    <td className="border-r border-black p-[2.7px] text-center bg-yellow-100">{p.yellowColonies}</td>
+                    <td className="border-r border-black p-[2.7px] text-center bg-green-100">{p.greenColonies}</td>
+                    <td className="p-[2.7px] text-center">{p.tpc}</td>
                   </tr>
                 ))}
                 <tr className="border-t border-black font-bold text-[13px]  text-red-600 bg-gray-50 optimum-row">
@@ -525,8 +539,8 @@ const WaterReport: React.FC<WaterReportProps> = ({
                 <tr className="bg-gray-50 text-[10px] p-1 border-b border-black">
                   <th className="border-r border-black"></th>
                   <th className="border-r border-black" colSpan={4}>Green alge</th>
-                  <th className="border-r border-black" colSpan={4}>Zooplankton</th>
                   <th className="border-r border-black">B.G Algae</th>
+                  <th className="border-r border-black" colSpan={4}>Zooplankton</th>
                   <th className="border-r border-black" colSpan={3}>Diatom</th>
                   <th className="border-r border-black" colSpan={3}>Blue Green Algae</th>
                   <th className="border-r border-black" colSpan={3}>Diatom</th>
@@ -541,11 +555,12 @@ const WaterReport: React.FC<WaterReportProps> = ({
                     { img: phacus, name: "Oosystis" },
                     { img: desmids, name: "Eudorina" },
                     { img: scenedesmus, name: "Scenedesmus" },
+                    { img: spirulina, name: "Spirulina" },
                     { img: copepod, name: "Copepod" },
                     { img: rotifer, name: "Rotifer" },
                     { img: nauplius, name: "Nauplius" },
                     { img: brachionus, name: "Brachionus" },
-                    { img: spirulina, name: "Spirulina" },
+                    
                     { img: chaetoceros, name: "Chaetoceros" },
                     { img: skeletonema, name: "Skeletonema" },
                     { img: rhizosolenia, name: "Rhizosolenia" },
@@ -569,7 +584,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
   style={{ minWidth: "65px" }} // adjust this as needed
 >
   <img className="w-8 h-8 p-0.5 mx-auto" src={item.img} alt={item.name} />
-  <div className="text-[7px] mt-1 leading-tight">{item.name}</div>
+  <div className="text-[6px] mt-1 leading-tight">{item.name}</div>
 </th>
                   ))}
                 </tr>
@@ -583,11 +598,12 @@ const WaterReport: React.FC<WaterReportProps> = ({
                       pond.phacus,
                       pond.desmids,
                       pond.scenedesmus,
+                       pond.spirulina,
                       pond.copepod,
                       pond.rotifer,
                       pond.nauplius,
                       pond.brachionus,
-                      pond.spirulina,
+                     
                       pond.chaetoceros,
                       pond.skeletonema,
                       pond.rhizosolenia,
@@ -680,6 +696,47 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
   
 `}</style>
+<style>{`
+@media print {
+
+  .bacteriology-print,
+  .bacteriology-print td,
+  .bacteriology-print th {
+    font-size: 8.8px !important;           /* ← main data – very common sweet spot */
+  }
+
+  /* Headers - keep slightly larger */
+  .bacteriology-print thead tr:first-child,
+  .bacteriology-print thead tr:nth-child(2),
+  .bacteriology-print thead td,
+  .bacteriology-print thead th {
+    font-size: 11px !important;
+  }
+
+  /* Telugu text inside headers – make smaller */
+  .bacteriology-print thead span {
+    font-size: 11px !important;
+  }
+
+  /* Optimum row – make it noticeable but not huge */
+  // .bacteriology-print .optimum-row,
+  // .bacteriology-print .optimum-row td {
+  //   font-size: 10.5px !important;
+  //   font-weight: bold !important;
+  // }
+    .bacteriology-print tbody td {
+    padding: 4.5px 2px !important;      /* ↑↑↑ more vertical space + some horizontal */
+    line-height: 1.15 !important;
+    vertical-align: middle !important;
+  }
+
+  /* Better spacing in small font */
+  .bacteriology-print td,
+  .bacteriology-print th {
+    padding: 2px 1px !important;          /* ← helps a lot */
+    line-height: 1.1 !important;
+  }
+}`}</style>
     </>
   );
 };

@@ -41,7 +41,7 @@ interface Sample {
   availableNitrogen: string;
   availablePhosphorus: string;
   redoxPotential: string;
-  remarks: string;
+  // remarks removed from per-sample data
 }
 
 interface SoilFormProps {
@@ -81,29 +81,24 @@ export default function SoilForm({
   });
 
   const [checkedBy, setCheckedBy] = useState(technicianName);
+  const [sharedRemarks, setSharedRemarks] = useState<string>(""); // ← new state for single remarks
 
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [localInvoice, setLocalInvoice] = useState<any>(null);
 
-  // ────────────────────────────────────────────────
   // Mapping: which test IDs control which soil fields
-  // ────────────────────────────────────────────────
   const testToSoilFields: Record<string, (keyof Sample)[]> = {
-    // Assuming these are the possible test IDs for soil (adjust if different)
     "soil_ph": ["pH"],
     "soil_ec": ["ec"],
     "soil_oc": ["organicCarbon"],
     // Add others if you have more granular soil tests
-    // If you have a "basic_soil" or similar that includes multiple, add here
   };
 
   // Always show these (common / header-like fields)
-  const alwaysShowFields = new Set<keyof Sample>(["pondNo", "remarks"]);
+  const alwaysShowFields = new Set<keyof Sample>(["pondNo"]); // remarks removed
 
-  // ────────────────────────────────────────────────
   // Fetch invoice
-  // ────────────────────────────────────────────────
   useEffect(() => {
     if (!locationId || !invoiceId) {
       console.warn("Missing locationId or invoiceId for SoilForm fetch");
@@ -159,7 +154,7 @@ export default function SoilForm({
     availableNitrogen: "Available Nitrogen",
     availablePhosphorus: "Available Phosphorus",
     redoxPotential: "Redox Potential",
-    remarks: "Remarks",
+    // remarks removed from per-sample map
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,6 +222,7 @@ export default function SoilForm({
             sampleDate: headerData.sampleDate || localInvoice.dateOfCulture || today,
           }));
           setCheckedBy(headerData.checkedBy || technicianName || "");
+          setSharedRemarks(headerData.remarks || ""); // ← load shared remarks
         }
 
         // Load all soil samples
@@ -257,7 +253,6 @@ export default function SoilForm({
               availableNitrogen: '',
               availablePhosphorus: '',
               redoxPotential: '',
-              remarks: ''
             });
           }
         }
@@ -275,9 +270,6 @@ export default function SoilForm({
     }
   }, [localInvoice, invoiceId, locationId, technicianName, totalSamples]);
 
-  // ────────────────────────────────────────────────
-  // Save with unselected fields forced to "-"
-  // ────────────────────────────────────────────────
   const saveAllData = async () => {
     if (!locationId || !invoiceId || !localInvoice?.docId) {
       alert("Cannot save: Invoice not loaded or missing ID");
@@ -285,7 +277,7 @@ export default function SoilForm({
     }
 
     try {
-      // Save shared header
+      // Save shared header — including remarks
       const reportHeaderRef = doc(db, "locations", locationId, "reports", invoiceId);
       await setDoc(reportHeaderRef, {
         soilType: formData.soilType,
@@ -296,17 +288,17 @@ export default function SoilForm({
         technicianName: technicianName,
         sampleDate: formData.sampleDate,
         checkedBy: checkedBy.trim() || technicianName || "N/A",
+        remarks: sharedRemarks.trim(), // ← save shared remarks here
       }, { merge: true });
 
-      // Save all samples with filtering
+      // Save all samples (without remarks field)
       const savePromises = samples.map(async (sample, index) => {
         const sampleNumber = index + 1;
         const selectedIds = perSampleSelectedTests[sampleNumber] || [];
 
-        // Create clean copy
         const dataToSave: Partial<Sample> = { ...sample };
 
-        // Reset all analyzable fields to "-"
+        // Reset unselected fields to "-"
         [
           "pH", "ec", "caco3", "soilTexture", "organicCarbon",
           "availableNitrogen", "availablePhosphorus", "redoxPotential"
@@ -314,7 +306,7 @@ export default function SoilForm({
           (dataToSave as any)[field] = "-";
         });
 
-        // Restore only selected ones
+        // Restore only selected fields
         selectedIds.forEach(testId => {
           const fields = testToSoilFields[testId];
           if (fields) {
@@ -446,7 +438,7 @@ export default function SoilForm({
           }
         });
 
-        // Define all possible fields with labels
+        // Define all possible fields with labels (remarks removed)
         const allSoilFields: { key: keyof Sample; label: string }[] = [
           { key: "pondNo", label: "Pond No." },
           { key: "pH", label: "pH" },
@@ -457,7 +449,6 @@ export default function SoilForm({
           { key: "availableNitrogen", label: "Available Nitrogen" },
           { key: "availablePhosphorus", label: "Available Phosphorus" },
           { key: "redoxPotential", label: "Redox Potential" },
-          { key: "remarks", label: "Remarks" },
         ];
 
         // Filter to show only enabled + always shown
@@ -512,6 +503,20 @@ export default function SoilForm({
           </div>
         );
       })}
+
+      {/* ────────────────────── Single Shared Remarks Section ────────────────────── */}
+      <div className="mb-10 border border-gray-300 rounded p-5 bg-gray-50">
+        <label className="block text-md font-bold mb-3 text-gray-800">
+          Remarks & Recommendations (applies to all samples)
+        </label>
+        <textarea
+          value={sharedRemarks}
+          onChange={(e) => setSharedRemarks(e.target.value)}
+          rows={3}
+          placeholder="Enter observations, conclusions or recommendations for the entire soil analysis report..."
+          className="w-full px-4 py-3 border border-gray-400 rounded focus:border-blue-600 focus:outline-none resize-y text-base"
+        />
+      </div>
 
       {/* Checked by input field */}
       <div className="mb-12 max-w-md mx-auto">
