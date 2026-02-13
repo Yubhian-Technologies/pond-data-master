@@ -401,11 +401,11 @@ export default function PCRForm({
                   : key === "dateOfCulture"
                   ? "Sample Collection Time"
                   : key === "docDifference"
-                  ? "Days Difference"
+                  ? "DOC"
                   : key === "noOfSamples"
                   ? "No. of Samples"
                   : key === "address"
-                  ? "Address"                // ← Changed label
+                  ? "Address"             
                   : key.replace(/([A-Z])/g, " $1").trim()}
               </label>
 
@@ -419,12 +419,18 @@ export default function PCRForm({
                   className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
                 />
               ) : key === "docDifference" ? (
-                <input
-                  type="text"
-                  value={value}
-                  readOnly
-                  className="w-full border bg-gray-100 rounded px-4 py-3 cursor-not-allowed"
-                />
+                <div className="relative">
+    <input
+      type="text"
+      value={value}
+      onChange={(e) =>
+        setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
+      }
+      className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500 pr-24"
+      placeholder="e.g. 15 days"
+    />
+    
+  </div>
               ) : key === "noOfSamples" || key === "farmerId" ? (
                 <input
                   type="text"
@@ -475,7 +481,7 @@ export default function PCRForm({
                       key={i}
                       className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full"
                     >
-                      {name}
+                      {name === "PL EHP" ? "EHP" : name}
                     </span>
                   ))}
                 </div>
@@ -518,7 +524,7 @@ export default function PCRForm({
                       <div>
                         <label className="block text-sm font-medium text-gray-700">Pathogen</label>
                         <input
-                          value={p.name}
+                          value={p.name === "PL EHP" ? "EHP" : p.name}
                           disabled
                           className="w-full border bg-gray-100 rounded px-4 py-3"
                         />

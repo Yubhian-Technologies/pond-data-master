@@ -702,10 +702,10 @@ const WaterReport: React.FC<WaterReportProps> = ({
   .bacteriology-print thead th,
   .bacteriology-print thead td,
   .bacteriology-print thead span {
-    font-size: 9.5px !important;
+    font-size: 9.3px !important;
   }
     .bacteriology-print thead span {
-    font-size: 9px !important;
+    font-size: 8.4px !important;
   }
 }
 
