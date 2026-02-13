@@ -265,7 +265,6 @@ export default function PCRReport({
     new Set(reports.flatMap((r) => (r.pathogens || []).map((p: any) => p.name)))
   );
 
-  
   const displayPathogens = allPathogens.map(p => 
     p === "PL EHP" ? "EHP" : p
   );
@@ -274,6 +273,9 @@ export default function PCRReport({
   const isSingleSample = reports.length === 1;
 
   const ResultTable = () => {
+    // Special case: one sample, multiple pathogens → pathogen per row
+    const isOneSampleMultiPathogen = isSingleSample && !singlePathogen;
+
     return (
       <div className="overflow-x-auto mb-4">
         <div className="text-center">
@@ -287,7 +289,7 @@ export default function PCRReport({
               <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Code</th>
               <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Type</th>
 
-              {isSingleSample ? (
+              {isOneSampleMultiPathogen || singlePathogen ? (
                 <>
                   <th rowSpan={2} className="border px-4 py-2 align-middle font-bold">
                     {"Pathogen"}
@@ -304,7 +306,7 @@ export default function PCRReport({
               )}
             </tr>
 
-            {!isSingleSample && (
+            {!isOneSampleMultiPathogen && !singlePathogen && (
               <tr>
                 {displayPathogens.map((p) => (
                   <React.Fragment key={p}>
@@ -317,92 +319,129 @@ export default function PCRReport({
           </thead>
 
           <tbody>
-            {reports.map((r, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="border px-4 py-5 text-center font-semibold">{r.sampleCode}</td>
-                <td className="border px-4 py-5 text-center">{r.sampleType}</td>
+            {isOneSampleMultiPathogen ? (
+              // Special mode: rows per pathogen for the single sample
+              reports[0].pathogens.map((pathogen: any, pathIdx: number) => {
+                const originalP = pathogen.name;
+                const displayP = displayPathogens[pathIdx];
+                const res = (pathogen.result || "-").trim().toLowerCase();
+                const ctValue = pathogen.ctValue || "-";
 
-                {isSingleSample ? (
-                  <>
+                let resultDisplay: React.ReactNode = pathogen.result || "-";
+                let ctDisplay: React.ReactNode = ctValue;
+
+                if (res === "negative" || res === "neg" || res === "-") {
+                  resultDisplay = <span className="text-black">Negative</span>;
+                  // ctDisplay remains the actual value (no longer forced to "-")
+                } else if (res === "positive" || res === "pos") {
+                  resultDisplay = <span className="text-red-600">Positive</span>;
+                  ctDisplay = <span className="text-red-600">{ctValue}</span>;
+                } else if (res === "suspect" || res.includes("sus")) {
+                  resultDisplay = <span className="text-yellow-600">Suspect</span>;
+                  ctDisplay = <span className="text-yellow-600">{ctValue}</span>;
+                } else {
+                  ctDisplay = <span className="text-gray-700">{ctValue}</span>;
+                }
+
+                return (
+                  <tr key={pathIdx} className="hover:bg-gray-50">
+                    <td className="border px-4 py-5 text-center font-semibold">{reports[0].sampleCode}</td>
+                    <td className="border px-4 py-5 text-center">{reports[0].sampleType}</td>
                     <td className="border px-4 py-5 text-center font-medium">
-                      {displayPathogens[0]}
+                      {displayP}
                     </td>
-
-                    {/* Result - colored based on value */}
                     <td className="border px-4 py-5 text-center font-bold">
-                      {(() => {
-                        const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
-                        if (res === "negative" || res === "neg" || res === "-") {
-                          return <span className="text-black">Negative</span>;
-                        }
-                        if (res === "positive" || res === "pos") {
-                          return <span className="text-red-600">Positive</span>;
-                        }
-                        if (res === "suspect" || res.includes("sus")) {
-                          return <span className="text-yellow-600">Suspect</span>;
-                        }
-                        return r.pathogens[0]?.result || "-";
-                      })()}
+                      {resultDisplay}
                     </td>
-
-                    {/* C.T - same color as result, blank when Negative */}
                     <td className="border px-4 py-5 text-center font-bold">
-                      {(() => {
-                        const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
-                        const ctValue = r.pathogens[0]?.ctValue || "-";
-
-                        if (res === "negative" || res === "neg" || res === "-") {
-                          return <span className="text-black">-</span>;
-                        }
-                        if (res === "positive" || res === "pos") {
-                          return <span className="text-red-600">{ctValue}</span>;
-                        }
-                        if (res === "suspect" || res.includes("sus")) {
-                          return <span className="text-yellow-600">{ctValue}</span>;
-                        }
-                        return <span className="text-gray-700">{ctValue}</span>;
-                      })()}
+                      {ctDisplay}
                     </td>
-                  </>
-                ) : (
-                  allPathogens.map((originalP) => {
-                    // Use original pathogen name to find data, but display renamed version
-                    const found = r.pathogens.find((x: any) => x.name === originalP);
-                    const res = (found?.result || "-").trim().toLowerCase();
-                    const ctValue = found?.ctValue || "-";
+                  </tr>
+                );
+              })
+            ) : (
+              reports.map((r, idx) => (
+                <tr key={idx} className="hover:bg-gray-50">
+                  <td className="border px-4 py-5 text-center font-semibold">{r.sampleCode}</td>
+                  <td className="border px-4 py-5 text-center">{r.sampleType}</td>
 
-                    let resultDisplay: React.ReactNode = found?.result || "-";
-                    let ctDisplay: React.ReactNode = ctValue;
+                  {singlePathogen ? (
+                    <>
+                      <td className="border px-4 py-5 text-center font-medium">
+                        {displayPathogens[0]}
+                      </td>
 
-                    if (res === "negative" || res === "neg" || res === "-") {
-                      resultDisplay = <span className="text-black">Negative</span>;
-                      ctDisplay = <span className="text-black">-</span>;
-                    } else if (res === "positive" || res === "pos") {
-                      resultDisplay = <span className="text-red-600">Positive</span>;
-                      ctDisplay = <span className="text-red-600">{ctValue}</span>;
-                    } else if (res === "suspect" || res.includes("sus")) {
-                      resultDisplay = <span className="text-yellow-600">Suspect</span>;
-                      ctDisplay = <span className="text-yellow-600">{ctValue}</span>;
-                    } else {
-                      ctDisplay = <span className="text-gray-700">{ctValue}</span>;
-                    }
+                      {/* Result - colored based on value */}
+                      <td className="border px-4 py-5 text-center font-bold">
+                        {(() => {
+                          const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
+                          if (res === "negative" || res === "neg" || res === "-") {
+                            return <span className="text-black">Negative</span>;
+                          }
+                          if (res === "positive" || res === "pos") {
+                            return <span className="text-red-600">Positive</span>;
+                          }
+                          if (res === "suspect" || res.includes("sus")) {
+                            return <span className="text-yellow-600">Suspect</span>;
+                          }
+                          return r.pathogens[0]?.result || "-";
+                        })()}
+                      </td>
 
-                    const displayName = originalP === "PL_EHP" ? "EHP" : originalP;
+                      {/* C.T - show actual value even for Negative */}
+                      <td className="border px-4 py-5 text-center font-bold">
+                        {(() => {
+                          const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
+                          const ctValue = r.pathogens[0]?.ctValue || "-";
 
-                    return (
-                      <React.Fragment key={originalP}>
-                        <td className="border px-4 py-5 text-center font-bold">
-                          {resultDisplay}
-                        </td>
-                        <td className="border px-4 py-5 text-center font-bold">
-                          {ctDisplay}
-                        </td>
-                      </React.Fragment>
-                    );
-                  })
-                )}
-              </tr>
-            ))}
+                          if (res === "positive" || res === "pos") {
+                            return <span className="text-red-600">{ctValue}</span>;
+                          }
+                          if (res === "suspect" || res.includes("sus")) {
+                            return <span className="text-yellow-600">{ctValue}</span>;
+                          }
+                          // For Negative or other cases → show real ctValue in neutral color
+                          return <span className="text-gray-700">{ctValue}</span>;
+                        })()}
+                      </td>
+                    </>
+                  ) : (
+                    allPathogens.map((originalP) => {
+                      const found = r.pathogens.find((x: any) => x.name === originalP);
+                      const res = (found?.result || "-").trim().toLowerCase();
+                      const ctValue = found?.ctValue || "ND";
+
+                      let resultDisplay: React.ReactNode = found?.result || "-";
+                      let ctDisplay: React.ReactNode = ctValue;
+
+                      if (res === "negative" || res === "neg" || res === "-") {
+                        resultDisplay = <span className="text-black">Negative</span>;
+                        // ctDisplay remains the actual value (no longer forced to "-")
+                      } else if (res === "positive" || res === "pos") {
+                        resultDisplay = <span className="text-red-600">Positive</span>;
+                        ctDisplay = <span className="text-red-600">{ctValue}</span>;
+                      } else if (res === "suspect" || res.includes("sus")) {
+                        resultDisplay = <span className="text-yellow-600">Suspect</span>;
+                        ctDisplay = <span className="text-yellow-600">{ctValue}</span>;
+                      } else {
+                        ctDisplay = <span className="text-gray-700">{ctValue}</span>;
+                      }
+
+                      return (
+                        <React.Fragment key={originalP}>
+                          <td className="border px-4 py-5 text-center font-bold">
+                            {resultDisplay}
+                          </td>
+                          <td className="border px-4 py-5 text-center font-bold">
+                            {ctDisplay}
+                          </td>
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
