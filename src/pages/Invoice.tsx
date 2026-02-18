@@ -435,6 +435,7 @@ const InvoicePage = () => {
           invoiceId,
           formattedDate,
           total: isZeroInvoice ? 0 : grandTotal,
+          locationId: session.locationId,
         },
       });
 

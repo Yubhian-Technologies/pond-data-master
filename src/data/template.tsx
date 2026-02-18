@@ -36,68 +36,78 @@ interface InvoiceState {
 
 interface InvoiceTemplateProps {
   state: InvoiceState | null;
-  locationId: string;           // ← added
+  locationId: string;
 }
 
 const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) => {
   const navigate = useNavigate();
 
-  // State for dynamic location details
-  const [locationDetails, setLocationDetails] = useState<{
-    address: string;
-    phone: string;
-    email: string;
-  }>({
-    address: "Loading address...",
-    phone: "Loading...",
-    email: "Loading...",
-  });
+  const [locationDetails, setLocationDetails] = useState({
+  address: "Still loading...",
+  phone: "...",
+  email: "...",
+  isLoading: true,
+});
 
-  // Fetch location details (same pattern as PLReport)
-  useEffect(() => {
-    if (!locationId) return;
+useEffect(() => {
+  console.log("useEffect running → locationId =", locationId); // ← add this
 
-    const fetchLocation = async () => {
-      try {
-        const locRef = doc(db, "locations", locationId);
-        const locSnap = await getDoc(locRef);
+  if (!locationId) {
+    console.log("No locationId → stopping");
+    setLocationDetails(prev => ({ ...prev, isLoading: false }));
+    return;
+  }
 
-        if (locSnap.exists()) {
-          const data = locSnap.data();
-          setLocationDetails({
-            address: data.address || "Address not available",
-            phone: data.contactNumber || data.phone || "Not available",
-            email: data.email || "Not available",
-          });
-        } else {
-          setLocationDetails({
-            address: "Location not found",
-            phone: "—",
-            email: "—",
-          });
-        }
-      } catch (err) {
-        console.error("Failed to load location details:", err);
+  const fetchLocation = async () => {
+    try {
+      console.log("Starting Firestore fetch for", locationId);
+      const locRef = doc(db, "locations", locationId);
+      const locSnap = await getDoc(locRef);
+
+      if (locSnap.exists()) {
+        const data = locSnap.data();
+        console.log("Firestore success → data:", data);
         setLocationDetails({
-          address: "Error loading address",
+          address: data?.address || "No address in DB",
+          phone: data?.contactNumber || data?.phone || "No phone",
+          email: data?.email || "No email",
+          isLoading: false,
+        });
+      } else {
+        console.log("Document does NOT exist for", locationId);
+        setLocationDetails({
+          address: "Location ID not found in database",
           phone: "—",
           email: "—",
+          isLoading: false,
         });
       }
-    };
+    } catch (err) {
+      console.error("Firestore fetch failed:", err);
+      setLocationDetails({
+        address: "Error: " + (err.message || "Check console"),
+        phone: "—",
+        email: "—",
+        isLoading: false,
+      });
+    }
+  };
 
-    fetchLocation();
-  }, [locationId]);
+  fetchLocation();
+}, [locationId]);
 
-  if (!state) {
+  // ────────────────────────────────────────────────
+  //  Loading guard – prevents showing/printing incomplete invoice
+  // ────────────────────────────────────────────────
+  if (locationDetails.isLoading || !state) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center p-8 bg-white rounded-lg shadow-lg">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">
-            Invoice Data Not Available
+          <h2 className="text-2xl font-bold text-blue-600 mb-4">
+            Loading Invoice...
           </h2>
           <p className="text-gray-600">
-            The invoice could not be loaded. Please try again or contact support.
+            Please wait while we fetch the location and invoice details.
           </p>
         </div>
       </div>
@@ -115,12 +125,10 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
 
   const financialYear = getFinancialYear();
 
-  // Original values from InvoicePage (include GST)
   const originalSubtotalInclGst = state.subtotal;
   const discountPercent = state.discountPercent || 0;
   const discountAmountInclGst = state.discountAmount || 0;
 
-  // Calculations for display
   const subtotalExGst = originalSubtotalInclGst / 1.18;
   const gstAmount = originalSubtotalInclGst - subtotalExGst;
 
@@ -128,7 +136,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
 
   const grandTotalAfterDiscount = subtotalPlusGst - discountAmountInclGst;
 
-  // Display values (zero invoice forces 0)
   const displaySubtotalExGst = isZeroInvoice ? 0 : subtotalExGst;
   const displayGstAmount = isZeroInvoice ? 0 : gstAmount;
   const displayDiscountAmount = isZeroInvoice ? 0 : discountAmountInclGst;
@@ -220,7 +227,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
           background: "#fff",
         }}
       >
-        {/* HEADER – now using dynamic location details */}
         <header className="flex items-center justify-between border-b pb-4">
           <img src={ADC} alt="ADC Logo" style={{ width: "100px" }} />
           <div className="text-center">
@@ -238,7 +244,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
           <img src={AV} alt="TWL Logo" style={{ width: "80px" }} />
         </header>
 
-        {/* INVOICE META */}
         <section
           style={{
             display: "flex",
@@ -252,7 +257,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
           <p style={{ fontWeight: "bold" }}>INVOICE NO: {state.invoiceId}</p>
         </section>
 
-        {/* FARMER DETAILS */}
         <section
           style={{
             display: "grid",
@@ -271,7 +275,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
           <p><strong>No of Sample Types :</strong> {Object.keys(state.tests).length}</p>
         </section>
 
-        {/* DYNAMIC TEST TABLES */}
         {Object.entries(state.tests).map(([type, items]) => (
           <section key={type} style={{ marginTop: "15px", pageBreakInside: "avoid" }}>
             <h3
@@ -324,7 +327,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
           </section>
         ))}
 
-        {/* TOTALS SECTION */}
         <section style={{ marginTop: "20px", pageBreakInside: "avoid" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
             <tbody>
@@ -396,7 +398,6 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
             Amount in Words: <strong>{numberToWords(displayGrandTotal)}</strong>
           </p>
 
-          {/* Payment mode section */}
           {!isZeroInvoice && (
             <div
               style={{
@@ -428,7 +429,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
               <div style={{ textAlign: "right" }}>
                 <p>For Waterbase Aqua Diagnostic Center</p>
                 <div style={{ height: "70px" }}></div>
-                <p style={{ fontWeight: "600" }}>Authorised Signatory</p>
+                
               </div>
             </div>
           )}

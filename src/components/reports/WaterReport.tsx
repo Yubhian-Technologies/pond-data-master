@@ -482,7 +482,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   </tr>
                 ))}
                 <tr className="border-t border-black font-bold bg-gray-50 text-[11px] text-red-600 optimum-row">
-                  <td className="border-r border-black p-0.5">Optimum</td>
+                  <td className="border-r border-black p-0.5 text-[4px]">OPTIMUM LEVEL</td>
                   <td className="border-r border-black p-0.5 text-center">7.5-8.5</td>
                   <td className="border-r border-black p-0.5 text-center">15-20</td>
                   <td className="border-r border-black p-0.5 text-center">20-40</td>
@@ -705,7 +705,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
           max-height: 45px !important;
           vertical-align: middle !important;
           font-weight: bold !important;
-          font-size: 11px !important;
+          font-size: 9px !important;
           padding: 0 !important;
         }
       `}</style>
