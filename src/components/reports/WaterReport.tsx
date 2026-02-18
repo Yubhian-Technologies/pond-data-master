@@ -140,7 +140,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
   const handlePrint = () => window.print();
 
-  
   // Fetch real invoice docId (unchanged)
   useEffect(() => {
     const fetchInvoiceDocId = async () => {
@@ -321,15 +320,34 @@ const WaterReport: React.FC<WaterReportProps> = ({
   }, [locationId]);
 
   const formatDateDDMMYYYY = (dateStr: string | undefined): string => {
-  if (!dateStr) return "-";
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).replace(/\//g, '-');
-};
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/\//g, '-');
+  };
+
+  // Refs for dynamic row height matching on screen
+  const waterDataRows = useRef([]);
+  const bactDataRows   = useRef([]);
+
+  // Dynamic height sync — only affects screen view
+  useEffect(() => {
+    waterDataRows.current = waterDataRows.current.slice(0, ponds.length);
+    bactDataRows.current   = bactDataRows.current.slice(0, ponds.length);
+
+    waterDataRows.current.forEach((waterRow, i) => {
+      const bactRow = bactDataRows.current[i];
+      if (waterRow && bactRow) {
+        const height = waterRow.getBoundingClientRect().height;
+        bactRow.style.height = `${height}px`;
+        bactRow.style.minHeight = `${height}px`;
+      }
+    });
+  }, [ponds]);
 
   if (loading) return <p className="text-center py-12 text-xl">Loading Water Report...</p>;
 
@@ -342,11 +360,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
         >
           <Printer size={20} /> Print Report (PDF)
         </button>
-
-        
       </div>
 
-      <div ref={reportRef} id="report" className="bg-white  max-w-full ">
+      <div ref={reportRef} id="report" className="bg-white max-w-full">
         {/* Header */}
         <div className="flex justify-between items-start mb-2 border-b-2 border-black pb-2">
           <div className="w-32 h-24 flex items-center justify-center">
@@ -370,44 +386,44 @@ const WaterReport: React.FC<WaterReportProps> = ({
         </div>
 
         <div className="w-full mb-8">
-        <table className="w-full border-2  border-gray-800 text-xs table-fixed">
-          <tbody>
-            <tr>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">Farmer Name</td>
-              <td className="border px-4 py-2">{formData.farmerName}</td>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">Mobile</td>
-              <td className="border px-4 py-2">{formData.mobile}</td>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">Sample Collection time</td>
-              <td className="border px-4 py-2">{formatDateDDMMYYYY(formData.sampleCollectionTime)}</td>
-            </tr>
-            <tr>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">Report Id</td>
-              <td className="border px-4 py-2">{invoiceId || '-'}</td>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">Source</td>
-              <td className="border px-4 py-2">{formData.sourceOfWater}</td>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">No. of samples</td>
-              <td className="border px-4 py-2">{formData.noOfSamples}</td>
-            </tr>
-            <tr>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">Farmer ID</td>
-              <td className="border px-4 py-2">{formData.farmerUID || '-'}</td>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">Address</td>
-              <td className="border px-4 py-2">{formData.farmerAddress}</td>
-              <td className="font-semibold bg-gray-100 border px-4 py-2">Sample Date</td>
-              <td className="border px-4 py-2">{formatDateDDMMYYYY(formData.sampleDate)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+          <table className="w-full border-2 border-gray-800 text-xs table-fixed">
+            <tbody>
+              <tr>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">Farmer Name</td>
+                <td className="border px-4 py-2">{formData.farmerName}</td>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">Mobile</td>
+                <td className="border px-4 py-2">{formData.mobile}</td>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">Sample Collection time</td>
+                <td className="border px-4 py-2">{formatDateDDMMYYYY(formData.sampleCollectionTime)}</td>
+              </tr>
+              <tr>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">Report Id</td>
+                <td className="border px-4 py-2">{invoiceId || '-'}</td>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">Source</td>
+                <td className="border px-4 py-2">{formData.sourceOfWater}</td>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">No. of samples</td>
+                <td className="border px-4 py-2">{formData.noOfSamples}</td>
+              </tr>
+              <tr>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">Farmer ID</td>
+                <td className="border px-4 py-2">{formData.farmerUID || '-'}</td>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">Address</td>
+                <td className="border px-4 py-2">{formData.farmerAddress}</td>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">Sample Date</td>
+                <td className="border px-4 py-2">{formatDateDDMMYYYY(formData.sampleDate)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      
-
-        {/* ANALYSIS SECTION - PERFECTLY JOINED SIDE BY SIDE */}
+        {/* ANALYSIS SECTION */}
         <div className="flex flex-row w-full mb-4 border border-black overflow-hidden">
           {/* WATER ANALYSIS */}
           <div className="flex-[8.5] border-r border-black">
-            <h4 className="text-center font-bold text-[12px] bg-gray-200 border-b border-black  text-red-600">WATER ANALYSIS</h4>
-            <table className="w-full text-[10px] border-collapse">
+            <h4 className="text-center font-bold text-[12px] bg-gray-200 border-b border-black text-red-600">
+              WATER ANALYSIS
+            </h4>
+            <table className="w-full text-[10px] border-collapse water-analysis-table">
               <thead>
                 <tr className="bg-gray-100 font-bold">
                   <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[8px]"></span></td>
@@ -439,9 +455,9 @@ const WaterReport: React.FC<WaterReportProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {ponds.map(p => (
-                  <tr key={p.id} className="border-t border-black">
-                    <td className="border-r border-black p-0.5 text-center font-bold bg-gray-50 text-[6px]">{p.pondNo}</td>
+                {ponds.map((p,index) => (
+                  <tr key={p.id} className="border-t border-black" ref={(el) => (waterDataRows.current[index] = el)}>
+                    <td className="border-r border-black p-0.5 text-center font-bold bg-gray-50 text-[8px]">{p.pondNo}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.pH}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.salinity}</td>
                     <td className="border-r border-black p-0.5 text-center">{p.co3}</td>
@@ -493,9 +509,11 @@ const WaterReport: React.FC<WaterReportProps> = ({
             </table>
           </div>
 
-          {/* BACTERIOLOGY - FULLY BORDERED & ALIGNED */}
+          {/* BACTERIOLOGY */}
           <div className="flex-[1.5]">
-            <h4 className="text-center font-bold text-[10.7px] p-0.5 bg-gray-200 border-b border-black  text-red-600">BACTERIOLOGY</h4>
+            <h4 className="text-center font-bold text-[10.7px] p-0.5 bg-gray-200 border-b border-black text-red-600">
+              BACTERIOLOGY
+            </h4>
             <table className="w-full text-[9px] border-collapse bacteriology-print">
               <thead>
                 <tr className="bg-gray-100 font-bold">
@@ -508,14 +526,14 @@ const WaterReport: React.FC<WaterReportProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {ponds.map(p => (
-                  <tr key={p.id} className="border-t border-black ">
+                {ponds.map((p,index) => (
+                  <tr key={p.id} className="border-t border-black" ref={(el) => (bactDataRows.current[index] = el)}>
                     <td className="border-r border-black p-[2.7px] text-center bg-yellow-100">{p.yellowColonies}</td>
                     <td className="border-r border-black p-[2.7px] text-center bg-green-100">{p.greenColonies}</td>
                     <td className="p-[2.7px] text-center">{p.tpc}</td>
                   </tr>
                 ))}
-                <tr className="border-t border-black font-bold text-[13px]  text-red-600 bg-gray-50 optimum-row">
+                <tr className="border-t border-black font-bold text-[13px] text-red-600 bg-gray-50 optimum-row">
                   <td className="border-r border-black p-0.5 text-center">&lt;300</td>
                   <td className="border-r border-black p-0.5 text-center">&lt;50</td>
                   <td className="p-0.5 text-center">&lt;300</td>
@@ -525,7 +543,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
           </div>
         </div>
 
-        {/* PLANKTON ANALYSIS - YOUR ORIGINAL IMAGES & NAMES RESTORED */}
+        {/* PLANKTON ANALYSIS */}
         <div className="border border-black mb-4">
           <h3 className="text-center font-bold bg-white text-red-500 py-1 text-xs border-b border-black uppercase">PLANKTON ANALYSIS</h3>
           <div className="overflow-hidden">
@@ -579,31 +597,30 @@ const WaterReport: React.FC<WaterReportProps> = ({
                     { img: favella, name: "Favella" },
                   ].map((item, idx) => (
                     <th
-  key={idx}
-  className={`border-b border-black ${idx === 24 ? "" : "border-r"} p-1.5 text-center align-top`}
-  style={{ minWidth: "65px" }} // adjust this as needed
->
-  <img className="w-8 h-8 p-0.5 mx-auto" src={item.img} alt={item.name} />
-  <div className="text-[6px] mt-1 leading-tight">{item.name}</div>
-</th>
+                      key={idx}
+                      className={`border-b border-black ${idx === 24 ? "" : "border-r"} p-1.5 text-center align-top`}
+                      style={{ minWidth: "65px" }} 
+                    >
+                      <img className="w-8 h-8 p-0.5 mx-auto" src={item.img} alt={item.name} />
+                      <div className="text-[6px] mt-1 leading-tight">{item.name}</div>
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {ponds.map((pond) => (
                   <tr key={pond.id} className="border-b border-black last:border-b-0">
-                    <td className="border-r border-black text-center font-bold bg-gray-50 text-[6px]">{pond.pondNo}</td>
+                    <td className="border-r border-black text-center font-bold bg-gray-50 text-[9px]">{pond.pondNo}</td>
                     {[
                       pond.chlorella,
                       pond.phacus,
                       pond.desmids,
                       pond.scenedesmus,
-                       pond.spirulina,
+                      pond.spirulina,
                       pond.copepod,
                       pond.rotifer,
                       pond.nauplius,
                       pond.brachionus,
-                     
                       pond.chaetoceros,
                       pond.skeletonema,
                       pond.rhizosolenia,
@@ -667,7 +684,6 @@ const WaterReport: React.FC<WaterReportProps> = ({
             left: 0;
             top: 0;
             width: 100vw;
-            
             padding: 0;
             margin:0 auto;
           }
@@ -676,72 +692,92 @@ const WaterReport: React.FC<WaterReportProps> = ({
           tr { page-break-inside: avoid; }
         }
       `}</style>
+
       <style>{`
-  /* Force tables to align perfectly */
-  #report table {
-    border-collapse: collapse !important;
-    table-layout: fixed !important; /* Forces columns to stay consistent */
-    width: 100% !important;
-  }
+        #report table {
+          border-collapse: collapse !important;
+          table-layout: fixed !important;
+          width: 100% !important;
+        }
 
-  /* Force uniform row height for BOTH Optimum level rows */
-  .optimum-row, .optimum-row td {
-    height: 40px !important; /* Fixed height to force alignment */
-    max-height: 45px !important;
-    vertical-align: middle !important;
-    font-weight: bold !important;
-    font-size: 11px !important;
-    padding: 0 !important;
-  }
+        .optimum-row, .optimum-row td {
+          height: 40px !important;
+          max-height: 45px !important;
+          vertical-align: middle !important;
+          font-weight: bold !important;
+          font-size: 11px !important;
+          padding: 0 !important;
+        }
+      `}</style>
 
-  
-`}</style>
-<style>{`
-/* This applies to screen viewing on larger monitors (desktops) */
-@media screen and (min-width: 1367px) {
-  .bacteriology-print thead th,
-  .bacteriology-print thead td,
-  .bacteriology-print thead span {
-    font-size: 9.3px !important;
-  }
-    .bacteriology-print thead span {
-    font-size: 8.4px !important;
-  }
-}
+      <style>{`
+        @media screen and (min-width: 1367px) {
+          .bacteriology-print thead th,
+          .bacteriology-print thead td,
+          .bacteriology-print thead span {
+            font-size: 9.3px !important;
+          }
+          .bacteriology-print thead span {
+            font-size: 8.4px !important;
+          }
+        }
 
-@media print {
-  .bacteriology-print,
-  .bacteriology-print td,
-  .bacteriology-print th {
-    font-size: 8.8px !important;           /* main data */
-  }
+        @media print {
+          
+          .water-analysis-table tbody tr:not(.optimum-row),
+          .bacteriology-print tbody tr:not(.optimum-row) {
+            height: 40px !important;
+            min-height: 40px !important;
+            max-height: 34px !important;
+            display: table-row !important;
+          }
 
-  /* Headers - keep slightly larger */
-  .bacteriology-print thead tr:first-child,
-  .bacteriology-print thead tr:nth-child(2),
-  .bacteriology-print thead td,
-  .bacteriology-print thead th {
-    font-size: 11px !important;
-  }
+          .water-analysis-table tbody td,
+          .bacteriology-print tbody td {
+            height: 100% !important;
+            padding: 4px 3px !important;
+            line-height: 1.18 !important;
+            vertical-align: middle !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+          }
 
-  /* Telugu text inside headers – make smaller */
-  .bacteriology-print thead span {
-    font-size: 11px !important;
-  }
+          .bacteriology-print tbody td {
+            font-size: 9.2px !important;
+            padding: 4px 4px !important;
+          }
 
-  .bacteriology-print tbody td {
-    padding: 4.5px 2px !important;
-    line-height: 1.15 !important;
-    vertical-align: middle !important;
-  }
+          /* Your original bacteriology print rules (kept) */
+          .bacteriology-print,
+          .bacteriology-print td,
+          .bacteriology-print th {
+            font-size: 8.8px !important;
+          }
 
-  .bacteriology-print td,
-  .bacteriology-print th {
-    padding: 2px 1px !important;
-    line-height: 1.1 !important;
-  }
-}
-`}</style>
+          .bacteriology-print thead tr:first-child,
+          .bacteriology-print thead tr:nth-child(2),
+          .bacteriology-print thead td,
+          .bacteriology-print thead th {
+            font-size: 11px !important;
+          }
+
+          .bacteriology-print thead span {
+            font-size: 11px !important;
+          }
+
+          .bacteriology-print tbody td {
+            padding: 4.5px 2px !important;
+            line-height: 1.15 !important;
+            vertical-align: middle !important;
+          }
+
+          .bacteriology-print td,
+          .bacteriology-print th {
+            padding: 2px 1px !important;
+            line-height: 1.1 !important;
+          }
+        }
+      `}</style>
     </>
   );
 };

@@ -283,23 +283,23 @@ export default function PCRReport({
             RT-qPCR Analysis
           </h2>
         </div>
-        <table className="w-full border-2 border-gray-800 text-sm">
+        <table className="w-[95%] mx-auto border-2 border-gray-800 text-sm">
           <thead className="bg-blue-100">
             <tr>
-              <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Code</th>
-              <th rowSpan={2} className="border px-4 py-2 align-middle">Sample Type</th>
+              <th rowSpan={2} className="border px-2 py-2 align-middle">Sample Code</th>
+              <th rowSpan={2} className="border px-2 py-2 align-middle">Sample Type</th>
 
               {isOneSampleMultiPathogen || singlePathogen ? (
                 <>
-                  <th rowSpan={2} className="border px-4 py-2 align-middle font-bold">
+                  <th rowSpan={2} className="border px-2 py-2 align-middle font-bold">
                     {"Pathogen"}
                   </th>
-                  <th className="border px-4 py-2">Result</th>
-                  <th className="border px-4 py-2">C.T</th>
+                  <th className="border px-2 py-2">Result</th>
+                  <th className="border px-2 py-2">C.T</th>
                 </>
               ) : (
                 displayPathogens.map((p) => (
-                  <th key={p} colSpan={2} className="border px-4 py-2 text-center">
+                  <th key={p} colSpan={2} className="border px-2 py-2 text-center">
                     {p}
                   </th>
                 ))
@@ -310,8 +310,8 @@ export default function PCRReport({
               <tr>
                 {displayPathogens.map((p) => (
                   <React.Fragment key={p}>
-                    <th className="border px-4 py-2">Result</th>
-                    <th className="border px-4 py-2">C.T</th>
+                    <th className="border px-2 py-2.5">Result</th>
+                    <th className="border px-2 py-2.5">C.T</th>
                   </React.Fragment>
                 ))}
               </tr>
@@ -345,15 +345,15 @@ export default function PCRReport({
 
                 return (
                   <tr key={pathIdx} className="hover:bg-gray-50">
-                    <td className="border px-4 py-5 text-center font-semibold">{reports[0].sampleCode}</td>
-                    <td className="border px-4 py-5 text-center">{reports[0].sampleType}</td>
-                    <td className="border px-4 py-5 text-center font-medium">
+                    <td className="border px-2 py-2.5 text-center font-semibold">{reports[0].sampleCode}</td>
+                    <td className="border px-2 py-2.5 text-center">{reports[0].sampleType}</td>
+                    <td className="border px-2 py-2.5 text-center font-medium">
                       {displayP}
                     </td>
-                    <td className="border px-4 py-5 text-center font-bold">
+                    <td className="border px-2 py-2.5 text-center font-bold">
                       {resultDisplay}
                     </td>
-                    <td className="border px-4 py-5 text-center font-bold">
+                    <td className="border px-2 py-2.5 text-center font-bold">
                       {ctDisplay}
                     </td>
                   </tr>
@@ -362,17 +362,17 @@ export default function PCRReport({
             ) : (
               reports.map((r, idx) => (
                 <tr key={idx} className="hover:bg-gray-50">
-                  <td className="border px-4 py-5 text-center font-semibold">{r.sampleCode}</td>
-                  <td className="border px-4 py-5 text-center">{r.sampleType}</td>
+                  <td className="border px-2 py-2.5 text-center font-semibold">{r.sampleCode}</td>
+                  <td className="border px-2 py-2.5 text-center">{r.sampleType}</td>
 
                   {singlePathogen ? (
                     <>
-                      <td className="border px-4 py-5 text-center font-medium">
+                      <td className="border px-2 py-2.5 text-center font-medium">
                         {displayPathogens[0]}
                       </td>
 
                       {/* Result - colored based on value */}
-                      <td className="border px-4 py-5 text-center font-bold">
+                      <td className="border px-2 py-2.5 text-center font-bold">
                         {(() => {
                           const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
                           if (res === "negative" || res === "neg" || res === "-") {
@@ -389,7 +389,7 @@ export default function PCRReport({
                       </td>
 
                       {/* C.T - show actual value even for Negative */}
-                      <td className="border px-4 py-5 text-center font-bold">
+                      <td className="border px-2 py-2.5 text-center font-bold">
                         {(() => {
                           const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
                           const ctValue = r.pathogens[0]?.ctValue || "-";
@@ -429,10 +429,10 @@ export default function PCRReport({
 
                       return (
                         <React.Fragment key={originalP}>
-                          <td className="border px-4 py-5 text-center font-bold">
+                          <td className="border px-2 py-2.5 text-center font-bold">
                             {resultDisplay}
                           </td>
-                          <td className="border px-4 py-5 text-center font-bold">
+                          <td className="border px-2 py-2.5 text-center font-bold">
                             {ctDisplay}
                           </td>
                         </React.Fragment>

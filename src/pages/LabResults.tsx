@@ -256,7 +256,7 @@ export default function LabResults() {
       </div>
 
       <div className="text-sm text-gray-800 mt-8 px-4">
-        {(hasPCR || hasPathology) && (
+        {(hasPCR) && (
           <p className="font-bold mb-4">
             <strong className="text-red-600">Important Note :</strong> EHP - Enterocytozoon hepatopanaei, WSSV - White spot syndrome virus, 
             IHHNV - Infectious hypodermal and hematopoietic necrosis virus, VIBRIO - Vibrio parahaemolyticus 
@@ -325,96 +325,105 @@ export default function LabResults() {
 );
 
   const handleDownloadJpeg = async () => {
-    if (!reportRef.current) {
-      alert("Report not ready. Please wait or try again.");
-      return;
-    }
+  if (!reportRef.current) {
+    alert("Report not ready. Please wait or try again.");
+    return;
+  }
 
-    const element = reportRef.current;
+  const element = reportRef.current;
 
-    const scrollContainers = element.querySelectorAll('.overflow-x-auto');
+  // ────────────── SAVE ORIGINAL STYLES ──────────────
+  const originalElementStyles = {
+    overflow: element.style.overflow,
+    width: element.style.width,
+    maxWidth: element.style.maxWidth,
+    position: element.style.position,
+    padding: element.style.padding,          // ← new
+    backgroundColor: element.style.backgroundColor, // optional
+  };
 
-    const originalElementStyles = {
-      overflow: element.style.overflow,
-      width: element.style.width,
-      maxWidth: element.style.maxWidth,
-      position: element.style.position,
-    };
+  const scrollContainers = element.querySelectorAll('.overflow-x-auto');
+  const originalScrollStyles: { [key: string]: string }[] = [];
 
-    const originalScrollStyles: { [key: string]: string }[] = [];
+  scrollContainers.forEach((container) => {
+    const el = container as HTMLElement;
+    originalScrollStyles.push({
+      overflowX: el.style.overflowX,
+      overflow: el.style.overflow,
+      width: el.style.width,
+      maxWidth: el.style.maxWidth,
+    });
+  });
+
+  try {
+    // ────────────── APPLY TEMPORARY CHANGES ──────────────
+    element.style.overflow = 'hidden';
+    element.style.width = 'auto';
+    element.style.maxWidth = 'none';
+    element.style.position = 'relative';
+
+    element.style.padding = '8px';                
+    element.style.backgroundColor = '#ffffff';    
 
     scrollContainers.forEach((container) => {
       const el = container as HTMLElement;
-      originalScrollStyles.push({
-        overflowX: el.style.overflowX,
-        overflow: el.style.overflow,
-        width: el.style.width,
-        maxWidth: el.style.maxWidth,
-      });
+      el.style.overflowX = 'visible';
+      el.style.overflow = 'visible';
+      el.style.width = 'auto';
+      el.style.maxWidth = 'none';
     });
 
-    try {
-      element.style.overflow = 'hidden';
-      element.style.width = 'auto';
-      element.style.maxWidth = 'none';
-      element.style.position = 'relative';
+    await new Promise(r => setTimeout(r, 500));
 
-      scrollContainers.forEach((container) => {
-        const el = container as HTMLElement;
-        el.style.overflowX = 'visible';
-        el.style.overflow = 'visible';
-        el.style.width = 'auto';
-        el.style.maxWidth = 'none';
-      });
+    const fullWidth = Math.max(element.scrollWidth, 794);
+    const fullHeight = element.scrollHeight;
 
-      await new Promise(r => setTimeout(r, 500)); 
+    const dataUrl = await htmlToImage.toJpeg(element, {
+      quality: 0.92,
+      backgroundColor: '#ffffff',
+      canvasWidth: fullWidth * 1.5,
+      canvasHeight: fullHeight * 1.5,
+      pixelRatio: 1.5,
+      filter: (node) => {
+        if (!(node instanceof HTMLElement)) return true;
+        const style = window.getComputedStyle(node);
+        return !(
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          node.classList.contains('print:hidden') ||
+          node.id === 'print-buttons' ||
+          node.id === 'view-mode-nav' ||
+          node.classList.contains('scrollbar') ||
+          node.classList.contains('::-webkit-scrollbar')
+        );
+      }
+    });
 
-      const fullWidth = Math.max(element.scrollWidth, 794);
-      const fullHeight = element.scrollHeight;
+    saveAs(dataUrl, `Lab-Report_${invoiceId || 'report'}.jpg`);
+  } catch (err) {
+    console.error("JPEG download failed:", err);
+    alert("Failed to generate JPEG.\nTry using Print → Save as PDF instead.");
+  } finally {
+    // ────────────── RESTORE ORIGINAL STYLES ──────────────
+    element.style.overflow = originalElementStyles.overflow || '';
+    element.style.width = originalElementStyles.width || '';
+    element.style.maxWidth = originalElementStyles.maxWidth || '';
+    element.style.position = originalElementStyles.position || '';
+    element.style.padding = originalElementStyles.padding || '';           // ← restore
+    element.style.backgroundColor = originalElementStyles.backgroundColor || '';
 
-      const dataUrl = await htmlToImage.toJpeg(element, {
-        quality: 0.92,
-        backgroundColor: '#ffffff',
-        canvasWidth: fullWidth * 1.5,
-        canvasHeight: fullHeight * 1.5,
-        pixelRatio: 1.5,
-        filter: (node) => {
-          if (!(node instanceof HTMLElement)) return true;
-          const style = window.getComputedStyle(node);
-          return !(
-            style.display === 'none' ||
-            style.visibility === 'hidden' ||
-            node.classList.contains('print:hidden') ||
-            node.id === 'print-buttons' ||
-            node.id === 'view-mode-nav' ||
-            node.classList.contains('scrollbar') ||
-            node.classList.contains('::-webkit-scrollbar')
-          );
-        }
-      });
-
-      saveAs(dataUrl, `Lab-Report_${invoiceId || 'report'}.jpg`);
-    } catch (err) {
-      console.error("JPEG download failed:", err);
-      alert("Failed to generate JPEG.\nTry using Print → Save as PDF instead.");
-    } finally {
-      element.style.overflow = originalElementStyles.overflow || '';
-      element.style.width = originalElementStyles.width || '';
-      element.style.maxWidth = originalElementStyles.maxWidth || '';
-      element.style.position = originalElementStyles.position || '';
-
-      scrollContainers.forEach((container, index) => {
-        const el = container as HTMLElement;
-        const orig = originalScrollStyles[index];
-        if (orig) {
-          el.style.overflowX = orig.overflowX || '';
-          el.style.overflow = orig.overflow || '';
-          el.style.width = orig.width || '';
-          el.style.maxWidth = orig.maxWidth || '';
-        }
-      });
-    }
-  };
+    scrollContainers.forEach((container, index) => {
+      const el = container as HTMLElement;
+      const orig = originalScrollStyles[index];
+      if (orig) {
+        el.style.overflowX = orig.overflowX || '';
+        el.style.overflow = orig.overflow || '';
+        el.style.width = orig.width || '';
+        el.style.maxWidth = orig.maxWidth || '';
+      }
+    });
+  }
+};
 
   // ────────────────────────────────────────────────
   // Print button: captures entire report like JPEG, then prints

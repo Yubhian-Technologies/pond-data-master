@@ -150,7 +150,7 @@ const InvoiceViewer: React.FC = () => {
   }
 
   // Success: Render Template
-  return <InvoiceTemplate state={invoiceData} />;
+  return <InvoiceTemplate state={invoiceData} locationId={locationId} />;
 };
 
 export default InvoiceViewer;

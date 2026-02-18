@@ -1,7 +1,10 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/pages/firebase";
+
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
-import { useNavigate } from "react-router-dom";
 
 interface TestItem {
   name: string;
@@ -33,10 +36,58 @@ interface InvoiceState {
 
 interface InvoiceTemplateProps {
   state: InvoiceState | null;
+  locationId: string;           // ← added
 }
 
-const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
+const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) => {
   const navigate = useNavigate();
+
+  // State for dynamic location details
+  const [locationDetails, setLocationDetails] = useState<{
+    address: string;
+    phone: string;
+    email: string;
+  }>({
+    address: "Loading address...",
+    phone: "Loading...",
+    email: "Loading...",
+  });
+
+  // Fetch location details (same pattern as PLReport)
+  useEffect(() => {
+    if (!locationId) return;
+
+    const fetchLocation = async () => {
+      try {
+        const locRef = doc(db, "locations", locationId);
+        const locSnap = await getDoc(locRef);
+
+        if (locSnap.exists()) {
+          const data = locSnap.data();
+          setLocationDetails({
+            address: data.address || "Address not available",
+            phone: data.contactNumber || data.phone || "Not available",
+            email: data.email || "Not available",
+          });
+        } else {
+          setLocationDetails({
+            address: "Location not found",
+            phone: "—",
+            email: "—",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load location details:", err);
+        setLocationDetails({
+          address: "Error loading address",
+          phone: "—",
+          email: "—",
+        });
+      }
+    };
+
+    fetchLocation();
+  }, [locationId]);
 
   if (!state) {
     return (
@@ -71,12 +122,10 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
 
   // Calculations for display
   const subtotalExGst = originalSubtotalInclGst / 1.18;
-  const gstAmount = originalSubtotalInclGst - subtotalExGst; // exact GST portion (152.54 for 1000)
+  const gstAmount = originalSubtotalInclGst - subtotalExGst;
 
-  // Subtotal + GST = original incl. GST amount (1000)
   const subtotalPlusGst = subtotalExGst + gstAmount;
 
-  // Discount applied on original incl-GST amount
   const grandTotalAfterDiscount = subtotalPlusGst - discountAmountInclGst;
 
   // Display values (zero invoice forces 0)
@@ -171,7 +220,7 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
           background: "#fff",
         }}
       >
-        {/* HEADER */}
+        {/* HEADER – now using dynamic location details */}
         <header className="flex items-center justify-between border-b pb-4">
           <img src={ADC} alt="ADC Logo" style={{ width: "100px" }} />
           <div className="text-center">
@@ -182,8 +231,8 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state }) => {
               WATERBASE AQUA DIAGNOSTIC CENTER
             </h3>
             <p style={{ fontSize: "12px" }}>
-              # Flat No:1B, Sriravi Plaza, Ramalingapuram, Nellore - 524 003, Andhra Pradesh<br />
-              Phone: +91 76088 88001 | E-mail: adcl@waterbaseindia.com
+              {locationDetails.address}<br />
+              Phone: {locationDetails.phone} | E-mail: {locationDetails.email}
             </p>
           </div>
           <img src={AV} alt="TWL Logo" style={{ width: "80px" }} />

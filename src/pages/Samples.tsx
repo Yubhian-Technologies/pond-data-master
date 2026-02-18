@@ -21,6 +21,7 @@ import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, doc, updateDoc, query, where, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
 import { format } from "date-fns";
+import { useSearchParams } from "react-router-dom";
 
 import {
   Select,
@@ -43,8 +44,7 @@ const Samples = () => {
   const [selectedOtherTechId, setSelectedOtherTechId] = useState<string>("none");           // only for NEW submissions
 
   // Date filter states
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  
 
   type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology" ;
   const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology","wssv"];
@@ -58,7 +58,12 @@ const Samples = () => {
 
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [farmerSearchQuery, setFarmerSearchQuery] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+// Read values from URL (fallback to empty string)
+const searchQuery = searchParams.get("q") || "";
+const startDate   = searchParams.get("start") || "";
+const endDate     = searchParams.get("end") || "";
 
   // Payment Dialog State 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -143,21 +148,23 @@ const Samples = () => {
   }, [session.locationId]);
 
   useEffect(() => {
-    const fetchInvoices = async () => {
-      setLoadingInvoices(true);
-      try {
-        const locationId = session.locationId;
-        if (!locationId) return;
+  const fetchInvoices = async () => {
+    setLoadingInvoices(true);
+    try {
+      const locationId = session.locationId;
+      if (!locationId) return;
 
-        let invoicesQuery = query(
-          collection(db, "locations", locationId, "invoices"),
-          orderBy("createdAt", "desc")
-        );
+      let invoicesQuery = query(
+        collection(db, "locations", locationId, "invoices"),
+        orderBy("createdAt", "desc")
+      );
 
-        if (startDate && endDate) {
-          const startT = new Date(startDate);
-          const endT = new Date(`${endDate}T23:59:59.999`);
+      if (startDate && endDate) {
+        const startT = new Date(startDate);
+        const endT = new Date(`${endDate}T23:59:59.999`);
 
+        // Make sure dates are valid
+        if (!isNaN(startT.getTime()) && !isNaN(endT.getTime())) {
           invoicesQuery = query(
             collection(db, "locations", locationId, "invoices"),
             where("createdAt", ">=", startT),
@@ -165,29 +172,26 @@ const Samples = () => {
             orderBy("createdAt", "desc")
           );
         }
-
-        const snap = await getDocs(invoicesQuery);
-
-        const data = snap.docs.map((doc) => {
-          const docData = doc.data();
-          if ('id' in docData) {
-            delete (docData as any).id;
-          }
-          return {
-            id: doc.id,
-            ...docData,
-          };
-        });
-
-        setInvoices(data);
-      } catch (err) {
-        console.error("Error fetching invoices:", err);
-      } finally {
-        setLoadingInvoices(false);
       }
-    };
-    fetchInvoices();
-  }, [session.locationId, startDate, endDate]);
+
+      const snap = await getDocs(invoicesQuery);
+
+      const data = snap.docs.map((doc) => {
+        const docData = doc.data();
+        if ('id' in docData) delete (docData as any).id;
+        return { id: doc.id, ...docData };
+      });
+
+      setInvoices(data);
+    } catch (err) {
+      console.error("Error fetching invoices:", err);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  fetchInvoices();
+}, [session.locationId, searchParams]);  
 
   const resetForm = () => {
     setStep(1);
@@ -421,11 +425,20 @@ const sortedInvoices = useMemo(() => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Farmer / Phone / Invoice ID..."
-            className="pl-10 h-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+  placeholder="Farmer / Phone / Invoice ID..."
+  className="pl-10 h-10"
+  value={searchQuery}
+  onChange={(e) => {
+    const value = e.target.value;
+    const newParams = new URLSearchParams(searchParams);
+    if (value.trim()) {
+      newParams.set("q", value.trim());
+    } else {
+      newParams.delete("q");
+    }
+    setSearchParams(newParams, { replace: true }); // replace → no extra history entry
+  }}
+/>
         </div>
       </div>
       <div className="flex-1 min-w-[180px]">
@@ -433,20 +446,38 @@ const sortedInvoices = useMemo(() => {
           Start Date
         </Label>
         <Input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
+  type="date"
+  value={startDate}
+  onChange={(e) => {
+    const value = e.target.value;
+    const newParams = new URLSearchParams(searchParams);
+    if (value) {
+      newParams.set("start", value);
+    } else {
+      newParams.delete("start");
+    }
+    setSearchParams(newParams, { replace: true });
+  }}
+/>
       </div>
       <div className="flex-1 min-w-[180px]">
         <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
           End Date
         </Label>
         <Input
-          type="date"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-        />
+  type="date"
+  value={endDate}
+  onChange={(e) => {
+    const value = e.target.value;
+    const newParams = new URLSearchParams(searchParams);
+    if (value) {
+      newParams.set("end", value);
+    } else {
+      newParams.delete("end");
+    }
+    setSearchParams(newParams, { replace: true });
+  }}
+/>
       </div>
 
    
