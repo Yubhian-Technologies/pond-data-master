@@ -162,22 +162,24 @@ const InvoicePage = () => {
   }, [perSampleTests.pcr]);
 
   const generateInvoiceId = (): string => {
-    let prefix = "XXX";
-    if (locationName) {
-      const lowerName = locationName.toLowerCase();
-      if (lowerName.includes("nellore")) prefix = "NLR";
-      else if (lowerName.includes("bhimavaram")) prefix = "BVRM";
-      else if (lowerName.includes("tamarakollu")) prefix = "TMRK";
-      else if (lowerName.includes("ganapavaram")) prefix = "GVRM";
-      else if (lowerName.includes("juvvalapalem")) prefix = "JP";
-    }
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let randomPart = "";
-    for (let i = 0; i < 4; i++) {
-      randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return `ADC ${prefix}${randomPart}`;
-  };
+  let prefix = "XXX";
+  if (locationName) {
+    const lowerName = locationName.toLowerCase();
+    if (lowerName.includes("nellore")) prefix = "NLR";
+    else if (lowerName.includes("bhimavaram")) prefix = "BVRM";
+    else if (lowerName.includes("tamarakollu")) prefix = "TMRK";
+    else if (lowerName.includes("ganapavaram")) prefix = "GVRM";
+    else if (lowerName.includes("juvvalapalem")) prefix = "JP";
+  }
+
+  const digits = "0123456789";
+  let randomPart = "";
+  for (let i = 0; i < 4; i++) {
+    randomPart += digits.charAt(Math.floor(Math.random() * digits.length));
+  }
+
+  return `ADC ${prefix}${randomPart}`;
+};
 
   const toggleTest = (sampleType: string, sampleIndex: number, testId: string) => {
     setPerSampleTests((prev) => {

@@ -454,7 +454,7 @@ export default function PCRReport({
     return (
       <div className="mt-12">
         <h3 className="text-xl font-bold text-center mb-8 text-gray-800">
-          Report Images
+          PCR Amplification Image
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {reports
@@ -464,7 +464,7 @@ export default function PCRReport({
                 key={idx}
                 className="border-2 border-gray-300 rounded-lg overflow-hidden shadow-md"
               >
-                <p className="text-center font-bold text-lg py-3 bg-gray-100">
+                <p className="text-center font-bold text-lg py-1 bg-gray-100">
                   Sample {r.sampleCode}
                 </p>
                 <img
