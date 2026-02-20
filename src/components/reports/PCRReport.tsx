@@ -448,36 +448,44 @@ export default function PCRReport({
     );
   };
 
-  const GelImagesSection = () => {
-    if (!reports.some((r) => r.gelImageUrl)) return null;
+ const GelImagesSection = () => {
+  if (!reports.some((r) => r.gelImageUrl)) return null;
 
-    return (
-      <div className="mt-12">
-        <h3 className="text-xl font-bold text-center mb-8 text-gray-800">
-          PCR Amplification Image
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {reports
-            .filter((r) => r.gelImageUrl)
-            .map((r, idx) => (
-              <div
-                key={idx}
-                className="border-2 border-gray-300 rounded-lg overflow-hidden shadow-md"
-              >
-                <p className="text-center font-bold text-lg py-1 bg-gray-100">
-                  Sample {r.sampleCode}
-                </p>
+  return (
+    <div className="mt-12">
+      <h3 className="text-xl font-bold text-center mb-10 text-gray-800">
+        PCR Amplification Images
+      </h3>
+
+      <div className="flex flex-col items-center gap-10">
+        {reports
+          .filter((r) => r.gelImageUrl)
+          .map((r, idx) => (
+            <div
+              key={idx}
+              className="w-full max-w-lg flex flex-col items-center border border-gray-200 rounded-xl overflow-hidden shadow-md bg-white"
+            >
+              {/* Image container – smaller padding & size */}
+              <div className="w-full bg-gray-50 flex justify-center items-center p-6 md:p-8">
                 <img
                   src={r.gelImageUrl}
-                  alt={`Gel Image - Sample ${r.sampleCode}`}
-                  className="w-[50%] h-auto object-contain mx-auto"
+                  alt={`Gel electrophoresis image - Sample ${r.sampleCode}`}
+                  className="max-w-full max-h-[420px] object-contain rounded-lg"
                 />
               </div>
-            ))}
-        </div>
+
+              {/* Sample label */}
+              <div className="py-4 text-center w-full bg-white">
+                <p className="text-base font-semibold text-gray-900">
+                  Sample {r.sampleCode}
+                </p>
+              </div>
+            </div>
+          ))}
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   if (compact) {
     return (

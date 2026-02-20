@@ -5,6 +5,8 @@ import { db } from "@/pages/firebase";
 
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
+import html2canvas from "html2canvas"; // ← added
+import { saveAs } from "file-saver"; // ← added
 
 interface TestItem {
   name: string;
@@ -43,62 +45,60 @@ const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ state, locationId }) 
   const navigate = useNavigate();
 
   const [locationDetails, setLocationDetails] = useState({
-  address: "Still loading...",
-  phone: "...",
-  email: "...",
-  isLoading: true,
-});
+    address: "Still loading...",
+    phone: "...",
+    email: "...",
+    isLoading: true,
+  });
 
-useEffect(() => {
-  console.log("useEffect running → locationId =", locationId); // ← add this
+  useEffect(() => {
+    console.log("useEffect running → locationId =", locationId);
 
-  if (!locationId) {
-    console.log("No locationId → stopping");
-    setLocationDetails(prev => ({ ...prev, isLoading: false }));
-    return;
-  }
+    if (!locationId) {
+      console.log("No locationId → stopping");
+      setLocationDetails(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
 
-  const fetchLocation = async () => {
-    try {
-      console.log("Starting Firestore fetch for", locationId);
-      const locRef = doc(db, "locations", locationId);
-      const locSnap = await getDoc(locRef);
+    const fetchLocation = async () => {
+      try {
+        console.log("Starting Firestore fetch for", locationId);
+        const locRef = doc(db, "locations", locationId);
+        const locSnap = await getDoc(locRef);
 
-      if (locSnap.exists()) {
-        const data = locSnap.data();
-        console.log("Firestore success → data:", data);
+        if (locSnap.exists()) {
+          const data = locSnap.data();
+          console.log("Firestore success → data:", data);
+          setLocationDetails({
+            address: data?.address || "No address in DB",
+            phone: data?.contactNumber || data?.phone || "No phone",
+            email: data?.email || "No email",
+            isLoading: false,
+          });
+        } else {
+          console.log("Document does NOT exist for", locationId);
+          setLocationDetails({
+            address: "Location ID not found in database",
+            phone: "—",
+            email: "—",
+            isLoading: false,
+          });
+        }
+      } catch (err) {
+        console.error("Firestore fetch failed:", err);
         setLocationDetails({
-          address: data?.address || "No address in DB",
-          phone: data?.contactNumber || data?.phone || "No phone",
-          email: data?.email || "No email",
-          isLoading: false,
-        });
-      } else {
-        console.log("Document does NOT exist for", locationId);
-        setLocationDetails({
-          address: "Location ID not found in database",
+          address: "Error: " + (err.message || "Check console"),
           phone: "—",
           email: "—",
           isLoading: false,
         });
       }
-    } catch (err) {
-      console.error("Firestore fetch failed:", err);
-      setLocationDetails({
-        address: "Error: " + (err.message || "Check console"),
-        phone: "—",
-        email: "—",
-        isLoading: false,
-      });
-    }
-  };
+    };
 
-  fetchLocation();
-}, [locationId]);
+    fetchLocation();
+  }, [locationId]);
 
-  // ────────────────────────────────────────────────
-  //  Loading guard – prevents showing/printing incomplete invoice
-  // ────────────────────────────────────────────────
+  // Loading guard
   if (locationDetails.isLoading || !state) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
@@ -197,6 +197,28 @@ useEffect(() => {
     window.print();
   };
 
+  const handleDownloadJpeg = async () => {
+    const element = document.getElementById("printable-invoice");
+    if (!element) return;
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2, // better quality
+        useCORS: true, // for external images (logos)
+        logging: false,
+      });
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          saveAs(blob, `Invoice_${state.invoiceId}.jpg`);
+        }
+      });
+    } catch (err) {
+      console.error("Failed to generate JPEG:", err);
+      alert("Could not download invoice as image. Please try Print instead.");
+    }
+  };
+
   return (
     <>
       <div className="mb-6 print:hidden flex justify-end gap-4 px-4">
@@ -211,6 +233,12 @@ useEffect(() => {
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
         >
           Print Invoice
+        </button>
+        <button
+          onClick={handleDownloadJpeg}
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium"
+        >
+          Download JPEG
         </button>
       </div>
 
@@ -239,6 +267,9 @@ useEffect(() => {
             <p style={{ fontSize: "12px" }}>
               {locationDetails.address}<br />
               Phone: {locationDetails.phone} | E-mail: {locationDetails.email}
+            </p>
+            <p className="text-sm text-black">
+              GSTIN: - 37AABCT0601L1ZJ
             </p>
           </div>
           <img src={AV} alt="TWL Logo" style={{ width: "80px" }} />
@@ -429,7 +460,6 @@ useEffect(() => {
               <div style={{ textAlign: "right" }}>
                 <p>For Waterbase Aqua Diagnostic Center</p>
                 <div style={{ height: "70px" }}></div>
-                
               </div>
             </div>
           )}
@@ -447,6 +477,19 @@ useEffect(() => {
               <p style={{ fontWeight: "600" }}>Authorised Signatory</p>
             </div>
           )}
+
+          {/* Added system-generated note at the very bottom */}
+          <div
+            style={{
+              marginTop: "30px",
+              textAlign: "center",
+              fontSize: "11px",
+              color: "#555",
+              fontStyle: "italic",
+            }}
+          >
+            This is a system-generated invoice. No signature is required.
+          </div>
         </section>
       </div>
 

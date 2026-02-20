@@ -263,7 +263,9 @@ export default function LabResults() {
             and Vibrio harveyi
           </p>
         )}
-        <p className="font-bold mb-2 text-red-600">Note:</p>
+        {(hasPL)&&(
+          <>
+          <p className="font-bold mb-2 text-red-600">Note:</p>
         <p className="mb-4">
           PL: Post Larve, MGR: Muscle Gut Ratio, SHG: Swollen Hind Gut, HP: Hepatopancreas, F: Full, S: Shrunken,
           FBI: Filamentous Bacterial Infection, PZ: Protozoal Infection, Infection Level: Light: &lt;10%, Moderate: 10 to 30%, Heavy:40%
@@ -274,6 +276,8 @@ export default function LabResults() {
           <span className="text-red-600 font-bold">Rostral Spines:</span> 15 Points (&gt;4 Spines), Average Length: 10 points(&gt;11mm), Size Variation: 10 points (&lt;10%), Muscle Gut Ratio: 15 points (&gt;4:1
           Spine), Hepatopancreas: 15 points (Full), Necrosis: 10 points (Absent) Fouling: 10 points (Absent), Swollen Hind Gut: 15 points (Absent)
         </p>
+          </>
+        )}
 
         <p className="mt-6">
           <span className="text-red-600 font-bold">Note:</span> The samples brought by Farmer, the Results Reported above are meant for guidance only for Aquaculture Purpose. Not for any Litigation.
