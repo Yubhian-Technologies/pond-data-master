@@ -257,31 +257,31 @@ const WaterReport: React.FC<WaterReportProps> = ({
             yellowColonies: data.yellowColonies || "-",
             greenColonies: data.greenColonies || "-",
             tpc: data.tpc || "-",
-            phacus: data.phacus || "-",
-            chlorella: data.chlorella || "-",
-            desmids: data.desmids || "-",
-            scenedesmus: data.scenedesmus || "-",
-            copepod: data.copepod || "-",
-            rotifer: data.rotifer || "-",
-            nauplius: data.nauplius || "-",
-            brachionus: data.brachionus || "-",
-            spirulina: data.spirulina || "-",
-            chaetoceros: data.chaetoceros || "-",
-            skeletonema: data.skeletonema || "-",
-            rhizosolenia: data.rhizosolenia || "-",
-            anabaena: data.anabaena || "-",
-            oscillatoria: data.oscillatoria || "-",
-            microcystis: data.microcystis || "-",
-            coscinodiscus: data.coscinodiscus || "-",
-            nitzchia: data.nitzchia || "-",
-            navicula: data.navicula || "-",
-            noctiluca: data.noctiluca || "-",
-            ceratium: data.ceratium || "-",
-            dinophysis: data.dinophysis || "-",
-            gymnodinium: data.gymnodinium || "-",
-            zoothamnium: data.zoothamnium || "-",
-            tintinnopsis: data.tintinnopsis || "-",
-            favella: data.favella || "-",
+            phacus: data.phacus ,
+            chlorella: data.chlorella,
+            desmids: data.desmids ,
+            scenedesmus: data.scenedesmus ,
+            copepod: data.copepod ,
+            rotifer: data.rotifer ,
+            nauplius: data.nauplius ,
+            brachionus: data.brachionus ,
+            spirulina: data.spirulina ,
+            chaetoceros: data.chaetoceros ,
+            skeletonema: data.skeletonema ,
+            rhizosolenia: data.rhizosolenia ,
+            anabaena: data.anabaena ,
+            oscillatoria: data.oscillatoria ,
+            microcystis: data.microcystis ,
+            coscinodiscus: data.coscinodiscus ,
+            nitzchia: data.nitzchia ,
+            navicula: data.navicula ,
+            noctiluca: data.noctiluca ,
+            ceratium: data.ceratium ,
+            dinophysis: data.dinophysis ,
+            gymnodinium: data.gymnodinium ,
+            zoothamnium: data.zoothamnium ,
+            tintinnopsis: data.tintinnopsis ,
+            favella: data.favella ,
           });
         }
 
@@ -642,7 +642,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                         key={idx}
                         className={`text-center ${idx === 24 ? "" : "border-r"} border-black`}
                       >
-                        {val || "-"}
+                        {val || " "}
                       </td>
                     ))}
                   </tr>
