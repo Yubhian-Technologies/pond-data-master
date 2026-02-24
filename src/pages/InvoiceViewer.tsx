@@ -10,7 +10,7 @@ import {
 import { db } from "./firebase";
 import InvoiceTemplate from "../data/template";
 
-// Full interface matching what InvoiceTemplate expects (from the second file)
+// Full interface matching what InvoiceTemplate expects
 interface InvoiceState {
   invoiceId: string;
   farmerName: string;
@@ -32,6 +32,10 @@ interface InvoiceState {
   isPartialPayment?: boolean;
   paidAmount?: number | null;
   balanceAmount?: number;
+  // ── Added fields to match what's stored and what template needs ──
+  discountPercent?: number;
+  discountAmount?: number;
+  isZeroInvoice?: boolean;
 }
 
 const InvoiceViewer: React.FC = () => {
@@ -96,6 +100,11 @@ const InvoiceViewer: React.FC = () => {
           isPartialPayment: data.isPartialPayment || false,
           paidAmount: data.paidAmount ?? null,
           balanceAmount: data.balanceAmount ?? null,
+          
+          // ── These were missing — now correctly mapped from Firestore ──
+          discountPercent: data.discountPercent ?? 0,
+          discountAmount: data.discountAmount ?? 0,
+          isZeroInvoice: data.isZeroInvoice ?? false,
         };
 
         setInvoiceData(invoiceState);
