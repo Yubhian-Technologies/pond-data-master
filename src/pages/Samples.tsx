@@ -71,6 +71,13 @@ const endDate     = searchParams.get("end") || "";
   const [paymentModeLocal, setPaymentModeLocal] = useState<"cash" | "qr" | "neft" | "">("");
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
+  
+useEffect(() => {
+  if (step === 2) {
+    const today = new Date().toISOString().split("T")[0];
+    setDateOfCulture(today);
+  }
+}, [step]);
 
   // Fetch current branch technicians (for filter dropdown)
   useEffect(() => {
@@ -196,7 +203,7 @@ const endDate     = searchParams.get("end") || "";
   const resetForm = () => {
     setStep(1);
     setSelectedFarmer(null);
-    setDateOfCulture("");
+    // setDateOfCulture("");
     setSelectedTypes([]);
     setQuantities({} as Record<SampleGroup, number>);
     setFarmerSearchQuery("");
@@ -802,19 +809,19 @@ const sortedInvoices = useMemo(() => {
                         </div>
 
                         <div className="space-y-3">
-                          <Label className="font-semibold">Date of Culture</Label>
-                          <input
-                            type="date"
-                            className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            value={dateOfCulture}
-                            onChange={(e) => setDateOfCulture(e.target.value)}
-                          />
-                          <div className="bg-blue-50 p-4 rounded-lg mt-4">
-                             <p className="text-xs text-blue-700 font-medium uppercase mb-1">Target Farmer</p>
-                             <p className="font-bold text-gray-800">{selectedFarmer?.name}</p>
-                             <p className="text-xs text-gray-600">{selectedFarmer?.phone}</p>
-                          </div>
-                        </div>
+  <Label className="font-semibold">Date</Label>
+  
+  <div className="flex h-11 w-full items-center rounded-md border border-input bg-gray-100 px-3 py-2 text-sm text-gray-900 cursor-not-allowed">
+    {dateOfCulture || "Loading..."}
+    <Calendar className="ml-auto h-4 w-4 text-gray-500" />
+  </div>
+
+  <div className="bg-blue-50 p-4 rounded-lg mt-4">
+    <p className="text-xs text-blue-700 font-medium uppercase mb-1">Target Farmer</p>
+    <p className="font-bold text-gray-800">{selectedFarmer?.name}</p>
+    <p className="text-xs text-gray-600">{selectedFarmer?.phone}</p>
+  </div>
+</div>
                       </div>
 
                       {selectedTypes.length > 0 && (

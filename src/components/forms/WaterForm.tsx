@@ -110,9 +110,9 @@ export default function WaterForm({
     totalAmmonia: "", unionizedAmmonia: "", h2s: "", nitrite: "", nitrate: "", iron: "", chlorine: "",
     dissolvedOxygen: "", totalDissolvedMatter: "",
     yellowColonies: "", greenColonies: "", tpc: "",
-    phacus: "", chlorella: "", desmids: "", scenedesmus: "",spirulina: "", copepod: "", rotifer: "", nauplius: "",
+    phacus: "", chlorella: "", desmids: "", scenedesmus: "", spirulina: "", copepod: "", rotifer: "", nauplius: "",
     brachionus: "",
-     chaetoceros: "", skeletonema: "", rhizosolenia: "",
+    chaetoceros: "", skeletonema: "", rhizosolenia: "",
     anabaena: "", oscillatoria: "", microcystis: "",
     coscinodiscus: "", nitzchia: "", navicula: "",
     noctiluca: "", ceratium: "", dinophysis: "", gymnodinium: "",
@@ -121,13 +121,11 @@ export default function WaterForm({
 
   const [ponds, setPonds] = useState<Pond[]>([]);
 
- 
   const testToPhysicoFields: Record<string, (keyof Pond)[]> = {
     basic_water: [
       "pH", "salinity", "co3", "hco3", "alkalinity", "hardness",
-      "ca", "mg",  "totalAmmonia", "unionizedAmmonia",
-       "nitrite",  "dissolvedOxygen",
-      
+      "ca", "mg", "totalAmmonia", "unionizedAmmonia",
+      "nitrite", "dissolvedOxygen",
     ],
     potassium: ["k"],
     sodium: ["na"],
@@ -135,10 +133,16 @@ export default function WaterForm({
     chlorine: ["chlorine"],
     nitrate: ["nitrate"],
     h2s: ["h2s"],
-    tom: ["totalDissolvedMatter"],  
+    tom: ["totalDissolvedMatter"],
   };
 
-  
+  // NEW: Mapping for bacteriology fields (only vibrio shows all 3)
+  const testToBacteriologyFields: Record<string, (keyof Pond)[]> = {
+    vibrio: ["yellowColonies", "greenColonies", "tpc"],
+    // You can add more later if needed, e.g.:
+    // micro_vibrio_plating: ["yellowColonies", "greenColonies", "tpc"],
+  };
+
   useEffect(() => {
     if (!locationId || !invoiceId) {
       console.warn("Missing locationId or invoiceId for WaterForm fetch");
@@ -219,7 +223,6 @@ export default function WaterForm({
     rotifer: "Rotifer",
     nauplius: "Nauplius",
     brachionus: "Brachionus",
-    
     chaetoceros: "Chaetoceros",
     skeletonema: "Skeletonema",
     rhizosolenia: "Rhizosolenia",
@@ -238,7 +241,6 @@ export default function WaterForm({
     favella: "Favella",
   };
 
-  
   useEffect(() => {
     const loadData = async () => {
       if (!localInvoice || !locationId || !invoiceId) {
@@ -323,12 +325,11 @@ export default function WaterForm({
               chlorella: data.chlorella || "",
               desmids: data.desmids || "",
               scenedesmus: data.scenedesmus || "",
-               spirulina: data.spirulina || "",
+              spirulina: data.spirulina || "",
               copepod: data.copepod || "",
               rotifer: data.rotifer || "",
               nauplius: data.nauplius || "",
               brachionus: data.brachionus || "",
-             
               chaetoceros: data.chaetoceros || "",
               skeletonema: data.skeletonema || "",
               rhizosolenia: data.rhizosolenia || "",
@@ -374,9 +375,6 @@ export default function WaterForm({
     );
   };
 
-  // ────────────────────────────────────────────────
-  // Save with unselected physico-chemical fields set to "-"
-  // ────────────────────────────────────────────────
   const saveAllPonds = async () => {
     if (!localInvoice?.docId) {
       alert("Cannot save: Invoice not loaded or missing ID");
@@ -387,10 +385,9 @@ export default function WaterForm({
       const sampleNumber = index + 1;
       const selectedIds = perSampleSelectedTests[sampleNumber] || [];
 
-      // Create a copy and reset unselected fields to "-"
       const dataToSave = { ...pond };
 
-      // Reset all physico-chemical fields first
+      // Reset physico-chemical fields
       [
         "pH", "salinity", "co3", "hco3", "alkalinity", "hardness",
         "ca", "mg", "na", "k", "totalAmmonia", "unionizedAmmonia",
@@ -400,7 +397,7 @@ export default function WaterForm({
         (dataToSave as any)[field] = "-";
       });
 
-      // Only keep values for selected tests
+      // Keep only selected physico-chemical values
       selectedIds.forEach(testId => {
         const fields = testToPhysicoFields[testId];
         if (fields) {
@@ -409,6 +406,14 @@ export default function WaterForm({
           });
         }
       });
+
+      // NEW: Reset bacteriology fields if "vibrio" is NOT selected
+      const hasVibrio = selectedIds.includes("vibrio");
+      if (!hasVibrio) {
+        dataToSave.yellowColonies = "-";
+        dataToSave.greenColonies = "-";
+        dataToSave.tpc = "-";
+      }
 
       const ref = doc(
         collection(db, "locations", locationId, "invoices", localInvoice.docId, "water_reports"),
@@ -473,14 +478,11 @@ export default function WaterForm({
         {[
           { label: "Farmer Name", name: "farmerName" },
           { label: "Mobile", name: "mobile" },
-          // { label: "S.D/D.O.C", name: "sdDoc" },
           { label: "Farmer UID", name: "farmerUID" },
           { label: "Source of Water", name: "sourceOfWater" },
           { label: "Farmer Address", name: "farmerAddress" },
           { label: "Sample Date", name: "sampleDate", type: "date" },
           { label: "Sample Collection Time", name: "sampleCollectionTime", type: "time" },
-          // { label: "Report Date", name: "reportDate", type: "date" },
-          // { label: "Report Time", name: "reportTime", type: "time" },
           { label: "No. of Samples", value: totalSamples, disabled: true },
         ].map((field) => (
           <div key={field.name || field.label}>
@@ -509,17 +511,26 @@ export default function WaterForm({
           .map(id => testNameMap[id] || id)
           .filter(Boolean);
 
-        // Determine which physico-chemical fields should be shown
-        const enabledFields = new Set<string>();
-
+        // Physico-chemical enabled fields
+        const enabledPhysico = new Set<string>();
         sampleSelectedIds.forEach(testId => {
           const fields = testToPhysicoFields[testId];
           if (fields) {
-            fields.forEach(f => enabledFields.add(f));
+            fields.forEach(f => enabledPhysico.add(f));
           }
         });
 
-        // Always show pondNo
+        // NEW: Bacteriology enabled fields (only if vibrio is selected)
+        const enabledBacteriology = new Set<keyof Pond>();
+        sampleSelectedIds.forEach(testId => {
+          const fields = testToBacteriologyFields[testId];
+          if (fields) {
+            fields.forEach(f => enabledBacteriology.add(f));
+          }
+        });
+
+        const showBacteriology = enabledBacteriology.size > 0;
+
         const physicoParams = [
           { key: "pondNo" as keyof Pond, label: "Pond No." },
           { key: "pH" as keyof Pond, label: "pH" },
@@ -541,7 +552,7 @@ export default function WaterForm({
           { key: "chlorine" as keyof Pond, label: "Chlorine" },
           { key: "dissolvedOxygen" as keyof Pond, label: "DO (ppm)" },
           { key: "totalDissolvedMatter" as keyof Pond, label: "TOM (ppm)" },
-        ].filter(item => item.key === "pondNo" || enabledFields.has(item.key));
+        ].filter(item => item.key === "pondNo" || enabledPhysico.has(item.key));
 
         return (
           <div key={pond.id} className="mb-12">
@@ -588,26 +599,50 @@ export default function WaterForm({
               </div>
             </div>
 
-            <div className="mb-8">
-              <h4 className="text-xl font-bold mb-4 text-red-800">Bacteriology (CFU/ml)</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {(["yellowColonies", "greenColonies", "tpc"] as const).map((field) => (
-                  <div key={field}>
-                    <label className="block text-xs font-medium mb-1">
-                      {field === "yellowColonies" ? "Yellow Colonies" :
-                       field === "greenColonies" ? "Green Colonies" :
-                       "Total Plate Count (TPC)"}
-                    </label>
-                    <input
-                      type="text"
-                      value={pond[field]}
-                      onChange={(e) => handlePondChange(pond.id, field, e.target.value)}
-                      className="w-full border border-gray-400 rounded px-3 py-2 text-sm"
-                    />
-                  </div>
-                ))}
+            {/* Bacteriology - only shown when vibrio is selected */}
+            {showBacteriology && (
+              <div className="mb-8">
+                <h4 className="text-xl font-bold mb-4 text-red-800">Bacteriology (CFU/ml)</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {enabledBacteriology.has("yellowColonies") && (
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Yellow Colonies (sucrose +)</label>
+                      <input
+                        type="text"
+                        value={pond.yellowColonies || ""}
+                        onChange={(e) => handlePondChange(pond.id, "yellowColonies", e.target.value)}
+                        className="w-full border border-gray-400 rounded px-3 py-2 text-sm"
+                        placeholder="e.g. 2.5 × 10³"
+                      />
+                    </div>
+                  )}
+                  {enabledBacteriology.has("greenColonies") && (
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Green Colonies (sucrose -)</label>
+                      <input
+                        type="text"
+                        value={pond.greenColonies || ""}
+                        onChange={(e) => handlePondChange(pond.id, "greenColonies", e.target.value)}
+                        className="w-full border border-gray-400 rounded px-3 py-2 text-sm"
+                        placeholder="e.g. < 10²"
+                      />
+                    </div>
+                  )}
+                  {enabledBacteriology.has("tpc") && (
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Total Plate Count (TPC)</label>
+                      <input
+                        type="text"
+                        value={pond.tpc || ""}
+                        onChange={(e) => handlePondChange(pond.id, "tpc", e.target.value)}
+                        className="w-full border border-gray-400 rounded px-3 py-2 text-sm"
+                        placeholder="e.g. 4.8 × 10⁴"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="mb-8">
               <h4 className="text-xl font-bold mb-4 text-green-800">Useful Plankton (cells/ml or org/ml)</h4>
@@ -616,7 +651,6 @@ export default function WaterForm({
                   "chlorella","phacus", "desmids", "scenedesmus",
                   "spirulina",
                   "copepod", "rotifer", "nauplius", "brachionus",
-                  
                   "chaetoceros", "skeletonema", "rhizosolenia",
                 ] as const).map((field) => {
                   let displayName = field.replace(/([A-Z])/g, " $1").trim();
