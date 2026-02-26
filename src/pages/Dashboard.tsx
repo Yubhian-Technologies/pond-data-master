@@ -92,13 +92,14 @@ interface InvoiceItem {
   village: string;
   species: string;
   cultureAreas: number;
+  transactionRef?: string;
 }
 
 interface ModalFarmer {
   farmerId: string;
   farmerName: string;
   phone: string;
-  village: string;
+  locationDisplay: string;      // ← Changed: now combined village/district fallback
   species: string;
   cultureAreas: number;
 }
@@ -117,7 +118,6 @@ const Dashboard = () => {
     samplesProcessed: 0,
     reportsGenerated: 0,
     revenue: 0,
-    // removed revenueChange
   });
 
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
@@ -135,21 +135,18 @@ const Dashboard = () => {
   const [exportData, setExportData] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
 
-  // Modal States
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<ModalData>({ type: null, title: "" });
   const [modalContent, setModalContent] = useState<any[]>([]);
 
-
-const [selectedSampleType, setSelectedSampleType] = useState<string>("all");
-const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
+  const [selectedSampleType, setSelectedSampleType] = useState<string>("all");
+  const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
 
   const handleExit = () => {
     clearTechnician();
     window.location.href = `/technicians/${session.locationId}`;
   };
 
-  // Fetch all lab branches
   useEffect(() => {
     const fetchLocations = async () => {
       try {
@@ -169,7 +166,6 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
     fetchLocations();
   }, []);
 
-  // Fetch Technicians for selected branch
   useEffect(() => {
     const fetchTechnicians = async () => {
       if (!selectedLocationId) return;
@@ -188,7 +184,6 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
     fetchTechnicians();
   }, [selectedLocationId]);
 
-  // Default to technician's location
   useEffect(() => {
     if (session.locationId && allLocations.length > 0) {
       setSelectedLocationId(session.locationId);
@@ -202,7 +197,6 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
     setLoading(true);
 
     try {
-      // Farmers collection reference
       const farmersColl: CollectionReference<DocumentData> = collection(
         db,
         "locations",
@@ -210,7 +204,6 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
         "farmers"
       );
 
-      // Invoices collection reference
       const invoicesColl: CollectionReference<DocumentData> = collection(
         db,
         "locations",
@@ -218,11 +211,9 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
         "invoices"
       );
 
-      // Total farmers (all time)
       const farmersSnap = await getDocs(farmersColl);
       const totalFarmers = farmersSnap.size;
 
-      // ── New farmers (this month or filtered period) ────────────────────────
       const isDateFiltered = !!startDate && !!endDate;
 
       let startT: Timestamp | null = null;
@@ -257,7 +248,6 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
       const newFarmersSnap = await getDocs(newFarmersQuery);
       const newFarmers = newFarmersSnap.size;
 
-      // ── Invoices ────────────────────────────────────────────────────────────
       let invoicesQuery: Query<DocumentData> = query(
         invoicesColl,
         orderBy("createdAt", "desc")
@@ -339,18 +329,21 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
           village: data.village || data.city || "N/A",
           species: data.species || "N/A",
           cultureAreas: Number(data.cultureAreas || 0),
+          transactionRef: data.transactionRef || "",
         };
 
         allInvoices.push(invoiceItem);
 
-        // Prepare payment distribution for export
-        const cash = data.paymentMode === "cash" ? Number(data.paidAmount || 0) : 0;
-        const qr = data.paymentMode === "qr" ? Number(data.paidAmount || 0) : 0;
-        const neft = data.paymentMode === "neft" ? Number(data.paidAmount || 0) : 0;
-        const rtgs = data.paymentMode === "rtgs" ? Number(data.paidAmount || 0) : 0;
+        let displayPaymentMode = "Pending";
+        if (data.paymentMode === "cash") displayPaymentMode = "Cash";
+        else if (data.paymentMode === "qr") displayPaymentMode = "QR Code / UPI";
+        else if (data.paymentMode === "neft") displayPaymentMode = "NEFT";
+        else if (data.paymentMode === "rtgs") displayPaymentMode = "RTGS";
 
         tempExportRows.push({
+          "Date": data.formattedDate || format(createdAt, "dd-MM-yyyy"),
           "Invoice ID": invoiceId,
+          
           "Farmer Name": farmerName,
           "Location": locationName,
           "Technician": techName,
@@ -358,13 +351,10 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
           "Sample Count": sampleCount,
           "Bill Amount (₹)": Number(data.total || 0),
           "Amount Paid (₹)": Number(data.paidAmount || 0),
-          "Cash (₹)": cash,
-          "QR/UPI (₹)": qr,
-          "NEFT (₹)": neft,
-          "RTGS (₹)": rtgs,
+          "Payment Mode": displayPaymentMode,
+          "Transaction Ref": data.transactionRef || "",
           "Pending Amount (₹)": Number(data.balanceAmount || 0),
           "Status": isReport ? "Report Completed" : "Sample Submitted",
-          "Date": data.formattedDate || format(createdAt, "dd-MM-yyyy"),
         });
       });
 
@@ -402,7 +392,7 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
 
       filteredInvoices.forEach((inv) => {
         samplesProcessed += inv.sampleCount;
-        revenue += inv.paidAmount;           // ← Revenue = sum of paidAmount
+        revenue += inv.paidAmount;
         if (inv.isReport) reportsGenerated += 1;
       });
 
@@ -446,26 +436,25 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
   };
 
   useEffect(() => {
-  if (invoices.length === 0) {
-    setAvailableSampleTypes([]);
-    return;
-  }
-
-  const typesSet = new Set<string>();
-
-  invoices.forEach((inv) => {
-    if (inv.typeDisplay && inv.typeDisplay.trim()) {
-      // Split if multiple types are joined with "/"
-      inv.typeDisplay.split("/").forEach(t => {
-        const clean = t.trim();
-        if (clean) typesSet.add(clean);
-      });
+    if (invoices.length === 0) {
+      setAvailableSampleTypes([]);
+      return;
     }
-  });
 
-  const sortedTypes = Array.from(typesSet).sort();
-  setAvailableSampleTypes(["all", ...sortedTypes]);
-}, [invoices]);
+    const typesSet = new Set<string>();
+
+    invoices.forEach((inv) => {
+      if (inv.typeDisplay && inv.typeDisplay.trim()) {
+        inv.typeDisplay.split("/").forEach(t => {
+          const clean = t.trim();
+          if (clean) typesSet.add(clean);
+        });
+      }
+    });
+
+    const sortedTypes = Array.from(typesSet).sort();
+    setAvailableSampleTypes(["all", ...sortedTypes]);
+  }, [invoices]);
 
   const fetchRealFarmers = async () => {
     if (!selectedLocationId) return [];
@@ -477,11 +466,20 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
 
       return snap.docs.map((doc) => {
         const data = doc.data();
+        // Improved location display: prefer village → district → fallback
+        const village = data.village || data.city || "";
+        const district = data.district || "";
+        const locationDisplay = village.trim() 
+          ? village 
+          : district.trim() 
+            ? district 
+            : "—";
+
         return {
           farmerId: data.farmerId || "N/A",
           farmerName: data.name || "Unknown",
           phone: data.phone || "N/A",
-          village: data.city || data.village || "N/A",
+          locationDisplay,                    // ← now used in table
           species: data.species || "Not specified",
           cultureAreas: Number(data.cultureAreas || 0),
         } as ModalFarmer;
@@ -566,10 +564,6 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
         reports: acc.reports + (row["Status"] === "Report Completed" ? 1 : 0),
         billAmount: acc.billAmount + row["Bill Amount (₹)"],
         amountPaid: acc.amountPaid + row["Amount Paid (₹)"],
-        cash: acc.cash + row["Cash (₹)"],
-        qr: acc.qr + row["QR/UPI (₹)"],
-        neft: acc.neft + row["NEFT (₹)"],
-        rtgs: acc.rtgs + row["RTGS (₹)"],
         pending: acc.pending + row["Pending Amount (₹)"],
       }),
       { 
@@ -578,16 +572,13 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
         reports: 0, 
         billAmount: 0, 
         amountPaid: 0, 
-        cash: 0,
-        qr: 0,
-        neft: 0,
-        rtgs: 0,
         pending: 0 
       }
     );
 
     const summaryRow = {
       "Invoice ID": "TOTALS",
+      "Date": `${totals.invoices} Invoices`,
       "Farmer Name": "",
       "Location": "",
       "Technician": "",
@@ -595,13 +586,10 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
       "Sample Count": totals.samples,
       "Bill Amount (₹)": totals.billAmount,
       "Amount Paid (₹)": totals.amountPaid,
-      "Cash (₹)": totals.cash,
-      "QR/UPI (₹)": totals.qr,
-      "NEFT (₹)": totals.neft,
-      "RTGS (₹)": totals.rtgs,
+      "Payment Mode": "",
+      "Transaction Ref": "",
       "Pending Amount (₹)": totals.pending,
       "Status": `${totals.reports} Reports Completed`,
-      "Date": `${totals.invoices} Invoices`,
     };
 
     const worksheetData = [{}, ...exportData, {}, summaryRow];
@@ -612,6 +600,7 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
 
     ws["!cols"] = [
       { wch: 18 },  // Invoice ID
+      { wch: 14 },  // Date
       { wch: 25 },  // Farmer Name
       { wch: 20 },  // Location
       { wch: 20 },  // Technician
@@ -619,13 +608,10 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
       { wch: 14 },  // Sample Count
       { wch: 18 },  // Bill Amount
       { wch: 18 },  // Amount Paid
-      { wch: 14 },  // Cash
-      { wch: 14 },  // QR/UPI
-      { wch: 14 },  // NEFT
-      { wch: 14 },  // RTGS
+      { wch: 18 },  // Payment Mode
+      { wch: 22 },  // Transaction Ref
       { wch: 18 },  // Pending
       { wch: 22 },  // Status
-      { wch: 15 },  // Date
     ];
 
     const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
@@ -695,7 +681,6 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
                   </div>
                 </div>
 
-                {/* Lab Branch & Technician Selector */}
                 <div className="mt-5 pt-4 border-t border-gray-200 flex flex-wrap gap-6">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -715,7 +700,7 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
                       </SelectContent>  
                     </Select>
                   </div>
-{/* ({loc.code}) */}
+
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Users className="w-4 h-4 text-purple-600" />
@@ -906,7 +891,7 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
                         <TableHead>Farmer ID</TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Phone</TableHead>
-                        <TableHead>Village</TableHead>
+                        <TableHead>Location</TableHead>           {/* ← Updated label if you want */}
                         <TableHead>Species</TableHead>
                         <TableHead>Culture Areas (acres)</TableHead>
                       </TableRow>
@@ -924,7 +909,7 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
                             <TableCell className="font-medium">{f.farmerId}</TableCell>
                             <TableCell>{f.farmerName}</TableCell>
                             <TableCell>{f.phone}</TableCell>
-                            <TableCell>{f.village}</TableCell>
+                            <TableCell>{f.locationDisplay}</TableCell>   {/* ← Now shows proper location */}
                             <TableCell>{f.species}</TableCell>
                             <TableCell>{f.cultureAreas}</TableCell>
                           </TableRow>
@@ -934,90 +919,90 @@ const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
                   </Table>
                 </div>
               )}
-              { (modalData.type === "samples" || modalData.type === "reports") && (
-  <div className="space-y-6">
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <h3 className="text-lg font-semibold">
-        {modalData.type === "samples" ? "Sample Submissions" : "Completed Reports"}
-      </h3>
 
-      {availableSampleTypes.length > 1 && (
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600 whitespace-nowrap">Filter by type:</span>
-          <Select 
-            value={selectedSampleType} 
-            onValueChange={setSelectedSampleType}
-          >
-            <SelectTrigger className="w-44">
-              <SelectValue placeholder="All Types" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableSampleTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type === "all" ? "All Types" : type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-    </div>
+              {(modalData.type === "samples" || modalData.type === "reports") && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h3 className="text-lg font-semibold">
+                      {modalData.type === "samples" ? "Sample Submissions" : "Completed Reports"}
+                    </h3>
 
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Invoice ID</TableHead>
-          <TableHead>Farmer</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead>Type</TableHead>
-          {modalData.type === "samples" && <TableHead>Count</TableHead>}
-          {modalData.type === "samples" && <TableHead>Status</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {(() => {
-          let filteredContent = modalContent;
+                    {availableSampleTypes.length > 1 && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600 whitespace-nowrap">Filter by type:</span>
+                        <Select 
+                          value={selectedSampleType} 
+                          onValueChange={setSelectedSampleType}
+                        >
+                          <SelectTrigger className="w-44">
+                            <SelectValue placeholder="All Types" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableSampleTypes.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type === "all" ? "All Types" : type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
 
-          if (selectedSampleType !== "all") {
-            filteredContent = modalContent.filter((item: any) =>
-              item.types?.includes(selectedSampleType)
-            );
-          }
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Invoice ID</TableHead>
+                        <TableHead>Farmer</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        {modalData.type === "samples" && <TableHead>Count</TableHead>}
+                        {modalData.type === "samples" && <TableHead>Status</TableHead>}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        let filteredContent = modalContent;
 
-          // For reports → only already filtered ones, but we can still apply type filter
-          if (modalData.type === "reports") {
-            filteredContent = filteredContent.filter((item: any) =>
-              selectedSampleType === "all" || item.types?.includes(selectedSampleType)
-            );
-          }
+                        if (selectedSampleType !== "all") {
+                          filteredContent = modalContent.filter((item: any) =>
+                            item.types?.includes(selectedSampleType)
+                          );
+                        }
 
-          return filteredContent.length === 0 ? (
-            <TableRow>
-              <TableCell 
-                colSpan={modalData.type === "samples" ? 6 : 4} 
-                className="text-center py-8 text-muted-foreground"
-              >
-                No {modalData.type === "samples" ? "samples" : "reports"} found
-                {selectedSampleType !== "all" ? ` matching type "${selectedSampleType}"` : ""}
-              </TableCell>
-            </TableRow>
-          ) : (
-            filteredContent.map((item: any, i: number) => (
-              <TableRow key={i}>
-                <TableCell>{item.invoiceId}</TableCell>
-                <TableCell>{item.farmerName}</TableCell>
-                <TableCell>{item.date}</TableCell>
-                <TableCell>{item.types}</TableCell>
-                {modalData.type === "samples" && <TableCell>{item.count}</TableCell>}
-                {modalData.type === "samples" && <TableCell>{item.status}</TableCell>}
-              </TableRow>
-            ))
-          );
-        })()}
-      </TableBody>
-    </Table>
-  </div>
-)}
+                        if (modalData.type === "reports") {
+                          filteredContent = filteredContent.filter((item: any) =>
+                            selectedSampleType === "all" || item.types?.includes(selectedSampleType)
+                          );
+                        }
+
+                        return filteredContent.length === 0 ? (
+                          <TableRow>
+                            <TableCell 
+                              colSpan={modalData.type === "samples" ? 6 : 4} 
+                              className="text-center py-8 text-muted-foreground"
+                            >
+                              No {modalData.type === "samples" ? "samples" : "reports"} found
+                              {selectedSampleType !== "all" ? ` matching type "${selectedSampleType}"` : ""}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredContent.map((item: any, i: number) => (
+                            <TableRow key={i}>
+                              <TableCell>{item.invoiceId}</TableCell>
+                              <TableCell>{item.farmerName}</TableCell>
+                              <TableCell>{item.date}</TableCell>
+                              <TableCell>{item.types}</TableCell>
+                              {modalData.type === "samples" && <TableCell>{item.count}</TableCell>}
+                              {modalData.type === "samples" && <TableCell>{item.status}</TableCell>}
+                            </TableRow>
+                          ))
+                        );
+                      })()}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
 
               {modalData.type === "revenue" && (
                 <div className="space-y-6">
