@@ -352,7 +352,7 @@ const Dashboard = () => {
           "Bill Amount (₹)": Number(data.total || 0),
           "Amount Paid (₹)": Number(data.paidAmount || 0),
           "Payment Mode": displayPaymentMode,
-          "Transaction Ref": data.transactionRef || "",
+          "UTR No": data.transactionRef || "",
           "Pending Amount (₹)": Number(data.balanceAmount || 0),
           "Status": isReport ? "Report Completed" : "Sample Submitted",
         });
@@ -587,7 +587,7 @@ const Dashboard = () => {
       "Bill Amount (₹)": totals.billAmount,
       "Amount Paid (₹)": totals.amountPaid,
       "Payment Mode": "",
-      "Transaction Ref": "",
+      "UTR No": "",
       "Pending Amount (₹)": totals.pending,
       "Status": `${totals.reports} Reports Completed`,
     };
