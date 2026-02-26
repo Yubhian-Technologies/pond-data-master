@@ -418,130 +418,144 @@ const WaterReport: React.FC<WaterReportProps> = ({
 
         {/* ANALYSIS SECTION */}
         <div className="flex flex-row w-full mb-4 border border-black overflow-hidden">
-          {/* WATER ANALYSIS */}
-          <div className="flex-[8.5] border-r border-black">
-            <h4 className="text-center font-bold text-[12px] bg-gray-200 border-b border-black text-red-600">
-              WATER ANALYSIS
-            </h4>
-            <table className="w-full text-[10px] border-collapse water-analysis-table">
-              <thead>
-                <tr className="bg-gray-100 font-bold">
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Pond<br/><span className="text-[8px]"></span></td>
-                  <td className="border-r border-black p-0.5 text-center w-12" rowSpan={3}>pH<br/></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Salinity<br/><span className="text-[8px]">సెలినిటీ</span></td>
-                  <td className="border-r border-black p-0.5 text-center" colSpan={3}>Alkalinity(PPM as Caco3)<br/><span className="text-[8px]">ఆల్కలినిటీ</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total Hardness<br/><span className="text-[8px]">మొత్తం కఠినత</span></td>
-                  <td className="border-r border-black p-0.5 text-center" colSpan={4}>Minerals (ppm)<br/></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Total NH3-NH4<br/>(ppm) <br /><span className="text-[8px]">అమ్మోనియా</span></td>
-                  <td className="border-r border-black p-0.5 text-center text-[9px]" rowSpan={3}>Un-ionized NH₃<br/>(ppm) <br /><span className="text-[7px]">అన్ అయోనైజ్డ్</span></td>
-                  
-                  <td className="border-r border-black text-[8.5px] p-0.5 text-center" rowSpan={3}>Nitrite <br />(NO₂)<br/>(ppm) <br /><span className="text-[8px]">నైట్రైట్</span></td>
-                  <td className="border-r border-black text-[8.5px] p-0.5 text-center" rowSpan={3}>Nitrate <br />(NO₃)<br/>(ppm) <br /><span className="text-[8px]">నైట్రేట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>H₂S<br/>(ppm) <br /><span className="text-[8px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Fe+<br/>(ppm) <br /><span className="text-[8px]">ఇనుము</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>Chlorine<br/>(ppm) <br /><span className="text-[8px]">క్లోరిన్</span></td>
-                  <td className="border-r border-black p-0.5 text-center" rowSpan={3}>DO<br/>(ppm) <br /><span className="text-[8px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
-                  <td className="p-0.5 text-center" rowSpan={3}>TOM<br/>(ppm) <br /><span className="text-[8px]">Total Organic Matter</span></td>
-                </tr>
-                <tr className="bg-gray-100 border-t border-black text-[10px]">
-                  <td className="border-r border-black p-0.5 text-center font-bold">CO₃<br/><span className="text-[8px]">కార్బొనేట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">HCO₃<br/><span className="text-[8px]">బైకార్బొనేట్</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Total <br/><span className="text-[8px]">మొత్తం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Ca++<br/><span className="text-[8px]">కాల్షియం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Mg++<br/><span className="text-[7px]">మెగ్నీషియం</span></td>
-                  
-                  <td className="border-r border-black p-0.5 text-center font-bold">K+<br/><span className="text-[7px]">పొటాషియం</span></td>
-                  <td className="border-r border-black p-0.5 text-center font-bold">Na+<br/><span className="text-[8px]">సోడియం</span></td>
-                </tr>
-              </thead>
-              <tbody>
-                {ponds.map((p,index) => (
-                  <tr key={p.id} className="border-t border-black" ref={(el) => (waterDataRows.current[index] = el)}>
-                    <td className="border-r border-black p-0.5 text-center font-bold bg-gray-50 text-[8px]">{p.pondNo}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.pH}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.salinity}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.co3}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.hco3}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.alkalinity}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.hardness}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.ca}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.mg}</td>
-                    
-                    <td className="border-r border-black p-0.5 text-center">{p.k}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.na}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.totalAmmonia}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.unionizedAmmonia}</td>
-                    
-                    <td className="border-r border-black p-0.5 text-center">{p.nitrite}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.nitrate}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.h2s}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.iron}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.chlorine}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.dissolvedOxygen}</td>
-                    <td className="p-0.5 text-center">{p.totalDissolvedMatter}</td>
-                  </tr>
-                ))}
-                <tr className="border-t border-black font-bold bg-gray-50 text-[11px] text-red-600 optimum-row">
-                  <td className="border-r border-black p-0.5 text-[4px]">OPTIMUM LEVEL</td>
-                  <td className="border-r border-black p-0.5 text-center">7.5-8.5</td>
-                  <td className="border-r border-black p-0.5 text-center">15-20</td>
-                  <td className="border-r border-black p-0.5 text-center">20-40</td>
-                  <td className="border-r border-black p-0.5 text-center">130-150</td>
-                  <td className="border-r border-black p-0.5 text-center">175-200</td>
-                  <td className="border-r border-black p-0.5 text-center">300-3000</td>
-                  <td className="border-r border-black p-0.5 text-center">&gt;100</td>
-                  <td className="border-r border-black p-0.5 text-center">&gt;300</td>
-                  
-                  <td className="border-r border-black p-0.5 text-center">&gt;10</td>
-                  <td className="border-r border-black p-0.5 text-center">&gt;300</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;1.0</td>
-                  <td className="border-r border-black p-0.5 text-center">0-0.1</td>
-                  
-                  <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;25</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;0.02</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
-                  <td className="border-r border-black p-0.5 text-center">&gt;4</td>
-                  <td className="p-0.5 text-center">40-70</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+  <table className="w-full text-[10px] border-collapse table-fixed">
+    <thead>
+      {/* Top headers – WATER ANALYSIS + BACTERIOLOGY */}
+      <tr className="bg-gray-200 border-b border-black">
+        <th 
+          colSpan={20}
+          className="border-r border-black p-0.5 text-center font-bold text-[12px] text-red-600"
+        >
+          WATER ANALYSIS
+        </th>
+        <th 
+          colSpan={3}
+          className="border-r border-black p-0.5 text-center font-bold text-[10.7px] text-red-600"
+        >
+          BACTERIOLOGY
+        </th>
+      </tr>
 
-          {/* BACTERIOLOGY */}
-          <div className="flex-[1.5]">
-            <h4 className="text-center font-bold text-[10.7px] p-0.5 bg-gray-200 border-b border-black text-red-600">
-              BACTERIOLOGY
-            </h4>
-            <table className="w-full text-[9px] border-collapse bacteriology-print">
-              <thead>
-                <tr className="bg-gray-100 font-bold">
-                  <td className="border-b border-black text-center text-[11px]" colSpan={3}>Vibrio CFU /ml</td>
-                </tr>
-                <tr className="bg-gray-100 text-[10px] font-bold">
-                  <td className="border-r border-black p-0.5 text-center bg-yellow-100">Yellow <br />Colonies <br /> <span className="text-[9px]">పసుపు కాలనీలు</span></td>
-                  <td className="border-r border-black p-0.5 text-center bg-green-100">Green <br />Colonies <br /><span className="text-[9px]">పచ్చ కాలనీలు</span></td>
-                  <td className="p-0.5 text-center">TPC <br /><span className="text-[8px]">Total Plate Count</span></td>
-                </tr>
-              </thead>
-              <tbody>
-                {ponds.map((p,index) => (
-                  <tr key={p.id} className="border-t border-black" ref={(el) => (bactDataRows.current[index] = el)}>
-                    <td className="border-r border-black p-[2.7px] text-center bg-yellow-100">{p.yellowColonies}</td>
-                    <td className="border-r border-black p-[2.7px] text-center bg-green-100">{p.greenColonies}</td>
-                    <td className="p-[2.7px] text-center">{p.tpc}</td>
-                  </tr>
-                ))}
-                <tr className="border-t border-black font-bold text-[13px] text-red-600 bg-gray-50 optimum-row">
-                  <td className="border-r border-black p-0.5 text-center">&lt;300</td>
-                  <td className="border-r border-black p-0.5 text-center">&lt;50</td>
-                  <td className="p-0.5 text-center">&lt;300</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* Second row – main parameters + Vibrio title */}
+      <tr className="bg-gray-100 font-bold border-b border-black">
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Pond</td>
+        <td className="border-r border-black p-0.5 text-center w-12" rowSpan={2}>pH</td>
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Salinity<br/><span className="text-[8px]">సెలినిటీ</span></td>
+        
+        <td className="border-r border-black p-0.5 text-center border-b border-black" colSpan={3}>
+          Alkalinity (PPM as CaCO₃)<br/><span className="text-[8px]">ఆల్కలినిటీ</span>
+        </td>
+        
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Total Hardness<br/><span className="text-[8px]">మొత్తం కఠినత</span></td>
+        
+        <td className="border-r border-black p-0.5 text-center border-b border-black" colSpan={4}>
+          Minerals (ppm)
+        </td>
+        
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Total NH₃-NH₄<br/>(ppm)<br/><span className="text-[8px]">అమ్మోనియా</span></td>
+        <td className="border-r border-black p-0.5 text-center text-[9px]" rowSpan={2}>Un-ionized NH₃<br/>(ppm)<br/><span className="text-[7px]">అన్ అయోనైజ్డ్</span></td>
+        
+        <td className="border-r border-black p-0.5 text-center text-[8.5px]" rowSpan={2}>Nitrite (NO₂)<br/>(ppm)<br/><span className="text-[8px]">నైట్రైట్</span></td>
+        <td className="border-r border-black p-0.5 text-center text-[8.5px]" rowSpan={2}>Nitrate (NO₃)<br/>(ppm)<br/><span className="text-[8px]">నైట్రేట్</span></td>
+        
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>H₂S<br/>(ppm)<br/><span className="text-[8px]">హైడ్రోజన్ సల్ఫైడ్</span></td>
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Fe⁺<br/>(ppm)<br/><span className="text-[8px]">ఇనుము</span></td>
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>Chlorine<br/>(ppm)<br/><span className="text-[8px]">క్లోరిన్</span></td>
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>DO<br/>(ppm)<br/><span className="text-[8px]">డిసాల్వ్డ్ ఆక్సిజన్</span></td>
+        <td className="border-r border-black p-0.5 text-center" rowSpan={2}>TOM<br/>(ppm)<br/><span className="text-[8px]">Total Organic Matter</span></td>
+
+        {/* Bacteriology – main title */}
+        <td className="text-center text-[11px] font-bold border-b border-black" colSpan={3}>
+          Vibrio CFU /ml
+        </td>
+      </tr>
+
+      {/* Third row – sub-headers – now with bottom border where groups end */}
+      <tr className="bg-gray-100 text-[10px] border-b border-black">
+        {/* Alkalinity subs */}
+        <td className="border-r border-black p-0.5 text-center font-bold">{/* CO₃ */}CO₃<br/><span className="text-[8px]">కార్బొనేట్</span></td>
+        <td className="border-r border-black p-0.5 text-center font-bold">HCO₃<br/><span className="text-[8px]">బైకార్బొనేట్</span></td>
+        <td className="border-r border-black p-0.5 text-center font-bold">Total<br/><span className="text-[8px]">మొత్తం</span></td>
+
+        {/* Minerals subs */}
+        <td className="border-r border-black p-0.5 text-center font-bold">Ca⁺⁺<br/><span className="text-[8px]">కాల్షియం</span></td>
+        <td className="border-r border-black p-0.5 text-center font-bold">Mg⁺⁺<br/><span className="text-[7px]">మెగ్నీషియం</span></td>
+        <td className="border-r border-black p-0.5 text-center font-bold">K⁺<br/><span className="text-[7px]">పొటాషియం</span></td>
+        <td className="border-r border-black p-0.5 text-center font-bold">Na⁺<br/><span className="text-[8px]">సోడియం</span></td>
+
+        {/* Bacteriology subs */}
+        <td className="border-r border-black p-0.5 text-center bg-yellow-100 font-bold">Yellow Colonies<br/><span className="text-[9px]">పసుపు కాలనీలు</span></td>
+        <td className="border-r border-black p-0.5 text-center bg-green-100 font-bold">Green Colonies<br/><span className="text-[9px]">పచ్చ కాలనీలు</span></td>
+        <td className="p-0.5 text-center font-bold border-r border-black">TPC<br/><span className="text-[8px]">Total Plate Count</span></td>
+      </tr>
+    </thead>
+
+    <tbody className="border-t border-black">
+      {ponds.map((p, index) => (
+        <tr
+          key={p.id}
+          className="border-b border-black"
+          ref={(el) => {
+            waterDataRows.current[index] = el;
+            bactDataRows.current[index] = el;
+          }}
+        >
+          <td className="border-r border-black p-0.5 text-center font-bold bg-gray-50 text-[8px]">{p.pondNo}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.pH}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.salinity}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.co3}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.hco3}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.alkalinity}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.hardness}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.ca}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.mg}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.k}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.na}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.totalAmmonia}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.unionizedAmmonia}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.nitrite}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.nitrate}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.h2s}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.iron}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.chlorine}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.dissolvedOxygen}</td>
+          <td className="border-r border-black p-0.5 text-center">{p.totalDissolvedMatter}</td>
+
+          <td className="border-r border-black p-0.5 text-center bg-yellow-100">{p.yellowColonies}</td>
+          <td className="border-r border-black p-0.5 text-center bg-green-100">{p.greenColonies}</td>
+          <td className="p-0.5 text-center">{p.tpc}</td>
+        </tr>
+      ))}
+
+      <tr className="border-b border-black font-bold bg-gray-50 text-[11px] text-red-600 optimum-row">
+        <td className="border-r border-black p-0.5 text-[9px]">OPTIMUM LEVEL</td>
+        <td className="border-r border-black p-0.5 text-center">7.5-8.5</td>
+        <td className="border-r border-black p-0.5 text-center">15-20</td>
+        <td className="border-r border-black p-0.5 text-center">20-40</td>
+        <td className="border-r border-black p-0.5 text-center">130-150</td>
+        <td className="border-r border-black p-0.5 text-center">175-200</td>
+        <td className="border-r border-black p-0.5 text-center">300-3000</td>
+        <td className="border-r border-black p-0.5 text-center">&gt;100</td>
+        <td className="border-r border-black p-0.5 text-center">&gt;300</td>
+        <td className="border-r border-black p-0.5 text-center">&gt;10</td>
+        <td className="border-r border-black p-0.5 text-center">&gt;300</td>
+        <td className="border-r border-black p-0.5 text-center">&lt;1.0</td>
+        <td className="border-r border-black p-0.5 text-center">0-0.1</td>
+        <td className="border-r border-black p-0.5 text-center">&lt;0.25</td>
+        <td className="border-r border-black p-0.5 text-center">&lt;25</td>
+        <td className="border-r border-black p-0.5 text-center">&lt;0.02</td>
+        <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
+        <td className="border-r border-black p-0.5 text-center">&lt;0.1</td>
+        <td className="border-r border-black p-0.5 text-center">&gt;4</td>
+        <td className="border-r border-black p-0.5 text-center">40-70</td>
+
+        <td className="border-r border-black p-0.5 text-center">&lt;300</td>
+        <td className="border-r border-black p-0.5 text-center">&lt;50</td>
+        <td className="p-0.5 text-center">&lt;300</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
         {/* PLANKTON ANALYSIS */}
         <div className="border border-black mb-4">
