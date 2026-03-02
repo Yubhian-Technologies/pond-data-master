@@ -212,6 +212,18 @@ const Dashboard = () => {
       );
 
       const farmersSnap = await getDocs(farmersColl);
+      const farmerAddressMap: Record<string, string> = {};
+
+farmersSnap.forEach((farmerDoc) => {
+  const f = farmerDoc.data();
+
+  const fullAddress =
+    (f.address ? f.address : "") +
+    (f.district ? ", " + f.district : "") +
+    (f.state ? ", " + f.state : "");
+
+  farmerAddressMap[farmerDoc.id] = fullAddress || "N/A";
+});
       const totalFarmers = farmersSnap.size;
 
       const isDateFiltered = !!startDate && !!endDate;
@@ -345,7 +357,9 @@ const Dashboard = () => {
           "Invoice ID": invoiceId,
           
           "Farmer Name": farmerName,
-          "Location": locationName,
+          "Address": farmerAddressMap[data.farmerId] || "N/A",
+"Farmer Mobile": data.farmerPhone || data.phone || "N/A",
+
           "Technician": techName,
           "Sample Types": typeDisplay || "-",
           "Sample Count": sampleCount,
@@ -466,14 +480,15 @@ const Dashboard = () => {
 
       return snap.docs.map((doc) => {
         const data = doc.data();
+        console.log(data);
         // Improved location display: prefer village → district → fallback
-        const village = data.village || data.city || "";
-        const district = data.district || "";
-        const locationDisplay = village.trim() 
-          ? village 
-          : district.trim() 
-            ? district 
-            : "—";
+        const fullAddress =
+  (data.address ? data.address : "") +
+  (data.district ? ", " + data.district : "") +
+  (data.state ? ", " + data.state : "");
+
+const locationDisplay = fullAddress || "—";
+
 
         return {
           farmerId: data.farmerId || "N/A",
@@ -577,42 +592,48 @@ const Dashboard = () => {
     );
 
     const summaryRow = {
-      "Invoice ID": "TOTALS",
-      "Date": `${totals.invoices} Invoices`,
-      "Farmer Name": "",
-      "Location": "",
-      "Technician": "",
-      "Sample Types": "",
-      "Sample Count": totals.samples,
-      "Bill Amount (₹)": totals.billAmount,
-      "Amount Paid (₹)": totals.amountPaid,
-      "Payment Mode": "",
-      "UTR No": "",
-      "Pending Amount (₹)": totals.pending,
-      "Status": `${totals.reports} Reports Completed`,
-    };
+  "Invoice ID": "TOTALS",
+  "Date": `${totals.invoices} Invoices`,
+  "Farmer Name": "",
+  "Address": "",
+  "Farmer Mobile": "",
+  
+  "Technician": "",
+  "Sample Types": "",
+  "Sample Count": totals.samples,
+  "Bill Amount (₹)": totals.billAmount,
+  "Amount Paid (₹)": totals.amountPaid,
+  "Payment Mode": "",
+  "UTR No": "",
+  "Pending Amount (₹)": totals.pending,
+  "Status": `${totals.reports} Reports Completed`,
+};
 
-    const worksheetData = [{}, ...exportData, {}, summaryRow];
+  const orderedExportData = [...exportData].reverse();
+
+const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
 
     const ws = XLSX.utils.json_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Lab Report");
 
     ws["!cols"] = [
-      { wch: 18 },  // Invoice ID
-      { wch: 14 },  // Date
-      { wch: 25 },  // Farmer Name
-      { wch: 20 },  // Location
-      { wch: 20 },  // Technician
-      { wch: 16 },  // Sample Types
-      { wch: 14 },  // Sample Count
-      { wch: 18 },  // Bill Amount
-      { wch: 18 },  // Amount Paid
-      { wch: 18 },  // Payment Mode
-      { wch: 22 },  // Transaction Ref
-      { wch: 18 },  // Pending
-      { wch: 22 },  // Status
-    ];
+  { wch: 18 },  // Invoice ID
+  { wch: 14 },  // Date
+  { wch: 25 },  // Farmer Name
+  { wch: 35 },  // Address
+  { wch: 18 },  // Farmer Mobile
+  
+  { wch: 20 },  // Technician
+  { wch: 16 },  // Sample Types
+  { wch: 14 },  // Sample Count
+  { wch: 18 },  // Bill Amount
+  { wch: 18 },  // Amount Paid
+  { wch: 18 },  // Payment Mode
+  { wch: 22 },  // Transaction Ref
+  { wch: 18 },  // Pending
+  { wch: 22 },  // Status
+];
 
     const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
     const fileName = `Lab_Dashboard_${currentLocationName.replace(/[^a-zA-Z0-9]/g, "_")}_${format(new Date(), "dd-MM-yyyy")}.xlsx`;
@@ -627,6 +648,7 @@ const Dashboard = () => {
     <DashboardLayout>
       <div className="h-screen flex flex-col">
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
+         
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">

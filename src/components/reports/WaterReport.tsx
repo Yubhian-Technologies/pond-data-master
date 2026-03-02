@@ -564,7 +564,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
             <table className="w-full border-collapse table-fixed text-[10px]">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border-r border-b border-black p-1 w-10">Pond</th>
+                  <th className="border-r border-b border-black p-1 w-[55px]">Pond</th>
                   <th className="border-r border-b border-black p-0.5 text-green-700 text-[11px]" colSpan={12}>USEFUL PLANKTON - ఉపయోగకరమైన ప్లవకములు</th>
                   <th className="border-b border-black p-0.5 text-red-700 text-[11px]" colSpan={13}>HARMFUL PLANKTON - హానికరమైన ప్లవకములు</th>
                 </tr>
@@ -624,7 +624,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
               <tbody>
                 {ponds.map((pond) => (
                   <tr key={pond.id} className="border-b border-black last:border-b-0">
-                    <td className="border-r border-black text-center font-bold bg-gray-50 text-[9px]">{pond.pondNo}</td>
+                    <td className="border-r border-black text-center font-bold bg-gray-50 text-[8px]">{pond.pondNo}</td>
                     {[
                       pond.chlorella,
                       pond.phacus,

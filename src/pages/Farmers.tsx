@@ -424,7 +424,10 @@ const Farmers = () => {
                             </div>
                           </TableCell>
                           <TableCell>{farmer.phone}</TableCell>
-                          <TableCell>{farmer.district}, {farmer.state}</TableCell>
+                          <TableCell><span>{farmer.address}{" ,"}</span>
+    <span className="">
+      {farmer.district}, {farmer.state}
+    </span></TableCell>
                           <TableCell>{farmer.species}</TableCell>
                           <TableCell>{farmer.cultureAreas}</TableCell>
                           <TableCell>
