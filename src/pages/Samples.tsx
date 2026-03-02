@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, doc, updateDoc, query, where, orderBy } from "firebase/firestore";
+import { collection, getDocs, doc,deleteDoc, updateDoc, query, where, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
 import { format } from "date-fns";
 import { useSearchParams } from "react-router-dom";
@@ -352,6 +352,75 @@ const sortedInvoices = useMemo(() => {
     }
   };
 
+  const handleDeleteInvoice = async (invoice: any) => {
+  const confirmDelete = window.confirm(
+    `Delete Invoice ${invoice.invoiceId}? This will remove reports and payments permanently.`
+  );
+
+  if (!confirmDelete) return;
+
+  try {
+    const locationId = session.locationId;
+    if (!locationId) return;
+
+    const invoiceId = invoice.id;
+    const invoiceCode = invoice.invoiceId;
+
+    // 🔥 1️⃣ Delete reports based on sampleType
+    if (invoice.sampleType && Array.isArray(invoice.sampleType)) {
+      for (const item of invoice.sampleType) {
+        const type = item.type?.toLowerCase();
+
+        let collectionName = "";
+
+        if (type === "water") collectionName = "water_reports";
+        if (type === "soil") collectionName = "soil_reports";
+        if (type === "microbiology") collectionName = "microbiology_reports";
+        if (type === "pl") collectionName = "pl_reports";
+        if (type === "pcr") collectionName = "pcr_reports";
+
+        if (collectionName) {
+          const reportRef = doc(
+            db,
+            "locations",
+            locationId,
+            collectionName,
+            invoiceCode   // assuming report doc id = invoiceId
+          );
+
+          await deleteDoc(reportRef);
+        }
+      }
+    }
+
+    // 🔥 2️⃣ Delete invoice document
+    const invoiceRef = doc(
+      db,
+      "locations",
+      locationId,
+      "invoices",
+      invoiceId
+    );
+
+    await deleteDoc(invoiceRef);
+
+    // 🔥 3️⃣ Remove from UI
+    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+
+    toast({
+      title: "Deleted Successfully",
+      description: "Invoice and related reports removed.",
+    });
+
+  } catch (error) {
+    console.error("Delete failed:", error);
+    toast({
+      title: "Error",
+      description: "Failed to delete invoice.",
+      variant: "destructive",
+    });
+  }
+};
   const openPaymentDialog = (invoice: any) => {
     setCurrentInvoice(invoice);
     const pending = invoice.total - (invoice.paidAmount || 0);
@@ -650,6 +719,7 @@ const sortedInvoices = useMemo(() => {
                                 >
                                   View Invoice
                                 </Button>
+                                
 
                                 {showAddPaymentButton && (
                                   <Button
@@ -663,7 +733,7 @@ const sortedInvoices = useMemo(() => {
                                 )}
 
                                 <Button
-                                  className="bg-transparent text-black border hover:bg-red-600 hover:text-white"
+                                  className="bg-transparent text-black border hover:bg-yellow-600 hover:text-white"
                                   size="sm"
                                   disabled={!fullyCompleted}
                                   onClick={() => navigate(`/lab-results/${sample.invoiceId}?mode=edit`)}
@@ -671,6 +741,13 @@ const sortedInvoices = useMemo(() => {
                                 >
                                   Edit
                                 </Button>
+                                <Button
+  className="bg-transparent text-black border hover:bg-red-700 hover:text-white"
+  size="sm"
+  onClick={() => handleDeleteInvoice(sample)}
+>
+  Delete
+</Button>
                               </div>
                             </TableCell>
                           </TableRow>
