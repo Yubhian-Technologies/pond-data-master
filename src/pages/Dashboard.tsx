@@ -218,9 +218,8 @@ farmersSnap.forEach((farmerDoc) => {
   const f = farmerDoc.data();
 
   const fullAddress =
-    (f.address ? f.address : "") +
-    (f.district ? ", " + f.district : "") +
-    (f.state ? ", " + f.state : "");
+    (f.address ? f.address : "") 
+    
 
   farmerAddressMap[farmerDoc.id] = fullAddress || "N/A";
 });
@@ -483,9 +482,8 @@ farmersSnap.forEach((farmerDoc) => {
         console.log(data);
         // Improved location display: prefer village → district → fallback
         const fullAddress =
-  (data.address ? data.address : "") +
-  (data.district ? ", " + data.district : "") +
-  (data.state ? ", " + data.state : "");
+  (data.address ? data.address : "")
+  
 
 const locationDisplay = fullAddress || "—";
 

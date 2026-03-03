@@ -424,10 +424,8 @@ const Farmers = () => {
                             </div>
                           </TableCell>
                           <TableCell>{farmer.phone}</TableCell>
-                          <TableCell><span>{farmer.address}{" ,"}</span>
-    <span className="">
-      {farmer.district}, {farmer.state}
-    </span></TableCell>
+                          <TableCell><span>{farmer.address}</span>
+   </TableCell>
                           <TableCell>{farmer.species}</TableCell>
                           <TableCell>{farmer.cultureAreas}</TableCell>
                           <TableCell>
