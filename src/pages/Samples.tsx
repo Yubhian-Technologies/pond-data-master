@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, doc,deleteDoc, updateDoc, query, where, orderBy } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, updateDoc, query, where, orderBy } from "firebase/firestore";
 import { db } from "./firebase";
 import { format } from "date-fns";
 import { useSearchParams } from "react-router-dom";
@@ -31,6 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const FILTER_STORAGE_KEY = "samples_page_filters_v1";
+
 const Samples = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -40,14 +42,11 @@ const Samples = () => {
   const [branchTechnicians, setBranchTechnicians] = useState<{ id: string; name: string }[]>([]);
   const [allOtherTechnicians, setAllOtherTechnicians] = useState<{ id: string; name: string; branchId: string }[]>([]);
 
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");           // filter for table only
-  const [selectedOtherTechId, setSelectedOtherTechId] = useState<string>("none");           // only for NEW submissions
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
+  const [selectedOtherTechId, setSelectedOtherTechId] = useState<string>("none");
 
-  // Date filter states
-  
-
-  type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology" ;
-  const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology","wssv"];
+  type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology";
+  const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology", "wssv"];
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
@@ -60,26 +59,73 @@ const Samples = () => {
   const [farmerSearchQuery, setFarmerSearchQuery] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
 
-// Read values from URL (fallback to empty string)
-const searchQuery = searchParams.get("q") || "";
-const startDate   = searchParams.get("start") || "";
-const endDate     = searchParams.get("end") || "";
+  // Local controlled filter inputs
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const [localStartDate, setLocalStartDate] = useState("");
+  const [localEndDate, setLocalEndDate] = useState("");
 
-  // Payment Dialog State 
+  // Currently applied (used for filtering table + fetching)
+  const appliedSearchQuery = searchParams.get("q") || "";
+  const appliedStartDate   = searchParams.get("start") || "";
+  const appliedEndDate     = searchParams.get("end") || "";
+
+  // Payment dialog states
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState<any>(null);
   const [paymentModeLocal, setPaymentModeLocal] = useState<"cash" | "qr" | "neft" | "">("");
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
-  
-useEffect(() => {
-  if (step === 2) {
-    const today = new Date().toISOString().split("T")[0];
-    setDateOfCulture(today);
-  }
-}, [step]);
 
-  // Fetch current branch technicians (for filter dropdown)
+  // Restore filters from localStorage + URL on first mount
+  useEffect(() => {
+    const saved = localStorage.getItem(FILTER_STORAGE_KEY);
+    let restored = { q: "", start: "", end: "" };
+
+    if (saved) {
+      try {
+        restored = JSON.parse(saved);
+      } catch (e) {
+        console.warn("Invalid saved filters", e);
+      }
+    }
+
+    // URL takes priority over saved values
+    const q     = searchParams.get("q")     || restored.q     || "";
+    const start = searchParams.get("start") || restored.start || "";
+    const end   = searchParams.get("end")   || restored.end   || "";
+
+    setLocalSearchQuery(q);
+    setLocalStartDate(start);
+    setLocalEndDate(end);
+
+    // If URL is empty but we have saved values → apply them to URL
+    if ((!searchParams.has("q") && !searchParams.has("start") && !searchParams.has("end")) && (q || start || end)) {
+      const newParams = new URLSearchParams();
+      if (q)     newParams.set("q", q);
+      if (start) newParams.set("start", start);
+      if (end)   newParams.set("end", end);
+      setSearchParams(newParams, { replace: true });
+    }
+  }, []); // ← only once on mount
+
+  // Save applied filters to localStorage whenever they change
+  useEffect(() => {
+    const filters = {
+      q: appliedSearchQuery,
+      start: appliedStartDate,
+      end: appliedEndDate,
+    };
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
+  }, [appliedSearchQuery, appliedStartDate, appliedEndDate]);
+
+  useEffect(() => {
+    if (step === 2) {
+      const today = new Date().toISOString().split("T")[0];
+      setDateOfCulture(today);
+    }
+  }, [step]);
+
+  // Fetch technicians (unchanged)
   useEffect(() => {
     const fetchTechnicians = async () => {
       const locationId = session.locationId;
@@ -99,11 +145,9 @@ useEffect(() => {
     fetchTechnicians();
   }, [session.locationId]);
 
-  // Fetch technicians from ALL OTHER branches (for new submission choice)
   useEffect(() => {
     const fetchAllOtherTechnicians = async () => {
       if (!session.locationId) return;
-
       try {
         const locationsSnap = await getDocs(collection(db, "locations"));
         const otherTechs: { id: string; name: string; branchId: string }[] = [];
@@ -117,11 +161,7 @@ useEffect(() => {
 
           techSnap.docs.forEach(techDoc => {
             const name = techDoc.data().name || "Unknown Technician";
-            otherTechs.push({
-              id: techDoc.id,
-              name,
-              branchId: locId
-            });
+            otherTechs.push({ id: techDoc.id, name, branchId: locId });
           });
         }
 
@@ -131,7 +171,6 @@ useEffect(() => {
         console.error("Error fetching other branches technicians:", err);
       }
     };
-
     fetchAllOtherTechnicians();
   }, [session.locationId]);
 
@@ -154,136 +193,152 @@ useEffect(() => {
     fetchFarmers();
   }, [session.locationId]);
 
+  // Fetch invoices based on applied filters
   useEffect(() => {
-  const fetchInvoices = async () => {
-    setLoadingInvoices(true);
-    try {
-      const locationId = session.locationId;
-      if (!locationId) return;
+    const fetchInvoices = async () => {
+      setLoadingInvoices(true);
+      try {
+        const locationId = session.locationId;
+        if (!locationId) return;
 
-      let invoicesQuery = query(
-        collection(db, "locations", locationId, "invoices"),
-        orderBy("createdAt", "desc")
-      );
+        let invoicesQuery = query(
+          collection(db, "locations", locationId, "invoices"),
+          orderBy("createdAt", "desc")
+        );
 
-      if (startDate && endDate) {
-        const startT = new Date(startDate);
-        const endT = new Date(`${endDate}T23:59:59.999`);
+        if (appliedStartDate && appliedEndDate) {
+          const startT = new Date(appliedStartDate);
+          const endT = new Date(`${appliedEndDate}T23:59:59.999`);
 
-        // Make sure dates are valid
-        if (!isNaN(startT.getTime()) && !isNaN(endT.getTime())) {
-          invoicesQuery = query(
-            collection(db, "locations", locationId, "invoices"),
-            where("createdAt", ">=", startT),
-            where("createdAt", "<=", endT),
-            orderBy("createdAt", "desc")
-          );
+          if (!isNaN(startT.getTime()) && !isNaN(endT.getTime())) {
+            invoicesQuery = query(
+              collection(db, "locations", locationId, "invoices"),
+              where("createdAt", ">=", startT),
+              where("createdAt", "<=", endT),
+              orderBy("createdAt", "desc")
+            );
+          }
         }
+
+        const snap = await getDocs(invoicesQuery);
+        const data = snap.docs.map((doc) => {
+          const docData = doc.data();
+          if ('id' in docData) delete (docData as any).id;
+          return { id: doc.id, ...docData };
+        });
+
+        setInvoices(data);
+      } catch (err) {
+        console.error("Error fetching invoices:", err);
+      } finally {
+        setLoadingInvoices(false);
       }
+    };
 
-      const snap = await getDocs(invoicesQuery);
-
-      const data = snap.docs.map((doc) => {
-        const docData = doc.data();
-        if ('id' in docData) delete (docData as any).id;
-        return { id: doc.id, ...docData };
-      });
-
-      setInvoices(data);
-    } catch (err) {
-      console.error("Error fetching invoices:", err);
-    } finally {
-      setLoadingInvoices(false);
-    }
-  };
-
-  fetchInvoices();
-}, [session.locationId, searchParams]);  
+    fetchInvoices();
+  }, [session.locationId, appliedStartDate, appliedEndDate]);
 
   const resetForm = () => {
     setStep(1);
     setSelectedFarmer(null);
-    // setDateOfCulture("");
     setSelectedTypes([]);
     setQuantities({} as Record<SampleGroup, number>);
     setFarmerSearchQuery("");
     setOpen(false);
-    setSelectedOtherTechId("none"); // reset for next time
+    setSelectedOtherTechId("none");
   };
 
   const isReportFullyCompleted = (sample: any) => {
-  if (!sample.reportsProgress) return false;
-  if (!sample.sampleType || !Array.isArray(sample.sampleType)) return false;
+    if (!sample.reportsProgress) return false;
+    if (!sample.sampleType || !Array.isArray(sample.sampleType)) return false;
 
-  const activeTypes = sample.sampleType
-    .map((s: any) => {
-      if (typeof s === "string") return s.toLowerCase().trim();
-      if (s && typeof s === "object" && s.type) return s.type.toString().toLowerCase().trim();
-      return null;
-    })
-    .filter((type: string | null): type is string => 
-      type !== null && 
-      type !== "" && 
-      type !== "pl_pcr" && 
-      type !== "wssv"          // ← Add this line: ignore WSSV completely
-    )
-    .filter((type: string, index: number) => {
-      const originalEntry = sample.sampleType[index];
-      let count = 0;
-      if (typeof originalEntry === "object" && originalEntry.count !== undefined) {
-        count = Number(originalEntry.count);
-      } else {
-        const match = sample.sampleType.find((t: any) =>
-          (typeof t === "object" ? t.type?.toLowerCase() : t?.toLowerCase()) === type
-        );
-        count = typeof match === "object" ? Number(match?.count || 0) : 0;
-      }
-      return count > 0;
-    });
+    const activeTypes = sample.sampleType
+      .map((s: any) => {
+        if (typeof s === "string") return s.toLowerCase().trim();
+        if (s && typeof s === "object" && s.type) return s.type.toString().toLowerCase().trim();
+        return null;
+      })
+      .filter((type: string | null): type is string =>
+        type !== null && type !== "" && type !== "pl_pcr" && type !== "wssv"
+      )
+      .filter((type: string, index: number) => {
+        const originalEntry = sample.sampleType[index];
+        let count = 0;
+        if (typeof originalEntry === "object" && originalEntry.count !== undefined) {
+          count = Number(originalEntry.count);
+        } else {
+          const match = sample.sampleType.find((t: any) =>
+            (typeof t === "object" ? t.type?.toLowerCase() : t?.toLowerCase()) === type
+          );
+          count = typeof match === "object" ? Number(match?.count || 0) : 0;
+        }
+        return count > 0;
+      });
 
-  if (activeTypes.length === 0) return true;
-
-  return activeTypes.every((type: string) => sample.reportsProgress[type] === "completed");
-};
+    if (activeTypes.length === 0) return true;
+    return activeTypes.every((type: string) => sample.reportsProgress[type] === "completed");
+  };
 
   const filteredInvoices = useMemo(() => {
-  let result = invoices;
+    let result = invoices;
 
-  // Technician filter
-  if (selectedTechnicianId !== "all") {
-    result = result.filter((inv) => inv.technicianId === selectedTechnicianId);
-  }
+    if (selectedTechnicianId !== "all") {
+      result = result.filter((inv) => inv.technicianId === selectedTechnicianId);
+    }
 
-  // Text search filter
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase().trim();
-    result = result.filter((inv) => {
-      return (
-        (inv.farmerName || "").toLowerCase().includes(q) ||
-        (inv.farmerPhone || "").toLowerCase().includes(q) ||
-        (inv.invoiceId || inv.id || "").toLowerCase().includes(q)
-      );
+    if (appliedSearchQuery.trim()) {
+      const q = appliedSearchQuery.toLowerCase().trim();
+      result = result.filter((inv) => {
+        return (
+          (inv.farmerName || "").toLowerCase().includes(q) ||
+          (inv.farmerPhone || "").toLowerCase().includes(q) ||
+          (inv.invoiceId || inv.id || "").toLowerCase().includes(q)
+        );
+      });
+    }
+
+    return result;
+  }, [invoices, selectedTechnicianId, appliedSearchQuery]);
+
+  const sortedInvoices = useMemo(() => {
+    return [...filteredInvoices].sort((a, b) => {
+      const timeA = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+      const timeB = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+      return timeB - timeA;
     });
-  }
-
-  return result;
-}, [invoices, selectedTechnicianId, searchQuery]);
-
-const sortedInvoices = useMemo(() => {
-  return [...filteredInvoices].sort((a, b) => {
-    const timeA = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
-    const timeB = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
-    return timeB - timeA;
-  });
-}, [filteredInvoices]);
+  }, [filteredInvoices]);
 
   const filteredFarmerSelection = useMemo(() => {
-    return farmers.filter(f => 
-      f.name.toLowerCase().includes(farmerSearchQuery.toLowerCase()) || 
+    return farmers.filter(f =>
+      f.name.toLowerCase().includes(farmerSearchQuery.toLowerCase()) ||
       f.phone.includes(farmerSearchQuery) ||
       f.id.toLowerCase().includes(farmerSearchQuery.toLowerCase())
     );
   }, [farmers, farmerSearchQuery]);
+
+  const handleApplyFilters = () => {
+    const newParams = new URLSearchParams();
+
+    if (localSearchQuery.trim()) {
+      newParams.set("q", localSearchQuery.trim());
+    }
+    if (localStartDate) {
+      newParams.set("start", localStartDate);
+    }
+    if (localEndDate) {
+      newParams.set("end", localEndDate);
+    }
+
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const handleClearFilters = () => {
+    setLocalSearchQuery("");
+    setLocalStartDate("");
+    setLocalEndDate("");
+    setSearchParams(new URLSearchParams(), { replace: true });
+    localStorage.removeItem(FILTER_STORAGE_KEY);
+  };
 
   const handleAddPayment = async () => {
     if (!currentInvoice || !paymentModeLocal || !paymentAmount) {
@@ -329,8 +384,8 @@ const sortedInvoices = useMemo(() => {
         lastPaymentDate: new Date(),
       });
 
-      setInvoices(prev => prev.map(inv => 
-        inv.id === currentInvoice.id 
+      setInvoices(prev => prev.map(inv =>
+        inv.id === currentInvoice.id
           ? { ...inv, paidAmount: newPaid, balanceAmount: newBalance > 0 ? newBalance : 0 }
           : inv
       ));
@@ -353,74 +408,72 @@ const sortedInvoices = useMemo(() => {
   };
 
   const handleDeleteInvoice = async (invoice: any) => {
-  const confirmDelete = window.confirm(
-    `Delete Invoice ${invoice.invoiceId}? This will remove reports and payments permanently.`
-  );
-
-  if (!confirmDelete) return;
-
-  try {
-    const locationId = session.locationId;
-    if (!locationId) return;
-
-    const invoiceId = invoice.id;
-    const invoiceCode = invoice.invoiceId;
-
-    // 🔥 1️⃣ Delete reports based on sampleType
-    if (invoice.sampleType && Array.isArray(invoice.sampleType)) {
-      for (const item of invoice.sampleType) {
-        const type = item.type?.toLowerCase();
-
-        let collectionName = "";
-
-        if (type === "water") collectionName = "water_reports";
-        if (type === "soil") collectionName = "soil_reports";
-        if (type === "microbiology") collectionName = "microbiology_reports";
-        if (type === "pl") collectionName = "pl_reports";
-        if (type === "pcr") collectionName = "pcr_reports";
-
-        if (collectionName) {
-          const reportRef = doc(
-            db,
-            "locations",
-            locationId,
-            collectionName,
-            invoiceCode   // assuming report doc id = invoiceId
-          );
-
-          await deleteDoc(reportRef);
-        }
-      }
-    }
-
-    // 🔥 2️⃣ Delete invoice document
-    const invoiceRef = doc(
-      db,
-      "locations",
-      locationId,
-      "invoices",
-      invoiceId
+    const confirmDelete = window.confirm(
+      `Delete Invoice ${invoice.invoiceId}? This will remove reports and payments permanently.`
     );
 
-    await deleteDoc(invoiceRef);
+    if (!confirmDelete) return;
 
-    // 🔥 3️⃣ Remove from UI
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+    try {
+      const locationId = session.locationId;
+      if (!locationId) return;
 
-    toast({
-      title: "Deleted Successfully",
-      description: "Invoice and related reports removed.",
-    });
+      const invoiceId = invoice.id;
+      const invoiceCode = invoice.invoiceId;
 
-  } catch (error) {
-    console.error("Delete failed:", error);
-    toast({
-      title: "Error",
-      description: "Failed to delete invoice.",
-      variant: "destructive",
-    });
-  }
-};
+      if (invoice.sampleType && Array.isArray(invoice.sampleType)) {
+        for (const item of invoice.sampleType) {
+          const type = item.type?.toLowerCase();
+
+          let collectionName = "";
+
+          if (type === "water") collectionName = "water_reports";
+          if (type === "soil") collectionName = "soil_reports";
+          if (type === "microbiology") collectionName = "microbiology_reports";
+          if (type === "pl") collectionName = "pl_reports";
+          if (type === "pcr") collectionName = "pcr_reports";
+
+          if (collectionName) {
+            const reportRef = doc(
+              db,
+              "locations",
+              locationId,
+              collectionName,
+              invoiceCode
+            );
+
+            await deleteDoc(reportRef);
+          }
+        }
+      }
+
+      const invoiceRef = doc(
+        db,
+        "locations",
+        locationId,
+        "invoices",
+        invoiceId
+      );
+
+      await deleteDoc(invoiceRef);
+
+      setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+
+      toast({
+        title: "Deleted Successfully",
+        description: "Invoice and related reports removed.",
+      });
+
+    } catch (error) {
+      console.error("Delete failed:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete invoice.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const openPaymentDialog = (invoice: any) => {
     setCurrentInvoice(invoice);
     const pending = invoice.total - (invoice.paidAmount || 0);
@@ -448,7 +501,6 @@ const sortedInvoices = useMemo(() => {
       return [{ type, count }];
     });
 
-    // Decide which technician to use for this NEW invoice
     let technicianForThisInvoice = {
       technicianId: session.technicianId || "unknown",
       technicianName: session.technicianName || "Current Technician"
@@ -465,11 +517,11 @@ const sortedInvoices = useMemo(() => {
     }
 
     navigate("/invoice", {
-      state: { 
-        sampleSummary, 
-        dateOfCulture, 
+      state: {
+        sampleSummary,
+        dateOfCulture,
         farmer: selectedFarmer,
-        technician: technicianForThisInvoice  // ← this is passed correctly
+        technician: technicianForThisInvoice
       },
     });
   };
@@ -491,84 +543,63 @@ const sortedInvoices = useMemo(() => {
             </div>
 
             <Card className="shadow-sm mb-8">
-  <CardContent className="pt-6">
-    
-    <div className="flex flex-wrap items-end gap-4">
-      <div className="flex-1 min-w-[240px]">
-        <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-          Search samples
-        </Label>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-  placeholder="Farmer / Phone / Invoice ID..."
-  className="pl-10 h-10"
-  value={searchQuery}
-  onChange={(e) => {
-    const value = e.target.value;
-    const newParams = new URLSearchParams(searchParams);
-    if (value.trim()) {
-      newParams.set("q", value.trim());
-    } else {
-      newParams.delete("q");
-    }
-    setSearchParams(newParams, { replace: true }); // replace → no extra history entry
-  }}
-/>
-        </div>
-      </div>
-      <div className="flex-1 min-w-[180px]">
-        <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-          Start Date
-        </Label>
-        <Input
-  type="date"
-  value={startDate}
-  onChange={(e) => {
-    const value = e.target.value;
-    const newParams = new URLSearchParams(searchParams);
-    if (value) {
-      newParams.set("start", value);
-    } else {
-      newParams.delete("start");
-    }
-    setSearchParams(newParams, { replace: true });
-  }}
-/>
-      </div>
-      <div className="flex-1 min-w-[180px]">
-        <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-          End Date
-        </Label>
-        <Input
-  type="date"
-  value={endDate}
-  onChange={(e) => {
-    const value = e.target.value;
-    const newParams = new URLSearchParams(searchParams);
-    if (value) {
-      newParams.set("end", value);
-    } else {
-      newParams.delete("end");
-    }
-    setSearchParams(newParams, { replace: true });
-  }}
-/>
-      </div>
+              <CardContent className="pt-6">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[240px]">
+                    <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                      Search samples
+                    </Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Farmer / Phone / Invoice ID..."
+                        className="pl-10 h-10"
+                        value={localSearchQuery}
+                        onChange={(e) => setLocalSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
 
-   
-      {/* <Button
-        className="h-10 bg-cyan-600 hover:bg-cyan-700"
-        onClick={() => {}} 
-      >
-        Search
-      </Button> */}
+                  <div className="flex-1 min-w-[180px]">
+                    <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                      Start Date
+                    </Label>
+                    <Input
+                      type="date"
+                      value={localStartDate}
+                      onChange={(e) => setLocalStartDate(e.target.value)}
+                    />
+                  </div>
 
-      
-      
-    </div>
-  </CardContent>
-</Card>
+                  <div className="flex-1 min-w-[180px]">
+                    <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                      End Date
+                    </Label>
+                    <Input
+                      type="date"
+                      value={localEndDate}
+                      onChange={(e) => setLocalEndDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Button
+                      className="h-10 bg-cyan-600 hover:bg-cyan-700"
+                      onClick={handleApplyFilters}
+                    >
+                      Apply Filter
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-10"
+                      onClick={handleClearFilters}
+                    >
+                      Clear Filter
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 flex-wrap gap-4">
@@ -596,29 +627,6 @@ const sortedInvoices = useMemo(() => {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Users className="w-4 h-4 text-amber-600" />
-                      <span className="font-medium">Submit as Tech:</span>
-                    </div>
-                    <Select 
-                      value={selectedOtherTechId} 
-                      onValueChange={setSelectedOtherTechId}
-                    >
-                      <SelectTrigger className="w-64 h-10">
-                        <SelectValue placeholder="Current technician" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Current technician (me)</SelectItem>
-                        {allOtherTechnicians.map((tech) => (
-                          <SelectItem key={tech.id} value={tech.id}>
-                            {tech.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div> */}
                 </div>
               </CardHeader>
 
@@ -674,7 +682,6 @@ const sortedInvoices = useMemo(() => {
                             )
                           : "N/A";
 
-                        // Always use the real stored name from Firestore
                         const displayTechnicianName = sample.technicianName || "Unknown";
 
                         return (
@@ -719,7 +726,6 @@ const sortedInvoices = useMemo(() => {
                                 >
                                   View Invoice
                                 </Button>
-                                
 
                                 {showAddPaymentButton && (
                                   <Button
@@ -741,13 +747,14 @@ const sortedInvoices = useMemo(() => {
                                 >
                                   Edit
                                 </Button>
+
                                 <Button
-  className="bg-transparent text-black border hover:bg-red-700 hover:text-white"
-  size="sm"
-  onClick={() => handleDeleteInvoice(sample)}
->
-  Delete
-</Button>
+                                  className="bg-transparent text-black border hover:bg-red-700 hover:text-white"
+                                  size="sm"
+                                  onClick={() => handleDeleteInvoice(sample)}
+                                >
+                                  Delete
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -759,7 +766,6 @@ const sortedInvoices = useMemo(() => {
               </CardContent>
             </Card>
 
-            {/* New Sample Submission Dialog */}
             <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) resetForm(); }}>
               <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-2">
@@ -886,19 +892,18 @@ const sortedInvoices = useMemo(() => {
                         </div>
 
                         <div className="space-y-3">
-  <Label className="font-semibold">Date</Label>
-  
-  <div className="flex h-11 w-full items-center rounded-md border border-input bg-gray-100 px-3 py-2 text-sm text-gray-900 cursor-not-allowed">
-    {dateOfCulture || "Loading..."}
-    <Calendar className="ml-auto h-4 w-4 text-gray-500" />
-  </div>
+                          <Label className="font-semibold">Date</Label>
+                          <div className="flex h-11 w-full items-center rounded-md border border-input bg-gray-100 px-3 py-2 text-sm text-gray-900 cursor-not-allowed">
+                            {dateOfCulture || "Loading..."}
+                            <Calendar className="ml-auto h-4 w-4 text-gray-500" />
+                          </div>
 
-  <div className="bg-blue-50 p-4 rounded-lg mt-4">
-    <p className="text-xs text-blue-700 font-medium uppercase mb-1">Target Farmer</p>
-    <p className="font-bold text-gray-800">{selectedFarmer?.name}</p>
-    <p className="text-xs text-gray-600">{selectedFarmer?.phone}</p>
-  </div>
-</div>
+                          <div className="bg-blue-50 p-4 rounded-lg mt-4">
+                            <p className="text-xs text-blue-700 font-medium uppercase mb-1">Target Farmer</p>
+                            <p className="font-bold text-gray-800">{selectedFarmer?.name}</p>
+                            <p className="text-xs text-gray-600">{selectedFarmer?.phone}</p>
+                          </div>
+                        </div>
                       </div>
 
                       {selectedTypes.length > 0 && (
@@ -958,7 +963,6 @@ const sortedInvoices = useMemo(() => {
               </DialogContent>
             </Dialog>
 
-            {/* Payment Dialog */}
             <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
