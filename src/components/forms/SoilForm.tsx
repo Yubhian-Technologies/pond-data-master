@@ -86,6 +86,7 @@ export default function SoilForm({
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [localInvoice, setLocalInvoice] = useState<any>(null);
+  const [technicians, setTechnicians] = useState<string[]>([]);
 
   // Mapping: which test IDs control which soil fields
   const testToSoilFields: Record<string, (keyof Sample)[]> = {
@@ -97,6 +98,28 @@ export default function SoilForm({
 
   // Always show these (common / header-like fields)
   const alwaysShowFields = new Set<keyof Sample>(["pondNo"]); // remarks removed
+
+  useEffect(() => {
+  const fetchTechnicians = async () => {
+    if (!locationId) return;
+
+    try {
+      const techRef = collection(db, "locations", locationId, "technicians");
+      const snapshot = await getDocs(techRef);
+
+      const techNames = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return data.name;
+      });
+
+      setTechnicians(techNames);
+    } catch (err) {
+      console.error("Error fetching technicians:", err);
+    }
+  };
+
+  fetchTechnicians();
+}, [locationId]);
 
   // Fetch invoice
   useEffect(() => {
@@ -523,14 +546,20 @@ export default function SoilForm({
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by
         </label>
-        <input
-          type="text"
-          value={checkedBy}
-          onChange={(e) => setCheckedBy(e.target.value)}
-          placeholder="Enter name of the person who checked the report"
-          required
-          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
-        />
+        <select
+  value={checkedBy}
+  onChange={(e) => setCheckedBy(e.target.value)}
+  required
+  className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+>
+  <option value="">Select Technician</option>
+
+  {technicians.map((tech, index) => (
+    <option key={index} value={tech}>
+      {tech}
+    </option>
+  ))}
+</select>
       </div>
 
       {/* Final Submit Button */}

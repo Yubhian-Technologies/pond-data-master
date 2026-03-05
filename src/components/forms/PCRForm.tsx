@@ -84,6 +84,8 @@ export default function PCRForm({
   const [gelImages, setGelImages] = useState<Record<number, string>>({});
   const [uploading, setUploading] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [technicians, setTechnicians] = useState<string[]>([]);
+  const [ctCustomMode, setCtCustomMode] = useState<boolean[][]>([]);
 
   const [checkedBy, setCheckedBy] = useState(technicianName);
 
@@ -172,6 +174,28 @@ export default function PCRForm({
     }
   }, [localInvoice?.farmerId, locationId]);
 
+  useEffect(() => {
+  const fetchTechnicians = async () => {
+    if (!locationId) return;
+
+    try {
+      const techRef = collection(db, "locations", locationId, "technicians");
+      const snapshot = await getDocs(techRef);
+
+      const techNames = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return data.name;
+      });
+
+      setTechnicians(techNames);
+    } catch (err) {
+      console.error("Error fetching technicians:", err);
+    }
+  };
+
+  fetchTechnicians();
+}, [locationId]);
+
   // Auto-calculate difference
   useEffect(() => {
     if (farmerInfo.sampleCollectionTime && farmerInfo.reportDate) {
@@ -248,7 +272,17 @@ export default function PCRForm({
         }
 
         setSamplesData(loadedSamples);
-        setCheckedBy(firstCheckedBy);
+setCheckedBy(firstCheckedBy);
+
+// Initialize CT custom mode for each pathogen
+setCtCustomMode(
+  loadedSamples.map(sample =>
+    sample.pathogens.map(p => {
+      const val = p.ctValue?.toLowerCase();
+      return val && val !== "non determined";
+    })
+  )
+);
       } catch (err) {
         console.error("Error loading PCR data:", err);
       } finally {
@@ -545,15 +579,56 @@ export default function PCRForm({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">CT Value</label>
-                        <input
-                          placeholder="e.g., 25.4"
-                          value={p.ctValue}
-                          onChange={(e) =>
-                            handlePathogenChange(sampleIndex, i, "ctValue", e.target.value)
-                          }
-                          className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
-                        />
+                       <div>
+  <label className="block text-sm font-medium text-gray-700">CT Value</label>
+
+  {ctCustomMode[sampleIndex]?.[i] ? (
+    <div className="flex gap-2">
+      <input
+        placeholder="Enter CT value"
+        value={p.ctValue}
+        onChange={(e) =>
+          handlePathogenChange(sampleIndex, i, "ctValue", e.target.value)
+        }
+        className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+      />
+
+      <button
+        type="button"
+        onClick={() => {
+          const updated = [...ctCustomMode];
+          updated[sampleIndex][i] = false;
+          setCtCustomMode(updated);
+          handlePathogenChange(sampleIndex, i, "ctValue", "");
+        }}
+        className="text-xs px-3 py-2 bg-gray-200 rounded"
+      >
+        Select
+      </button>
+    </div>
+  ) : (
+    <select
+      value={p.ctValue}
+      onChange={(e) => {
+        const val = e.target.value;
+
+        if (val === "Others") {
+          const updated = [...ctCustomMode];
+          updated[sampleIndex][i] = true;
+          setCtCustomMode(updated);
+          handlePathogenChange(sampleIndex, i, "ctValue", "");
+        } else {
+          handlePathogenChange(sampleIndex, i, "ctValue", val);
+        }
+      }}
+      className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">Select</option>
+      <option value="Non Determined">Non Determined</option>
+      <option value="Others">Others</option>
+    </select>
+  )}
+</div>
                       </div>
                     </div>
                   ))}
@@ -590,14 +665,20 @@ export default function PCRForm({
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by
         </label>
-        <input
-          type="text"
-          value={checkedBy}
-          onChange={(e) => setCheckedBy(e.target.value)}
-          placeholder="Enter name of the person who checked the report"
-          required
-          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
-        />
+        <select
+  value={checkedBy}
+  onChange={(e) => setCheckedBy(e.target.value)}
+  required
+  className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+>
+  <option value="">Select Technician</option>
+
+  {technicians.map((tech, index) => (
+    <option key={index} value={tech}>
+      {tech}
+    </option>
+  ))}
+</select>
       </div>
 
       <div className="text-center mt-12">

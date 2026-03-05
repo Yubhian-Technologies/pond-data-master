@@ -274,7 +274,7 @@ export default function PCRReport({
 
   const ResultTable = () => {
     // Special case: one sample, multiple pathogens → pathogen per row
-    const isOneSampleMultiPathogen = isSingleSample && !singlePathogen;
+    const isOneSampleMultiPathogen = false;
 
     return (
       <div className="overflow-x-auto mb-4">
@@ -319,48 +319,8 @@ export default function PCRReport({
           </thead>
 
           <tbody>
-            {isOneSampleMultiPathogen ? (
-              // Special mode: rows per pathogen for the single sample
-              reports[0].pathogens.map((pathogen: any, pathIdx: number) => {
-                const originalP = pathogen.name;
-                const displayP = displayPathogens[pathIdx];
-                const res = (pathogen.result || "-").trim().toLowerCase();
-                const ctValue = pathogen.ctValue || "-";
-
-                let resultDisplay: React.ReactNode = pathogen.result || "-";
-                let ctDisplay: React.ReactNode = ctValue;
-
-                if (res === "negative" || res === "neg" || res === "-") {
-                  resultDisplay = <span className="text-black">Negative</span>;
-                  // ctDisplay remains the actual value (no longer forced to "-")
-                } else if (res === "positive" || res === "pos") {
-                  resultDisplay = <span className="text-red-600">Positive</span>;
-                  ctDisplay = <span className="text-red-600">{ctValue}</span>;
-                } else if (res === "suspect" || res.includes("sus")) {
-                  resultDisplay = <span className="text-yellow-600">Suspect</span>;
-                  ctDisplay = <span className="text-yellow-600">{ctValue}</span>;
-                } else {
-                  ctDisplay = <span className="text-gray-700">{ctValue}</span>;
-                }
-
-                return (
-                  <tr key={pathIdx} className="hover:bg-gray-50">
-                    <td className="border px-2 py-2.5 text-center font-semibold">{reports[0].sampleCode}</td>
-                    <td className="border px-2 py-2.5 text-center">{reports[0].sampleType}</td>
-                    <td className="border px-2 py-2.5 text-center font-medium">
-                      {displayP}
-                    </td>
-                    <td className="border px-2 py-2.5 text-center font-bold">
-                      {resultDisplay}
-                    </td>
-                    <td className="border px-2 py-2.5 text-center font-bold">
-                      {ctDisplay}
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              reports.map((r, idx) => (
+            
+              {reports.map((r, idx) => (
                 <tr key={idx} className="hover:bg-gray-50">
                   <td className="border px-2 py-2.5 text-center font-semibold">{r.sampleCode}</td>
                   <td className="border px-2 py-2.5 text-center">{r.sampleType}</td>
@@ -409,23 +369,32 @@ export default function PCRReport({
                     allPathogens.map((originalP) => {
                       const found = r.pathogens.find((x: any) => x.name === originalP);
                       const res = (found?.result || "-").trim().toLowerCase();
-                      const ctValue = found?.ctValue || "ND";
+                      const ctValue = found?.ctValue || "-";
 
-                      let resultDisplay: React.ReactNode = found?.result || "-";
-                      let ctDisplay: React.ReactNode = ctValue;
+                     let resultDisplay: React.ReactNode = "-";
+let ctDisplay: React.ReactNode = "-";
 
-                      if (res === "negative" || res === "neg" || res === "-") {
-                        resultDisplay = <span className="text-black">Negative</span>;
-                        // ctDisplay remains the actual value (no longer forced to "-")
-                      } else if (res === "positive" || res === "pos") {
-                        resultDisplay = <span className="text-red-600">Positive</span>;
-                        ctDisplay = <span className="text-red-600">{ctValue}</span>;
-                      } else if (res === "suspect" || res.includes("sus")) {
-                        resultDisplay = <span className="text-yellow-600">Suspect</span>;
-                        ctDisplay = <span className="text-yellow-600">{ctValue}</span>;
-                      } else {
-                        ctDisplay = <span className="text-gray-700">{ctValue}</span>;
-                      }
+if (found) {
+  const res = (found.result || "").trim().toLowerCase();
+  const ctValue = found.ctValue || "-";
+
+  if (res === "negative" || res === "neg") {
+    resultDisplay = <span className="text-black">Negative</span>;
+    ctDisplay = <span className="text-gray-700">{ctValue}</span>;
+  } 
+  else if (res === "positive" || res === "pos") {
+    resultDisplay = <span className="text-red-600">Positive</span>;
+    ctDisplay = <span className="text-red-600">{ctValue}</span>;
+  } 
+  else if (res === "suspect" || res.includes("sus")) {
+    resultDisplay = <span className="text-yellow-600">Suspect</span>;
+    ctDisplay = <span className="text-yellow-600">{ctValue}</span>;
+  } 
+  else {
+    resultDisplay = found.result || "-";
+    ctDisplay = <span className="text-gray-700">{ctValue}</span>;
+  }
+}
 
                       return (
                         <React.Fragment key={originalP}>
@@ -441,7 +410,7 @@ export default function PCRReport({
                   )}
                 </tr>
               ))
-            )}
+            }
           </tbody>
         </table>
       </div>

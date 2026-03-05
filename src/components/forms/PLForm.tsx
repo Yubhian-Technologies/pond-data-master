@@ -128,6 +128,7 @@ export default function PLForm({
   };
 
   const [customModes, setCustomModes] = useState<Record<string, boolean[]>>({});
+  const [technicians, setTechnicians] = useState<string[]>([]);
 
   // MGR specific dropdown values
   const mgrOptions = ["4:1"];
@@ -162,6 +163,28 @@ export default function PLForm({
 
     fetchInvoice();
   }, [invoiceId, locationId]);
+
+  useEffect(() => {
+  const fetchTechnicians = async () => {
+    if (!locationId) return;
+
+    try {
+      const techRef = collection(db, "locations", locationId, "technicians");
+      const snapshot = await getDocs(techRef);
+
+      const techNames = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return data.name;
+      });
+
+      setTechnicians(techNames);
+    } catch (err) {
+      console.error("Error fetching technicians:", err);
+    }
+  };
+
+  fetchTechnicians();
+}, [locationId]);
 
   // Combined loading logic
   useEffect(() => {
@@ -631,14 +654,20 @@ export default function PLForm({
         <label className="block text-xl font-bold mb-4 text-gray-800">
           Checked by
         </label>
-        <input
-          type="text"
-          value={checkedBy}
-          onChange={(e) => setCheckedBy(e.target.value)}
-          placeholder="Enter name of the person who checked the report"
-          required
-          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
-        />
+        <select
+  value={checkedBy}
+  onChange={(e) => setCheckedBy(e.target.value)}
+  required
+  className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+>
+  <option value="">Select Technician</option>
+
+  {technicians.map((tech, index) => (
+    <option key={index} value={tech}>
+      {tech}
+    </option>
+  ))}
+</select>
       </div>
 
       {/* Submit Button - unchanged */}
