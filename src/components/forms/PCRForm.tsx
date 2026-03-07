@@ -647,14 +647,42 @@ setCtCustomMode(
               />
               {uploading === sampleIndex && <p className="mt-2 text-sm text-blue-600">Uploading image...</p>}
               {gelImages[sampleNum] && (
-                <div className="mt-6">
-                  <img
-                    src={gelImages[sampleNum]}
-                    alt={`Gel image for Sample ${sampleNum}`}
-                    className="max-w-lg rounded-lg border shadow-lg"
-                  />
-                </div>
-              )}
+  <div className="mt-6">
+    <img
+      src={gelImages[sampleNum]}
+      alt={`Gel image for Sample ${sampleNum}`}
+      className="max-w-lg rounded-lg border shadow-lg"
+    />
+
+    <div className="mt-3 flex gap-3">
+      {/* Delete button */}
+      <button
+        type="button"
+        onClick={() => {
+          setGelImages((prev) => {
+            const updated = { ...prev };
+            delete updated[sampleNum];
+            return updated;
+          });
+        }}
+        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+      >
+        Delete Image
+      </button>
+
+      {/* Choose new file */}
+      {/* <label className="px-4 py-2 bg-blue-600 text-white rounded cursor-pointer hover:bg-blue-700">
+        Choose New File
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => handleImageUpload(sampleIndex, e)}
+          className="hidden"
+        />
+      </label> */}
+    </div>
+  </div>
+)}
             </div>
           </section>
         );
