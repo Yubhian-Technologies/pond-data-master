@@ -45,6 +45,7 @@ export default function MicrobiologyReport({
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo | null>(null);
   const [data, setData] = useState<MicrobiologyData | null>(null);
+  const [sampleType, setSampleType] = useState<string>("Microbiology");
   const [technicianName, setTechnicianName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [checkedByName, setCheckedByName] = useState<string>("");
@@ -128,6 +129,10 @@ export default function MicrobiologyReport({
           techName = reportData.technicianName || reportData.reportedBy || "";
 
           setFarmerInfo(reportData.farmerInfo || null);
+
+          if (reportData.sampleType) {
+            setSampleType(reportData.sampleType);
+          }
 
           const microData = reportData.microbiologyData || {
             testCode: [],
@@ -435,7 +440,7 @@ export default function MicrobiologyReport({
                 <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
                   Sample Type
                 </td>
-                <td className="border px-4 py-2 w-1/8">Microbiology</td>
+                <td className="border px-4 py-2 w-1/8">{sampleType}</td>
                 <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
                   Date
                 </td>
