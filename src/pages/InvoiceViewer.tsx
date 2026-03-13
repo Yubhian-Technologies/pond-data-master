@@ -29,6 +29,7 @@ interface InvoiceState {
   gstAmount: number;
   total: number;
   paymentMode: "cash" | "qr" | "neft" | "rtgs";
+  transactionRef?: string | null;
   isPartialPayment?: boolean;
   paidAmount?: number | null;
   balanceAmount?: number;
@@ -97,10 +98,11 @@ const InvoiceViewer: React.FC = () => {
           gstAmount: data.gstAmount || 0,
           total: data.total || 0,
           paymentMode: data.paymentMode || "cash",
+          transactionRef: data.transactionRef ?? null,
           isPartialPayment: data.isPartialPayment || false,
           paidAmount: data.paidAmount ?? null,
           balanceAmount: data.balanceAmount ?? null,
-          
+
           // ── These were missing — now correctly mapped from Firestore ──
           discountPercent: data.discountPercent ?? 0,
           discountAmount: data.discountAmount ?? 0,

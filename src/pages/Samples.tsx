@@ -1,5 +1,11 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,14 +17,38 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Check, Users, Search, X, IndianRupee, Calendar } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Plus,
+  Check,
+  Users,
+  Search,
+  X,
+  IndianRupee,
+  Calendar,
+} from "lucide-react";
 import { Farmer } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useUserSession } from "../contexts/UserSessionContext";
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, doc, deleteDoc, updateDoc, query, where, orderBy } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  doc,
+  deleteDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+} from "firebase/firestore";
 import { db } from "./firebase";
 import { format } from "date-fns";
 import { useSearchParams } from "react-router-dom";
@@ -32,6 +62,15 @@ import {
 } from "@/components/ui/select";
 
 const FILTER_STORAGE_KEY = "samples_page_filters_v1";
+const SAMPLE_TYPE_FILTER_OPTIONS = [
+  { value: "all", label: "All Sample Types" },
+  { value: "water", label: "Water" },
+  { value: "soil", label: "Soil" },
+  { value: "pl", label: "PL" },
+  { value: "pcr", label: "PCR" },
+  { value: "microbiology", label: "Microbiology" },
+  { value: "wssv", label: "WSSV" },
+] as const;
 
 const Samples = () => {
   const navigate = useNavigate();
@@ -39,21 +78,35 @@ const Samples = () => {
   const { session } = useUserSession();
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [branchTechnicians, setBranchTechnicians] = useState<{ id: string; name: string }[]>([]);
-  const [allOtherTechnicians, setAllOtherTechnicians] = useState<{ id: string; name: string; branchId: string }[]>([]);
+  const [branchTechnicians, setBranchTechnicians] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [allOtherTechnicians, setAllOtherTechnicians] = useState<
+    { id: string; name: string; branchId: string }[]
+  >([]);
 
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
-  const [selectedOtherTechId, setSelectedOtherTechId] = useState<string>("none");
+  const [selectedTechnicianId, setSelectedTechnicianId] =
+    useState<string>("all");
+  const [selectedOtherTechId, setSelectedOtherTechId] =
+    useState<string>("none");
 
   type SampleGroup = "water" | "soil" | "pl_pcr" | "microbiology";
-  const sampleTypeOptions: SampleGroup[] = ["water", "soil", "pl_pcr", "microbiology", "wssv"];
+  const sampleTypeOptions: SampleGroup[] = [
+    "water",
+    "soil",
+    "pl_pcr",
+    "microbiology",
+    "wssv",
+  ];
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
   const [dateOfCulture, setDateOfCulture] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<SampleGroup[]>([]);
-  const [quantities, setQuantities] = useState<Record<SampleGroup, number>>(() => ({} as Record<SampleGroup, number>));
+  const [quantities, setQuantities] = useState<Record<SampleGroup, number>>(
+    () => ({}) as Record<SampleGroup, number>,
+  );
 
   const [loadingInvoices, setLoadingInvoices] = useState(true);
   const [farmerSearchQuery, setFarmerSearchQuery] = useState("");
@@ -63,23 +116,27 @@ const Samples = () => {
   const [localSearchQuery, setLocalSearchQuery] = useState("");
   const [localStartDate, setLocalStartDate] = useState("");
   const [localEndDate, setLocalEndDate] = useState("");
+  const [localSampleType, setLocalSampleType] = useState<string>("all");
 
   // Currently applied (used for filtering table + fetching)
   const appliedSearchQuery = searchParams.get("q") || "";
-  const appliedStartDate   = searchParams.get("start") || "";
-  const appliedEndDate     = searchParams.get("end") || "";
+  const appliedStartDate = searchParams.get("start") || "";
+  const appliedEndDate = searchParams.get("end") || "";
+  const appliedSampleType = searchParams.get("type") || "all";
 
   // Payment dialog states
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState<any>(null);
-  const [paymentModeLocal, setPaymentModeLocal] = useState<"cash" | "qr" | "neft" | "">("");
+  const [paymentModeLocal, setPaymentModeLocal] = useState<
+    "cash" | "qr" | "neft" | ""
+  >("");
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
 
   // Restore filters from localStorage + URL on first mount
   useEffect(() => {
     const saved = localStorage.getItem(FILTER_STORAGE_KEY);
-    let restored = { q: "", start: "", end: "" };
+    let restored = { q: "", start: "", end: "", type: "all" };
 
     if (saved) {
       try {
@@ -90,20 +147,29 @@ const Samples = () => {
     }
 
     // URL takes priority over saved values
-    const q     = searchParams.get("q")     || restored.q     || "";
+    const q = searchParams.get("q") || restored.q || "";
     const start = searchParams.get("start") || restored.start || "";
-    const end   = searchParams.get("end")   || restored.end   || "";
+    const end = searchParams.get("end") || restored.end || "";
+    const type = searchParams.get("type") || restored.type || "all";
 
     setLocalSearchQuery(q);
     setLocalStartDate(start);
     setLocalEndDate(end);
+    setLocalSampleType(type);
 
     // If URL is empty but we have saved values → apply them to URL
-    if ((!searchParams.has("q") && !searchParams.has("start") && !searchParams.has("end")) && (q || start || end)) {
+    if (
+      !searchParams.has("q") &&
+      !searchParams.has("start") &&
+      !searchParams.has("end") &&
+      !searchParams.has("type") &&
+      (q || start || end || type !== "all")
+    ) {
       const newParams = new URLSearchParams();
-      if (q)     newParams.set("q", q);
+      if (q) newParams.set("q", q);
       if (start) newParams.set("start", start);
-      if (end)   newParams.set("end", end);
+      if (end) newParams.set("end", end);
+      if (type && type !== "all") newParams.set("type", type);
       setSearchParams(newParams, { replace: true });
     }
   }, []); // ← only once on mount
@@ -114,9 +180,10 @@ const Samples = () => {
       q: appliedSearchQuery,
       start: appliedStartDate,
       end: appliedEndDate,
+      type: appliedSampleType,
     };
     localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
-  }, [appliedSearchQuery, appliedStartDate, appliedEndDate]);
+  }, [appliedSearchQuery, appliedStartDate, appliedEndDate, appliedSampleType]);
 
   useEffect(() => {
     if (step === 2) {
@@ -133,9 +200,9 @@ const Samples = () => {
       try {
         const techRef = collection(db, "locations", locationId, "technicians");
         const snap = await getDocs(techRef);
-        const techs = snap.docs.map(d => ({
+        const techs = snap.docs.map((d) => ({
           id: d.id,
-          name: d.data().name || "Unknown Technician"
+          name: d.data().name || "Unknown Technician",
         }));
         setBranchTechnicians(techs);
       } catch (err) {
@@ -159,7 +226,7 @@ const Samples = () => {
           const techRef = collection(db, "locations", locId, "technicians");
           const techSnap = await getDocs(techRef);
 
-          techSnap.docs.forEach(techDoc => {
+          techSnap.docs.forEach((techDoc) => {
             const name = techDoc.data().name || "Unknown Technician";
             otherTechs.push({ id: techDoc.id, name, branchId: locId });
           });
@@ -203,7 +270,7 @@ const Samples = () => {
 
         let invoicesQuery = query(
           collection(db, "locations", locationId, "invoices"),
-          orderBy("createdAt", "desc")
+          orderBy("createdAt", "desc"),
         );
 
         if (appliedStartDate && appliedEndDate) {
@@ -215,7 +282,7 @@ const Samples = () => {
               collection(db, "locations", locationId, "invoices"),
               where("createdAt", ">=", startT),
               where("createdAt", "<=", endT),
-              orderBy("createdAt", "desc")
+              orderBy("createdAt", "desc"),
             );
           }
         }
@@ -223,7 +290,7 @@ const Samples = () => {
         const snap = await getDocs(invoicesQuery);
         const data = snap.docs.map((doc) => {
           const docData = doc.data();
-          if ('id' in docData) delete (docData as any).id;
+          if ("id" in docData) delete (docData as any).id;
           return { id: doc.id, ...docData };
         });
 
@@ -255,20 +322,28 @@ const Samples = () => {
     const activeTypes = sample.sampleType
       .map((s: any) => {
         if (typeof s === "string") return s.toLowerCase().trim();
-        if (s && typeof s === "object" && s.type) return s.type.toString().toLowerCase().trim();
+        if (s && typeof s === "object" && s.type)
+          return s.type.toString().toLowerCase().trim();
         return null;
       })
-      .filter((type: string | null): type is string =>
-        type !== null && type !== "" && type !== "pl_pcr" && type !== "wssv"
+      .filter(
+        (type: string | null): type is string =>
+          type !== null && type !== "" && type !== "pl_pcr" && type !== "wssv",
       )
       .filter((type: string, index: number) => {
         const originalEntry = sample.sampleType[index];
         let count = 0;
-        if (typeof originalEntry === "object" && originalEntry.count !== undefined) {
+        if (
+          typeof originalEntry === "object" &&
+          originalEntry.count !== undefined
+        ) {
           count = Number(originalEntry.count);
         } else {
-          const match = sample.sampleType.find((t: any) =>
-            (typeof t === "object" ? t.type?.toLowerCase() : t?.toLowerCase()) === type
+          const match = sample.sampleType.find(
+            (t: any) =>
+              (typeof t === "object"
+                ? t.type?.toLowerCase()
+                : t?.toLowerCase()) === type,
           );
           count = typeof match === "object" ? Number(match?.count || 0) : 0;
         }
@@ -276,14 +351,18 @@ const Samples = () => {
       });
 
     if (activeTypes.length === 0) return true;
-    return activeTypes.every((type: string) => sample.reportsProgress[type] === "completed");
+    return activeTypes.every(
+      (type: string) => sample.reportsProgress[type] === "completed",
+    );
   };
 
   const filteredInvoices = useMemo(() => {
     let result = invoices;
 
     if (selectedTechnicianId !== "all") {
-      result = result.filter((inv) => inv.technicianId === selectedTechnicianId);
+      result = result.filter(
+        (inv) => inv.technicianId === selectedTechnicianId,
+      );
     }
 
     if (appliedSearchQuery.trim()) {
@@ -297,22 +376,43 @@ const Samples = () => {
       });
     }
 
+    if (appliedSampleType !== "all") {
+      result = result.filter((inv) => {
+        if (!Array.isArray(inv.sampleType)) return false;
+
+        return inv.sampleType.some((sample: any) => {
+          const type = typeof sample === "string" ? sample : sample?.type;
+          const count =
+            typeof sample === "object" && sample?.count !== undefined
+              ? Number(sample.count)
+              : 1;
+
+          return (
+            type?.toString().toLowerCase() === appliedSampleType && count > 0
+          );
+        });
+      });
+    }
+
     return result;
-  }, [invoices, selectedTechnicianId, appliedSearchQuery]);
+  }, [invoices, selectedTechnicianId, appliedSearchQuery, appliedSampleType]);
 
   const sortedInvoices = useMemo(() => {
     return [...filteredInvoices].sort((a, b) => {
-      const timeA = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
-      const timeB = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+      const timeA =
+        a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+      const timeB =
+        b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
       return timeB - timeA;
     });
   }, [filteredInvoices]);
 
   const filteredFarmerSelection = useMemo(() => {
-    return farmers.filter(f =>
-      f.name.toLowerCase().includes(farmerSearchQuery.toLowerCase()) ||
-      f.phone.includes(farmerSearchQuery) ||
-      f.id.toLowerCase().includes(farmerSearchQuery.toLowerCase())
+    return farmers.filter(
+      (f) =>
+        f.name.toLowerCase().includes(farmerSearchQuery.toLowerCase()) ||
+        f.phone.includes(farmerSearchQuery) ||
+        f.id.toLowerCase().includes(farmerSearchQuery.toLowerCase()),
     );
   }, [farmers, farmerSearchQuery]);
 
@@ -328,6 +428,9 @@ const Samples = () => {
     if (localEndDate) {
       newParams.set("end", localEndDate);
     }
+    if (localSampleType !== "all") {
+      newParams.set("type", localSampleType);
+    }
 
     setSearchParams(newParams, { replace: true });
   };
@@ -336,6 +439,7 @@ const Samples = () => {
     setLocalSearchQuery("");
     setLocalStartDate("");
     setLocalEndDate("");
+    setLocalSampleType("all");
     setSearchParams(new URLSearchParams(), { replace: true });
     localStorage.removeItem(FILTER_STORAGE_KEY);
   };
@@ -360,7 +464,10 @@ const Samples = () => {
       return;
     }
 
-    if ((paymentModeLocal === "qr" || paymentModeLocal === "neft") && !transactionRef.trim()) {
+    if (
+      (paymentModeLocal === "qr" || paymentModeLocal === "neft") &&
+      !transactionRef.trim()
+    ) {
       toast({
         title: "Error",
         description: "Transaction reference is required for QR/NEFT",
@@ -373,22 +480,35 @@ const Samples = () => {
       const newPaid = (currentInvoice.paidAmount || 0) + amount;
       const newBalance = currentInvoice.total - newPaid;
 
-      const invoiceRef = doc(db, "locations", session.locationId!, "invoices", currentInvoice.id);
+      const invoiceRef = doc(
+        db,
+        "locations",
+        session.locationId!,
+        "invoices",
+        currentInvoice.id,
+      );
 
       await updateDoc(invoiceRef, {
         paidAmount: newPaid,
         balanceAmount: newBalance > 0 ? newBalance : 0,
         isPartialPayment: newBalance > 0,
         paymentMode: paymentModeLocal,
-        transactionRef: paymentModeLocal !== "cash" ? transactionRef.trim() : null,
+        transactionRef:
+          paymentModeLocal !== "cash" ? transactionRef.trim() : null,
         lastPaymentDate: new Date(),
       });
 
-      setInvoices(prev => prev.map(inv =>
-        inv.id === currentInvoice.id
-          ? { ...inv, paidAmount: newPaid, balanceAmount: newBalance > 0 ? newBalance : 0 }
-          : inv
-      ));
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === currentInvoice.id
+            ? {
+                ...inv,
+                paidAmount: newPaid,
+                balanceAmount: newBalance > 0 ? newBalance : 0,
+              }
+            : inv,
+        ),
+      );
 
       toast({
         title: "Success",
@@ -409,7 +529,7 @@ const Samples = () => {
 
   const handleDeleteInvoice = async (invoice: any) => {
     const confirmDelete = window.confirm(
-      `Delete Invoice ${invoice.invoiceId}? This will remove reports and payments permanently.`
+      `Delete Invoice ${invoice.invoiceId}? This will remove reports and payments permanently.`,
     );
 
     if (!confirmDelete) return;
@@ -439,7 +559,7 @@ const Samples = () => {
               "locations",
               locationId,
               collectionName,
-              invoiceCode
+              invoiceCode,
             );
 
             await deleteDoc(reportRef);
@@ -452,18 +572,17 @@ const Samples = () => {
         "locations",
         locationId,
         "invoices",
-        invoiceId
+        invoiceId,
       );
 
       await deleteDoc(invoiceRef);
 
-      setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+      setInvoices((prev) => prev.filter((inv) => inv.id !== invoiceId));
 
       toast({
         title: "Deleted Successfully",
         description: "Invoice and related reports removed.",
       });
-
     } catch (error) {
       console.error("Delete failed:", error);
       toast({
@@ -496,22 +615,27 @@ const Samples = () => {
     const sampleSummary = selectedTypes.flatMap((type) => {
       const count = quantities[type] ?? 1;
       if (type === "pl_pcr") {
-        return [{ type: "pl", count }, { type: "pcr", count }];
+        return [
+          { type: "pl", count },
+          { type: "pcr", count },
+        ];
       }
       return [{ type, count }];
     });
 
     let technicianForThisInvoice = {
       technicianId: session.technicianId || "unknown",
-      technicianName: session.technicianName || "Current Technician"
+      technicianName: session.technicianName || "Current Technician",
     };
 
     if (selectedOtherTechId && selectedOtherTechId !== "none") {
-      const chosen = allOtherTechnicians.find(t => t.id === selectedOtherTechId);
+      const chosen = allOtherTechnicians.find(
+        (t) => t.id === selectedOtherTechId,
+      );
       if (chosen) {
         technicianForThisInvoice = {
           technicianId: chosen.id,
-          technicianName: chosen.name
+          technicianName: chosen.name,
         };
       }
     }
@@ -521,7 +645,7 @@ const Samples = () => {
         sampleSummary,
         dateOfCulture,
         farmer: selectedFarmer,
-        technician: technicianForThisInvoice
+        technician: technicianForThisInvoice,
       },
     });
   };
@@ -533,8 +657,12 @@ const Samples = () => {
           <div className="max-w-7xl mx-auto">
             <div className="mb-8 flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-foreground mb-2">Sample Submission</h1>
-                <p className="text-muted-foreground">Submit and manage sample testing requests</p>
+                <h1 className="text-3xl font-bold text-foreground mb-2">
+                  Sample Submission
+                </h1>
+                <p className="text-muted-foreground">
+                  Submit and manage sample testing requests
+                </p>
               </div>
               <Button onClick={() => setOpen(true)} className="gap-2">
                 <Plus className="w-4 h-4" />
@@ -582,6 +710,27 @@ const Samples = () => {
                     />
                   </div>
 
+                  <div className="flex-1 min-w-[200px]">
+                    <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                      Sample Type
+                    </Label>
+                    <Select
+                      value={localSampleType}
+                      onValueChange={setLocalSampleType}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="All Sample Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SAMPLE_TYPE_FILTER_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="flex items-center gap-3 flex-wrap">
                     <Button
                       className="h-10 bg-cyan-600 hover:bg-cyan-700"
@@ -613,7 +762,10 @@ const Samples = () => {
                       <Users className="w-4 h-4 text-purple-600" />
                       <span className="font-medium">Filter by Tech:</span>
                     </div>
-                    <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
+                    <Select
+                      value={selectedTechnicianId}
+                      onValueChange={setSelectedTechnicianId}
+                    >
                       <SelectTrigger className="w-56 h-10">
                         <SelectValue placeholder="All Technicians" />
                       </SelectTrigger>
@@ -651,13 +803,18 @@ const Samples = () => {
                         <TableCell colSpan={9} className="h-32 text-center">
                           <div className="flex flex-col items-center justify-center gap-3">
                             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-primary"></div>
-                            <p className="text-muted-foreground">Loading samples...</p>
+                            <p className="text-muted-foreground">
+                              Loading samples...
+                            </p>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : sortedInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-muted-foreground">
+                        <TableCell
+                          colSpan={9}
+                          className="text-center text-muted-foreground"
+                        >
                           No samples found for selected filters
                         </TableCell>
                       </TableRow>
@@ -670,19 +827,30 @@ const Samples = () => {
                         const paidSoFar = Number(sample.paidAmount || 0);
                         const pendingAmount = grandTotal - paidSoFar;
 
-                        const isPaidAtGeneration = sample.paymentMode && sample.paymentMode !== "pending";
-                        const displayPaid = isPaidAtGeneration ? grandTotal : paidSoFar;
-                        const displayPending = isPaidAtGeneration ? 0 : pendingAmount;
-                        const showAddPaymentButton = sample.paymentMode === "pending" && displayPending > 0;
+                        const isPaidAtGeneration =
+                          sample.paymentMode &&
+                          sample.paymentMode !== "pending";
+                        const displayPaid = isPaidAtGeneration
+                          ? grandTotal
+                          : paidSoFar;
+                        const displayPending = isPaidAtGeneration
+                          ? 0
+                          : pendingAmount;
+                        const showAddPaymentButton =
+                          sample.paymentMode === "pending" &&
+                          displayPending > 0;
 
                         const sampleDate = sample.createdAt
                           ? format(
-                              sample.createdAt.toDate ? sample.createdAt.toDate() : new Date(sample.createdAt.seconds * 1000),
-                              "dd MMM yyyy"
+                              sample.createdAt.toDate
+                                ? sample.createdAt.toDate()
+                                : new Date(sample.createdAt.seconds * 1000),
+                              "dd MMM yyyy",
                             )
                           : "N/A";
 
-                        const displayTechnicianName = sample.technicianName || "Unknown";
+                        const displayTechnicianName =
+                          sample.technicianName || "Unknown";
 
                         return (
                           <TableRow key={sample.id}>
@@ -691,12 +859,16 @@ const Samples = () => {
                                 {sampleDate}
                               </div>
                             </TableCell>
-                            <TableCell className="font-medium">{invoiceId}</TableCell>
+                            <TableCell className="font-medium">
+                              {invoiceId}
+                            </TableCell>
                             <TableCell>{sample.farmerName}</TableCell>
                             <TableCell>{sample.farmerPhone ?? "N/A"}</TableCell>
                             <TableCell>{displayTechnicianName}</TableCell>
                             <TableCell>₹{grandTotal}</TableCell>
-                            <TableCell className="font-medium text-green-600">₹{displayPaid}</TableCell>
+                            <TableCell className="font-medium text-green-600">
+                              ₹{displayPaid}
+                            </TableCell>
                             <TableCell
                               className={
                                 displayPending > 0
@@ -713,16 +885,24 @@ const Samples = () => {
                                   className="bg-transparent text-black border hover:bg-cyan-700 hover:text-white"
                                   size="sm"
                                   onClick={() =>
-                                    navigate(`/lab-results/${sample.invoiceId}${fullyCompleted ? "?mode=view" : ""}`)
+                                    navigate(
+                                      `/lab-results/${sample.invoiceId}${fullyCompleted ? "?mode=view" : ""}`,
+                                    )
                                   }
                                 >
-                                  {fullyCompleted ? "View Report" : "Generate Report"}
+                                  {fullyCompleted
+                                    ? "View Report"
+                                    : "Generate Report"}
                                 </Button>
 
                                 <Button
                                   className="bg-transparent text-black border hover:bg-green-600 hover:text-white"
                                   size="sm"
-                                  onClick={() => navigate(`/invoice/${invoiceId}/${session.locationId}`)}
+                                  onClick={() =>
+                                    navigate(
+                                      `/invoice/${invoiceId}/${session.locationId}`,
+                                    )
+                                  }
                                 >
                                   View Invoice
                                 </Button>
@@ -742,8 +922,16 @@ const Samples = () => {
                                   className="bg-transparent text-black border hover:bg-yellow-600 hover:text-white"
                                   size="sm"
                                   disabled={!fullyCompleted}
-                                  onClick={() => navigate(`/lab-results/${sample.invoiceId}?mode=edit`)}
-                                  title={!fullyCompleted ? "Edit available only after report is fully generated" : "Edit report data"}
+                                  onClick={() =>
+                                    navigate(
+                                      `/lab-results/${sample.invoiceId}?mode=edit`,
+                                    )
+                                  }
+                                  title={
+                                    !fullyCompleted
+                                      ? "Edit available only after report is fully generated"
+                                      : "Edit report data"
+                                  }
                                 >
                                   Edit
                                 </Button>
@@ -766,7 +954,12 @@ const Samples = () => {
               </CardContent>
             </Card>
 
-            <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) resetForm(); }}>
+            <Dialog
+              open={open}
+              onOpenChange={(isOpen) => {
+                if (!isOpen) resetForm();
+              }}
+            >
               <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-2">
                   <DialogTitle className="text-xl">
@@ -778,17 +971,21 @@ const Samples = () => {
                   {step === 1 && (
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label className="text-sm font-semibold">Search and Select Farmer</Label>
+                        <Label className="text-sm font-semibold">
+                          Search and Select Farmer
+                        </Label>
                         <div className="relative">
                           <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                          <Input 
-                            placeholder="Type name, phone or ID to search..." 
+                          <Input
+                            placeholder="Type name, phone or ID to search..."
                             className="pl-10 h-11"
                             value={farmerSearchQuery}
-                            onChange={(e) => setFarmerSearchQuery(e.target.value)}
+                            onChange={(e) =>
+                              setFarmerSearchQuery(e.target.value)
+                            }
                           />
                           {farmerSearchQuery && (
-                            <button 
+                            <button
                               onClick={() => setFarmerSearchQuery("")}
                               className="absolute right-3 top-3"
                             >
@@ -805,13 +1002,17 @@ const Samples = () => {
                                   key={farmer.id}
                                   onClick={() => {
                                     setSelectedFarmer(farmer);
-                                    setFarmerSearchQuery(""); 
+                                    setFarmerSearchQuery("");
                                   }}
-                                  className={`p-3 cursor-pointer transition-colors flex items-center justify-between hover:bg-cyan-50 ${selectedFarmer?.id === farmer.id ? 'bg-cyan-50 border-l-4 border-cyan-500' : ''}`}
+                                  className={`p-3 cursor-pointer transition-colors flex items-center justify-between hover:bg-cyan-50 ${selectedFarmer?.id === farmer.id ? "bg-cyan-50 border-l-4 border-cyan-500" : ""}`}
                                 >
                                   <div>
-                                    <p className="font-semibold text-gray-800">{farmer.name}</p>
-                                    <p className="text-xs text-muted-foreground">Ph: {farmer.phone}</p>
+                                    <p className="font-semibold text-gray-800">
+                                      {farmer.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Ph: {farmer.phone}
+                                    </p>
                                   </div>
                                   {selectedFarmer?.id === farmer.id && (
                                     <Check className="w-5 h-5 text-cyan-600" />
@@ -832,20 +1033,36 @@ const Samples = () => {
                           <CardContent className="pt-6">
                             <div className="grid grid-cols-2 gap-y-3 text-sm">
                               <div>
-                                <span className="text-muted-foreground font-medium">Selected Farmer:</span>
-                                <p className="text-lg font-bold text-cyan-700">{selectedFarmer.name}</p>
+                                <span className="text-muted-foreground font-medium">
+                                  Selected Farmer:
+                                </span>
+                                <p className="text-lg font-bold text-cyan-700">
+                                  {selectedFarmer.name}
+                                </p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground font-medium">Phone:</span>
-                                <p className="font-semibold">{selectedFarmer.phone}</p>
+                                <span className="text-muted-foreground font-medium">
+                                  Phone:
+                                </span>
+                                <p className="font-semibold">
+                                  {selectedFarmer.phone}
+                                </p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground font-medium">Species:</span>
-                                <p className="font-semibold">{selectedFarmer.species}</p>
+                                <span className="text-muted-foreground font-medium">
+                                  Species:
+                                </span>
+                                <p className="font-semibold">
+                                  {selectedFarmer.species}
+                                </p>
                               </div>
                               <div>
-                                <span className="text-muted-foreground font-medium">Location:</span>
-                                <p className="font-semibold">{selectedFarmer.city}, {selectedFarmer.state}</p>
+                                <span className="text-muted-foreground font-medium">
+                                  Location:
+                                </span>
+                                <p className="font-semibold">
+                                  {selectedFarmer.city}, {selectedFarmer.state}
+                                </p>
                               </div>
                             </div>
                           </CardContent>
@@ -858,20 +1075,24 @@ const Samples = () => {
                     <div className="space-y-6 pb-6">
                       <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-3">
-                          <Label className="font-semibold">Sample Type(s)</Label>
+                          <Label className="font-semibold">
+                            Sample Type(s)
+                          </Label>
                           <div className="grid grid-cols-1 gap-2">
                             {sampleTypeOptions.map((type) => (
                               <button
                                 key={type}
                                 onClick={() => {
                                   const willAdd = !selectedTypes.includes(type);
-                                  setSelectedTypes(prev =>
-                                    willAdd ? [...prev, type] : prev.filter(t => t !== type)
+                                  setSelectedTypes((prev) =>
+                                    willAdd
+                                      ? [...prev, type]
+                                      : prev.filter((t) => t !== type),
                                   );
                                   if (willAdd) {
-                                    setQuantities(q => ({ ...q, [type]: 1 }));
+                                    setQuantities((q) => ({ ...q, [type]: 1 }));
                                   } else {
-                                    setQuantities(prev => {
+                                    setQuantities((prev) => {
                                       const newQ = { ...prev };
                                       delete newQ[type];
                                       return newQ;
@@ -879,13 +1100,18 @@ const Samples = () => {
                                   }
                                 }}
                                 className={`flex items-center justify-between p-3 rounded-md border text-sm font-medium transition-all ${
-                                  selectedTypes.includes(type) 
-                                    ? "bg-cyan-600 text-white border-cyan-700" 
+                                  selectedTypes.includes(type)
+                                    ? "bg-cyan-600 text-white border-cyan-700"
                                     : "bg-white hover:bg-gray-50 text-gray-700"
                                 }`}
                               >
-                                {type === "pl_pcr" ? "PL / PCR" : type.charAt(0).toUpperCase() + type.slice(1)}
-                                {selectedTypes.includes(type) && <Check className="w-4 h-4" />}
+                                {type === "pl_pcr"
+                                  ? "PL / PCR"
+                                  : type.charAt(0).toUpperCase() +
+                                    type.slice(1)}
+                                {selectedTypes.includes(type) && (
+                                  <Check className="w-4 h-4" />
+                                )}
                               </button>
                             ))}
                           </div>
@@ -899,21 +1125,34 @@ const Samples = () => {
                           </div>
 
                           <div className="bg-blue-50 p-4 rounded-lg mt-4">
-                            <p className="text-xs text-blue-700 font-medium uppercase mb-1">Target Farmer</p>
-                            <p className="font-bold text-gray-800">{selectedFarmer?.name}</p>
-                            <p className="text-xs text-gray-600">{selectedFarmer?.phone}</p>
+                            <p className="text-xs text-blue-700 font-medium uppercase mb-1">
+                              Target Farmer
+                            </p>
+                            <p className="font-bold text-gray-800">
+                              {selectedFarmer?.name}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {selectedFarmer?.phone}
+                            </p>
                           </div>
                         </div>
                       </div>
 
                       {selectedTypes.length > 0 && (
                         <div className="space-y-4 pt-4 border-t">
-                          <Label className="font-bold text-gray-800 uppercase tracking-wider text-xs">Quantity for each type</Label>
+                          <Label className="font-bold text-gray-800 uppercase tracking-wider text-xs">
+                            Quantity for each type
+                          </Label>
                           <div className="grid grid-cols-2 gap-4">
                             {selectedTypes.map((type) => (
-                              <div key={type} className="space-y-2 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                              <div
+                                key={type}
+                                className="space-y-2 p-4 bg-gray-50 rounded-xl border border-gray-100"
+                              >
                                 <Label className="text-xs font-bold text-gray-600 uppercase">
-                                  {type === "pl_pcr" ? "PL / PCR Samples" : `${type} Samples`}
+                                  {type === "pl_pcr"
+                                    ? "PL / PCR Samples"
+                                    : `${type} Samples`}
                                 </Label>
                                 <Input
                                   type="number"
@@ -922,8 +1161,17 @@ const Samples = () => {
                                   className="bg-white"
                                   value={quantities[type] ?? 1}
                                   onChange={(e) => {
-                                    const val = Math.max(1, Math.min(10, parseInt(e.target.value) || 1));
-                                    setQuantities(prev => ({ ...prev, [type]: val }));
+                                    const val = Math.max(
+                                      1,
+                                      Math.min(
+                                        10,
+                                        parseInt(e.target.value) || 1,
+                                      ),
+                                    );
+                                    setQuantities((prev) => ({
+                                      ...prev,
+                                      [type]: val,
+                                    }));
                                   }}
                                 />
                               </div>
@@ -938,10 +1186,16 @@ const Samples = () => {
                 <DialogFooter className="p-6 pt-2 border-t bg-gray-50/50">
                   {step === 1 ? (
                     <>
-                      <Button onClick={resetForm} variant="outline" className="h-11 px-8">Cancel</Button>
-                      <Button 
-                        onClick={() => setStep(2)} 
-                        disabled={!selectedFarmer} 
+                      <Button
+                        onClick={resetForm}
+                        variant="outline"
+                        className="h-11 px-8"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => setStep(2)}
+                        disabled={!selectedFarmer}
                         className="h-11 px-10 bg-cyan-600 hover:bg-cyan-700"
                       >
                         Next: Sample Details
@@ -949,7 +1203,13 @@ const Samples = () => {
                     </>
                   ) : (
                     <>
-                      <Button onClick={() => setStep(1)} variant="outline" className="h-11 px-8">Back</Button>
+                      <Button
+                        onClick={() => setStep(1)}
+                        variant="outline"
+                        className="h-11 px-8"
+                      >
+                        Back
+                      </Button>
                       <Button
                         onClick={handleSubmitAndGenerate}
                         disabled={!dateOfCulture || selectedTypes.length === 0}
@@ -963,13 +1223,22 @@ const Samples = () => {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+            <Dialog
+              open={paymentDialogOpen}
+              onOpenChange={setPaymentDialogOpen}
+            >
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Record Payment</DialogTitle>
                   <DialogDescription>
-                    Invoice: <span className="font-semibold">{currentInvoice?.invoiceId}</span> | 
-                    Farmer: <span className="font-semibold">{currentInvoice?.farmerName}</span>
+                    Invoice:{" "}
+                    <span className="font-semibold">
+                      {currentInvoice?.invoiceId}
+                    </span>{" "}
+                    | Farmer:{" "}
+                    <span className="font-semibold">
+                      {currentInvoice?.farmerName}
+                    </span>
                   </DialogDescription>
                 </DialogHeader>
 
@@ -977,12 +1246,18 @@ const Samples = () => {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">Total Bill</p>
-                      <p className="font-bold text-lg">₹{currentInvoice?.total || 0}</p>
+                      <p className="font-bold text-lg">
+                        ₹{currentInvoice?.total || 0}
+                      </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Pending Amount</p>
                       <p className="font-bold text-lg text-red-600">
-                        ₹{currentInvoice ? currentInvoice.total - (currentInvoice.paidAmount || 0) : 0}
+                        ₹
+                        {currentInvoice
+                          ? currentInvoice.total -
+                            (currentInvoice.paidAmount || 0)
+                          : 0}
                       </p>
                     </div>
                   </div>
@@ -995,25 +1270,36 @@ const Samples = () => {
                       onChange={(e) => setPaymentAmount(e.target.value)}
                       placeholder="Enter amount"
                       min="1"
-                      max={currentInvoice ? currentInvoice.total - (currentInvoice.paidAmount || 0) : undefined}
+                      max={
+                        currentInvoice
+                          ? currentInvoice.total -
+                            (currentInvoice.paidAmount || 0)
+                          : undefined
+                      }
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label>Payment Mode</Label>
-                    <Select value={paymentModeLocal} onValueChange={(v) => setPaymentModeLocal(v as any)}>
+                    <Select
+                      value={paymentModeLocal}
+                      onValueChange={(v) => setPaymentModeLocal(v as any)}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select payment mode" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
                         <SelectItem value="qr">QR Code / UPI</SelectItem>
-                        <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
+                        <SelectItem value="neft">
+                          NEFT / Bank Transfer
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {(paymentModeLocal === "qr" || paymentModeLocal === "neft") && (
+                  {(paymentModeLocal === "qr" ||
+                    paymentModeLocal === "neft") && (
                     <div className="space-y-2">
                       <Label>Transaction Reference</Label>
                       <Input
@@ -1026,10 +1312,19 @@ const Samples = () => {
                 </div>
 
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => { setPaymentDialogOpen(false); resetPaymentForm(); }}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setPaymentDialogOpen(false);
+                      resetPaymentForm();
+                    }}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={handleAddPayment} className="bg-blue-600 hover:bg-blue-700">
+                  <Button
+                    onClick={handleAddPayment}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
                     Record Payment
                   </Button>
                 </DialogFooter>

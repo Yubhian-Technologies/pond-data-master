@@ -1,9 +1,32 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileCheck2, Calendar, FileText, Users, UserCircle, IndianRupee, RotateCcw, Pencil, Search } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  FileCheck2,
+  Calendar,
+  FileText,
+  Users,
+  UserCircle,
+  IndianRupee,
+  RotateCcw,
+  Pencil,
+  Search,
+} from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, getDocs, Timestamp, query, where, orderBy } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  Timestamp,
+  query,
+  where,
+  orderBy,
+} from "firebase/firestore";
 import { db } from "./firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +41,14 @@ import {
 import { Input } from "@/components/ui/input";
 
 type ReportType = "Soil" | "Water" | "PL" | "PCR" | "Microbiology";
+const REPORT_SAMPLE_TYPE_OPTIONS = [
+  { value: "all", label: "All Sample Types" },
+  { value: "soil", label: "Soil" },
+  { value: "water", label: "Water" },
+  { value: "pl", label: "PL" },
+  { value: "pcr", label: "PCR" },
+  { value: "microbiology", label: "Microbiology" },
+] as const;
 
 interface ReportEntry {
   invoiceId: string;
@@ -39,8 +70,11 @@ const Reports = () => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<ReportEntry[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(true);
-  const [branchTechnicians, setBranchTechnicians] = useState<{ id: string; name: string }[]>([]);
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
+  const [branchTechnicians, setBranchTechnicians] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [selectedTechnicianId, setSelectedTechnicianId] =
+    useState<string>("all");
 
   // Date filter states
   const [startDate, setStartDate] = useState<string>("");
@@ -48,6 +82,7 @@ const Reports = () => {
 
   // Search state (new)
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedSampleType, setSelectedSampleType] = useState<string>("all");
 
   const locationId = session.locationId;
 
@@ -57,9 +92,9 @@ const Reports = () => {
       try {
         const techRef = collection(db, "locations", locationId, "technicians");
         const snap = await getDocs(techRef);
-        const techs = snap.docs.map(d => ({
+        const techs = snap.docs.map((d) => ({
           id: d.id,
-          name: d.data().name || "Unknown Technician"
+          name: d.data().name || "Unknown Technician",
         }));
         setBranchTechnicians(techs);
       } catch (err) {
@@ -77,7 +112,7 @@ const Reports = () => {
       try {
         let invoicesQuery = query(
           collection(db, "locations", locationId, "invoices"),
-          orderBy("createdAt", "desc")
+          orderBy("createdAt", "desc"),
         );
 
         // Apply date filters if provided
@@ -89,7 +124,7 @@ const Reports = () => {
             collection(db, "locations", locationId, "invoices"),
             where("createdAt", ">=", startT),
             where("createdAt", "<=", endT),
-            orderBy("createdAt", "desc")
+            orderBy("createdAt", "desc"),
           );
         }
 
@@ -179,7 +214,9 @@ const Reports = () => {
 
     // Technician filter
     if (selectedTechnicianId !== "all") {
-      result = result.filter((report) => report.technicianId === selectedTechnicianId);
+      result = result.filter(
+        (report) => report.technicianId === selectedTechnicianId,
+      );
     }
 
     // Text search filter
@@ -193,14 +230,21 @@ const Reports = () => {
       });
     }
 
+    if (selectedSampleType !== "all") {
+      result = result.filter((report) =>
+        report.types.some((type) => type.toLowerCase() === selectedSampleType),
+      );
+    }
+
     return result;
-  }, [reports, selectedTechnicianId, searchQuery]);
+  }, [reports, selectedTechnicianId, searchQuery, selectedSampleType]);
 
   const handleResetFilters = () => {
     setStartDate("");
     setEndDate("");
     setSelectedTechnicianId("all");
     setSearchQuery(""); // also reset search
+    setSelectedSampleType("all");
   };
 
   return (
@@ -227,7 +271,10 @@ const Reports = () => {
                       <Users className="w-4 h-4 text-purple-600" />
                       <span className="font-medium">Tech:</span>
                     </div>
-                    <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
+                    <Select
+                      value={selectedTechnicianId}
+                      onValueChange={setSelectedTechnicianId}
+                    >
                       <SelectTrigger className="w-56 h-10 border-none shadow-none focus:ring-0">
                         <SelectValue placeholder="All Technicians" />
                       </SelectTrigger>
@@ -243,7 +290,11 @@ const Reports = () => {
                   </div>
 
                   {/* Reset Filters Button */}
-                  {(startDate || endDate || selectedTechnicianId !== "all" || searchQuery) && (
+                  {(startDate ||
+                    endDate ||
+                    selectedTechnicianId !== "all" ||
+                    searchQuery ||
+                    selectedSampleType !== "all") && (
                     <Button
                       variant="outline"
                       size="icon"
@@ -256,7 +307,6 @@ const Reports = () => {
                 </div>
               </div>
 
-              
               <Card className="shadow-sm">
                 <CardContent className="pt-6">
                   <div className="flex flex-wrap items-end gap-4">
@@ -294,10 +344,26 @@ const Reports = () => {
                         onChange={(e) => setEndDate(e.target.value)}
                       />
                     </div>
-                   
-
-                    
-                    
+                    <div className="flex-1 min-w-[200px]">
+                      <label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                        Sample Type
+                      </label>
+                      <Select
+                        value={selectedSampleType}
+                        onValueChange={setSelectedSampleType}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="All Sample Types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REPORT_SAMPLE_TYPE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -315,7 +381,11 @@ const Reports = () => {
                     <FileText className="w-10 h-10 text-gray-400" />
                   </div>
                   <h3 className="text-xl font-medium text-muted-foreground mb-2">
-                    {selectedTechnicianId !== "all" || startDate || endDate || searchQuery
+                    {selectedTechnicianId !== "all" ||
+                    startDate ||
+                    endDate ||
+                    searchQuery ||
+                    selectedSampleType !== "all"
                       ? "No reports found for selected filters"
                       : "No completed reports yet"}
                   </h3>
@@ -339,7 +409,10 @@ const Reports = () => {
                           </h3>
                           <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
                             <FileText className="w-3.5 h-3.5" />
-                            Invoice: <span className="font-mono text-gray-700">{report.invoiceId}</span>
+                            Invoice:{" "}
+                            <span className="font-mono text-gray-700">
+                              {report.invoiceId}
+                            </span>
                           </p>
                         </div>
 
@@ -348,8 +421,12 @@ const Reports = () => {
                             <Calendar className="w-3.5 h-3.5" />
                             {report.displayDate}
                           </p>
-                          <Badge variant="secondary" className="mt-2 text-xs px-3 py-1">
-                            {report.types.length} report{report.types.length > 1 ? "s" : ""} ready
+                          <Badge
+                            variant="secondary"
+                            className="mt-2 text-xs px-3 py-1"
+                          >
+                            {report.types.length} report
+                            {report.types.length > 1 ? "s" : ""} ready
                           </Badge>
                         </div>
                       </div>
@@ -394,10 +471,13 @@ const Reports = () => {
                                     : "text-red-600 font-medium"
                                 }
                               >
-                                Payment {report.isFullyPaid ? "Completed" : "Pending"}
+                                Payment{" "}
+                                {report.isFullyPaid ? "Completed" : "Pending"}
                               </span>
                               <span className="text-gray-600">|</span>
-                              <span className="font-medium">₹{report.paidAmount}</span>
+                              <span className="font-medium">
+                                ₹{report.paidAmount}
+                              </span>
                               <span className="text-gray-600">|</span>
                               <span className="font-medium">
                                 Pending: ₹{report.pendingAmount}

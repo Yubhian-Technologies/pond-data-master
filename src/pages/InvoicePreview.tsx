@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useLocation } from "react-router-dom";
-import InvoiceTemplate from "@/data/template";   // adjust path if needed
+import InvoiceTemplate from "@/data/template"; // adjust path if needed
 
 interface InvoiceState {
   invoiceId: string;
@@ -22,16 +22,19 @@ interface InvoiceState {
   gstAmount: number;
   total: number;
   paymentMode: "cash" | "qr" | "neft" | "rtgs";
+  transactionRef?: string | null;
   isPartialPayment?: boolean;
   paidAmount?: number | null;
   balanceAmount?: number;
   // ─── Add this line (or make sure it's included in the type)
-  locationId?: string;   
+  locationId?: string;
 }
 
 const InvoicePreview: React.FC = () => {
   const location = useLocation();
-  const navState = location.state as (InvoiceState & { locationId?: string }) | null;
+  const navState = location.state as
+    | (InvoiceState & { locationId?: string })
+    | null;
 
   if (!navState) {
     return (
@@ -52,9 +55,9 @@ const InvoicePreview: React.FC = () => {
   const { locationId, ...invoiceData } = navState;
 
   return (
-    <InvoiceTemplate 
-      state={invoiceData} 
-      locationId={locationId || ""}   // ← this prevents undefined
+    <InvoiceTemplate
+      state={invoiceData}
+      locationId={locationId || ""} // ← this prevents undefined
     />
   );
 };
