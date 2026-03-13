@@ -1,18 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  doc, 
-  getDoc, 
-  collection, 
-  getDocs, 
-  query, 
-  where 
+import {
+  doc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
 import { Printer, Download } from "lucide-react";
 import { useUserSession } from "@/contexts/UserSessionContext";
-import html2canvas from 'html2canvas';
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 interface FarmerInfo {
   farmerName: string;
@@ -61,7 +62,6 @@ export default function MicrobiologyReport({
 
   const reportRef = useRef<HTMLDivElement>(null);
 
-
   useEffect(() => {
     const fetchRealDocId = async () => {
       if (!invoiceId || !locationId) {
@@ -85,7 +85,10 @@ export default function MicrobiologyReport({
           setRealInvoiceDocId(docSnap.id);
           console.log("MicrobiologyReport - Found real docId:", docSnap.id);
         } else {
-          console.error("MicrobiologyReport - Invoice document not found for:", invoiceId);
+          console.error(
+            "MicrobiologyReport - Invoice document not found for:",
+            invoiceId,
+          );
         }
       } catch (err) {
         console.error("Error fetching invoice docId:", err);
@@ -94,7 +97,6 @@ export default function MicrobiologyReport({
 
     fetchRealDocId();
   }, [invoiceId, locationId]);
-
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -113,7 +115,7 @@ export default function MicrobiologyReport({
           "invoices",
           realInvoiceDocId,
           "microbiologyReports",
-          "data"
+          "data",
         );
 
         const snap = await getDoc(reportRef);
@@ -135,16 +137,31 @@ export default function MicrobiologyReport({
           };
 
           const filled = {
-            testCode: Array.from({ length: allSampleCount }, (_, i) => microData.testCode?.[i] || `Sample ${i + 1}`),
-            yellowColonies: Array.from({ length: allSampleCount }, (_, i) => microData.yellowColonies?.[i] || "-"),
-            greenColonies: Array.from({ length: allSampleCount }, (_, i) => microData.greenColonies?.[i] || "-"),
-            tpc: Array.from({ length: allSampleCount }, (_, i) => microData.tpc?.[i] || "-"),
+            testCode: Array.from(
+              { length: allSampleCount },
+              (_, i) => microData.testCode?.[i] || `Sample ${i + 1}`,
+            ),
+            yellowColonies: Array.from(
+              { length: allSampleCount },
+              (_, i) => microData.yellowColonies?.[i] || "-",
+            ),
+            greenColonies: Array.from(
+              { length: allSampleCount },
+              (_, i) => microData.greenColonies?.[i] || "-",
+            ),
+            tpc: Array.from(
+              { length: allSampleCount },
+              (_, i) => microData.tpc?.[i] || "-",
+            ),
           };
 
           setData(filled);
         } else {
           const empty = {
-            testCode: Array.from({ length: allSampleCount }, (_, i) => `Sample ${i + 1}`),
+            testCode: Array.from(
+              { length: allSampleCount },
+              (_, i) => `Sample ${i + 1}`,
+            ),
             yellowColonies: Array.from({ length: allSampleCount }, () => "-"),
             greenColonies: Array.from({ length: allSampleCount }, () => "-"),
             tpc: Array.from({ length: allSampleCount }, () => "-"),
@@ -159,7 +176,13 @@ export default function MicrobiologyReport({
 
         setTechnicianName(techName);
 
-        const invoiceRef = doc(db, "locations", locationId, "invoices", realInvoiceDocId);
+        const invoiceRef = doc(
+          db,
+          "locations",
+          locationId,
+          "invoices",
+          realInvoiceDocId,
+        );
         const invoiceSnap = await getDoc(invoiceRef);
 
         if (invoiceSnap.exists()) {
@@ -168,7 +191,6 @@ export default function MicrobiologyReport({
         } else {
           setCheckedByName("______________________");
         }
-
       } catch (e) {
         console.error("Error fetching microbiology report:", e);
         setData(null);
@@ -186,7 +208,6 @@ export default function MicrobiologyReport({
       fetchReport();
     }
   }, [realInvoiceDocId, locationId, allSampleCount, session]);
-
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -210,60 +231,113 @@ export default function MicrobiologyReport({
     fetchLocationDetails();
   }, [locationId]);
 
-
   const handlePrint = () => {
     window.print();
   };
+  const handleDownloadPdf = async () => {
+    if (!reportRef.current) return;
+    const element = reportRef.current;
+
+    try {
+      const originalPadding = element.style.padding;
+      const originalWidth = element.style.width;
+
+      element.style.padding = "8px";
+      element.style.width = "1200px";
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        scrollY: -window.scrollY,
+        windowWidth: element.scrollWidth + 100,
+      });
+
+      element.style.padding = originalPadding;
+      element.style.width = originalWidth;
+
+      const imageData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 6;
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+
+      const widthRatio = maxWidth / canvas.width;
+      const heightRatio = maxHeight / canvas.height;
+      const ratio = Math.min(widthRatio, heightRatio);
+
+      const renderWidth = canvas.width * ratio;
+      const renderHeight = canvas.height * ratio;
+      const x = (pageWidth - renderWidth) / 2;
+      const y = margin;
+
+      pdf.addImage(imageData, "JPEG", x, y, renderWidth, renderHeight);
+      pdf.save(`Microbiology_Report_${invoiceId}.pdf`);
+    } catch (err) {
+      console.error("PDF Download Error:", err);
+    }
+  };
   const handleDownloadJpeg = async () => {
-  if (!reportRef.current) return;
-  const element = reportRef.current;
+    if (!reportRef.current) return;
+    const element = reportRef.current;
 
-  try {
-    // 1. Add temporary padding to the element for the capture
-    const originalPadding = element.style.padding;
-    element.style.padding = "40px"; // Adjust this value for more/less border space
+    try {
+      // 1. Add temporary padding to the element for the capture
+      const originalPadding = element.style.padding;
+      element.style.padding = "40px"; // Adjust this value for more/less border space
 
-    const canvas = await html2canvas(element, {
-      scale: 2, // High quality
-      useCORS: true, 
-      backgroundColor: "#ffffff",
-      // Ensures the canvas captures the full height even if scrolled
-      scrollY: -window.scrollY, 
-      windowWidth: element.scrollWidth + 100, // Adds extra horizontal room
-    });
+      const canvas = await html2canvas(element, {
+        scale: 2, // High quality
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        // Ensures the canvas captures the full height even if scrolled
+        scrollY: -window.scrollY,
+        windowWidth: element.scrollWidth + 100, // Adds extra horizontal room
+      });
 
-    // 2. Revert the element's style back to original immediately after capture
-    element.style.padding = originalPadding;
+      // 2. Revert the element's style back to original immediately after capture
+      element.style.padding = originalPadding;
 
-    const image = canvas.toDataURL("image/jpeg", 0.9);
-    const link = document.createElement("a");
-    link.href = image;
-    link.download = `Micro-Report_${invoiceId}.jpg`;
-    link.click();
-  } catch (err) {
-    console.error("JPEG Capture Error:", err);
-  }
-};
- 
+      const image = canvas.toDataURL("image/jpeg", 0.9);
+      const link = document.createElement("a");
+      link.href = image;
+      link.download = `Micro-Report_${invoiceId}.jpg`;
+      link.click();
+    } catch (err) {
+      console.error("JPEG Capture Error:", err);
+    }
+  };
 
   if (loading) {
     return <p className="text-center py-8 text-lg">Loading Report...</p>;
   }
 
   if (!data) {
-    return <p className="text-center py-8 text-red-600 text-xl">No microbiology report found.</p>;
+    return (
+      <p className="text-center py-8 text-red-600 text-xl">
+        No microbiology report found.
+      </p>
+    );
   }
 
   const formatDateDDMMYYYY = (dateStr: string | undefined): string => {
-  if (!dateStr) return "-";
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).replace(/\//g, '-');
-};
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return date
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "-");
+  };
 
   return (
     <>
@@ -276,17 +350,20 @@ export default function MicrobiologyReport({
           <Printer size={20} /> Print Report
         </button>
         <button
+          onClick={handleDownloadPdf}
+          className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 shadow"
+        >
+          <Download size={20} /> Save Report as PDF
+        </button>
+        <button
           onClick={handleDownloadJpeg}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 shadow"
         >
-          <Printer size={20} /> Download JPEG
+          <Download size={20} /> Download JPEG
         </button>
-
-        
       </div>
 
-      
-      <div 
+      <div
         ref={reportRef}
         className="bg-white print:flex print:flex-col print:min-h-[297mm]"
         id="report"
@@ -302,8 +379,8 @@ export default function MicrobiologyReport({
               {locationDetails.address || "Loading lab address..."}
             </p>
             <p className="text-sm text-black print:text-xs">
-              Contact No: {locationDetails.contactNumber || "Loading..."} | 
-              Mail Id: {locationDetails.email || "Loading..."}
+              Contact No: {locationDetails.contactNumber || "Loading..."} | Mail
+              Id: {locationDetails.email || "Loading..."}
             </p>
             <p className="text-sm text-black print:text-xs">
               GSTIN: - 37AABCT0601L1ZJ
@@ -317,28 +394,54 @@ export default function MicrobiologyReport({
           <table className="border-2 border-gray-800 text-sm w-full max-w-full print:text-xs">
             <tbody>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer Name</td>
-                <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerName || "-"}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Mobile</td>
-                <td className="border px-4 py-2 w-1/8">{farmerInfo?.mobile || "-"}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                  Farmer Name
+                </td>
+                <td className="border px-4 py-2 w-1/8">
+                  {farmerInfo?.farmerName || "-"}
+                </td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                  Mobile
+                </td>
+                <td className="border px-4 py-2 w-1/8">
+                  {farmerInfo?.mobile || "-"}
+                </td>
               </tr>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Address</td>
-                <td className="border px-4 py-2 w-1/8">{farmerInfo?.address || "-"}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Report ID</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                  Address
+                </td>
+                <td className="border px-4 py-2 w-1/8">
+                  {farmerInfo?.address || "-"}
+                </td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                  Report ID
+                </td>
                 <td className="border px-4 py-2 w-1/8">{invoiceId || "-"}</td>
               </tr>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">No. of Samples</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                  No. of Samples
+                </td>
                 <td className="border px-4 py-2 w-1/8">{allSampleCount}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Farmer ID</td>
-                <td className="border px-4 py-2 w-1/8">{farmerInfo?.farmerId || "-"}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                  Farmer ID
+                </td>
+                <td className="border px-4 py-2 w-1/8">
+                  {farmerInfo?.farmerId || "-"}
+                </td>
               </tr>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Sample Type</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                  Sample Type
+                </td>
                 <td className="border px-4 py-2 w-1/8">Microbiology</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">Date</td>
-                <td className="border px-4 py-2 w-1/8">{formatDateDDMMYYYY(farmerInfo?.date)}</td>
+                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                  Date
+                </td>
+                <td className="border px-4 py-2 w-1/8">
+                  {formatDateDDMMYYYY(farmerInfo?.date)}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -356,18 +459,26 @@ export default function MicrobiologyReport({
           <table className="border-2 border-gray-800 text-sm w-full max-w-lg print:max-w-none print:w-full print:text-xs">
             <thead>
               <tr className="bg-blue-100">
-                <th 
-                  colSpan={4} 
+                <th
+                  colSpan={4}
                   className="border px-4 py-2 text-center font-bold text-base print:text-sm"
                 >
                   VIBRIO CFU/ml
                 </th>
               </tr>
               <tr className="bg-gray-200">
-                <th className="border px-4 py-1.5 font-semibold text-sm print:py-1">Test Code</th>
-                <th className="border px-4 py-1.5 font-semibold text-sm bg-yellow-200 print:py-1">Yellow Colonies</th>
-                <th className="border px-4 py-1.5 font-semibold text-sm bg-green-300 print:py-1">Green Colonies</th>
-                <th className="border px-4 py-1.5 font-semibold text-sm print:py-1">TPC</th>
+                <th className="border px-4 py-1.5 font-semibold text-sm print:py-1">
+                  Test Code
+                </th>
+                <th className="border px-4 py-1.5 font-semibold text-sm bg-yellow-200 print:py-1">
+                  Yellow Colonies
+                </th>
+                <th className="border px-4 py-1.5 font-semibold text-sm bg-green-300 print:py-1">
+                  Green Colonies
+                </th>
+                <th className="border px-4 py-1.5 font-semibold text-sm print:py-1">
+                  TPC
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -388,10 +499,18 @@ export default function MicrobiologyReport({
                 </tr>
               ))}
               <tr className="bg-red-50 font-semibold">
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">Optimum Values</td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">&lt; 300</td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">&lt; 50</td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">&lt; 1000</td>
+                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">
+                  Optimum Values
+                </td>
+                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">
+                  &lt; 300
+                </td>
+                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">
+                  &lt; 50
+                </td>
+                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">
+                  &lt; 1000
+                </td>
               </tr>
             </tbody>
           </table>
@@ -416,7 +535,11 @@ export default function MicrobiologyReport({
 
         {/* Note */}
         <div className="text-center text-sm text-gray-700 mt-8 mb-6 print:text-xs print:mt-4 print:mb-4">
-          <p><strong className="text-red-600">Note:</strong> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation.</p>
+          <p>
+            <strong className="text-red-600">Note:</strong> The samples brought
+            by Farmer, the Results Reported above are meant for Guidance only
+            for Aquaculture purpose, Not for any Litigation.
+          </p>
         </div>
 
         <div className="mt-10 font-bold text-center text-sm text-red-600 mb-6 print:mt-6 print:mb-4 print:text-xs">
@@ -424,7 +547,6 @@ export default function MicrobiologyReport({
         </div>
       </div>
 
-      
       <style>{`
         @media print {
           @page {

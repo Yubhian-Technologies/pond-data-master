@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Printer, Download } from "lucide-react";
 import { useParams } from "react-router-dom";
 import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import {
   doc,
   getDoc,
@@ -90,13 +91,13 @@ const SoilReport: React.FC<SoilReportProps> = ({
     try {
       const originalPadding = element.style.padding;
       const originalWidth = element.style.width;
-      
-      element.style.padding = "40px"; 
+
+      element.style.padding = "8px";
       element.style.width = "1200px";
 
       const canvas = await html2canvas(element, {
         scale: 2,
-        useCORS: true, 
+        useCORS: true,
         backgroundColor: "#ffffff",
         scrollY: -window.scrollY,
       });
@@ -114,13 +115,68 @@ const SoilReport: React.FC<SoilReportProps> = ({
     }
   };
 
+  const handleDownloadPdf = async () => {
+    if (!reportRef.current) return;
+    const element = reportRef.current;
+
+    try {
+      const originalPadding = element.style.padding;
+      const originalWidth = element.style.width;
+
+      element.style.padding = "40px";
+      element.style.width = "1200px";
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        scrollY: -window.scrollY,
+      });
+
+      element.style.padding = originalPadding;
+      element.style.width = originalWidth;
+
+      const imageData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 6;
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+
+      const widthRatio = maxWidth / canvas.width;
+      const heightRatio = maxHeight / canvas.height;
+      const ratio = Math.min(widthRatio, heightRatio);
+
+      const renderWidth = canvas.width * ratio;
+      const renderHeight = canvas.height * ratio;
+      const x = (pageWidth - renderWidth) / 2;
+      const y = margin;
+
+      pdf.addImage(imageData, "JPEG", x, y, renderWidth, renderHeight);
+      pdf.save(`Soil_Report_${invoiceId}.pdf`);
+    } catch (err) {
+      console.error("PDF Download Error:", err);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         if (!invoiceId || !locationId) return;
 
         // Fetch report data (soil-specific fields + remarks)
-        const reportRef = doc(db, "locations", locationId, "reports", invoiceId);
+        const reportRef = doc(
+          db,
+          "locations",
+          locationId,
+          "reports",
+          invoiceId,
+        );
         const reportSnap = await getDoc(reportRef);
 
         let technicianName = "";
@@ -168,16 +224,20 @@ const SoilReport: React.FC<SoilReportProps> = ({
         const calculatedSoilCount =
           data.sampleType
             ?.filter((s: any) => s.type?.toLowerCase() === "soil")
-            .reduce((sum: number, item: any) => sum + Number(item.count || 0), 0) || 0;
+            .reduce(
+              (sum: number, item: any) => sum + Number(item.count || 0),
+              0,
+            ) || 0;
 
-        const displaySampleCount = allSampleCount > 0 ? allSampleCount : calculatedSoilCount;
+        const displaySampleCount =
+          allSampleCount > 0 ? allSampleCount : calculatedSoilCount;
 
         const finalSampleDate =
           savedSampleDate ||
           data.dateOfCulture ||
           data.sampleDate ||
           data.formattedDate ||
-          (data.createdAt?.toDate?.()?.toISOString().split("T")[0]) ||
+          data.createdAt?.toDate?.()?.toISOString().split("T")[0] ||
           new Date().toISOString().split("T")[0];
 
         setFormData((prev) => ({
@@ -197,11 +257,17 @@ const SoilReport: React.FC<SoilReportProps> = ({
           sampleTime,
           reportTime,
         }));
-        
+
         setCheckedByName(data.checkedBy || "________________");
 
         if (data.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", data.farmerId);
+          const farmerRef = doc(
+            db,
+            "locations",
+            locationId,
+            "farmers",
+            data.farmerId,
+          );
           const farmerSnap = await getDoc(farmerRef);
 
           if (farmerSnap.exists()) {
@@ -210,9 +276,10 @@ const SoilReport: React.FC<SoilReportProps> = ({
             setFormData((prev) => ({
               ...prev,
               farmerUID: farmerData.farmerId || prev.farmerUID,
-              farmerAddress: [farmerData.address, farmerData.city, farmerData.state]
-                .filter(Boolean)
-                .join(", ") || prev.farmerAddress,
+              farmerAddress:
+                [farmerData.address, farmerData.city, farmerData.state]
+                  .filter(Boolean)
+                  .join(", ") || prev.farmerAddress,
               mobile: farmerData.phone || prev.mobile,
             }));
           }
@@ -224,7 +291,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
           locationId,
           "reports",
           invoiceId,
-          "soil samples"
+          "soil samples",
         );
 
         const sampleSnap = await getDocs(samplesRef);
@@ -272,20 +339,27 @@ const SoilReport: React.FC<SoilReportProps> = ({
     fetchLocationDetails();
   }, [locationId]);
 
-  if (loading) return <p className="text-center py-12 text-xl">Loading Soil Report...</p>;
+  if (loading)
+    return <p className="text-center py-12 text-xl">Loading Soil Report...</p>;
   if (samples.length === 0 && formData.farmerName === "") {
-    return <p className="text-center py-12 text-red-600 text-xl">No soil report data found for this invoice.</p>;
+    return (
+      <p className="text-center py-12 text-red-600 text-xl">
+        No soil report data found for this invoice.
+      </p>
+    );
   }
   const formatDateDDMMYYYY = (dateStr: string | undefined): string => {
-  if (!dateStr) return "-";
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).replace(/\//g, '-');
-};
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return date
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "-");
+  };
 
   return (
     <>
@@ -297,10 +371,16 @@ const SoilReport: React.FC<SoilReportProps> = ({
           <Printer size={20} /> Print Report (PDF)
         </button>
         <button
+          onClick={handleDownloadPdf}
+          className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700"
+        >
+          <Download size={20} /> Save Report as PDF
+        </button>
+        <button
           onClick={handleDownloadJpeg}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
         >
-          <Printer size={20} /> Download JPEG
+          <Download size={20} /> Download JPEG
         </button>
       </div>
 
@@ -315,11 +395,10 @@ const SoilReport: React.FC<SoilReportProps> = ({
               {locationDetails.address || "Loading lab address..."}
             </p>
             <p className="text-sm text-black">
-              Contact No: {locationDetails.contactNumber || "Loading..."} | Mail Id: {locationDetails.email || "Loading..."}
+              Contact No: {locationDetails.contactNumber || "Loading..."} | Mail
+              Id: {locationDetails.email || "Loading..."}
             </p>
-            <p className="text-sm text-black">
-              GSTIN: - 37AABCT0601L1ZJ
-            </p>
+            <p className="text-sm text-black">GSTIN: - 37AABCT0601L1ZJ</p>
           </div>
           <img src={AV} alt="AV Logo" className="w-40 object-contain" />
         </div>
@@ -372,7 +451,7 @@ const SoilReport: React.FC<SoilReportProps> = ({
             Sample Collection Time
           </div>
           <div className="col-span-1 border-t border-black p-1">
-          {formatDateDDMMYYYY(formData.sampleCollectionTime)}
+            {formatDateDDMMYYYY(formData.sampleCollectionTime)}
           </div>
 
           {/* Row 3 */}
@@ -398,46 +477,187 @@ const SoilReport: React.FC<SoilReportProps> = ({
           </div>
         </div>
 
-        <table className="w-full mb-4 text-xs" style={{ border: '2px solid #1f2937' }}>
+        <table
+          className="w-full mb-4 text-xs"
+          style={{ border: "2px solid #1f2937" }}
+        >
           <thead>
-            <tr style={{ borderBottom: '2px solid #1f2937', backgroundColor: '#d1d5db' }}>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Pond No.</th>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>pH</th>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>EC (ds/m)</th>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>CaCO₃ Content(%)</th>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Soil texture</th>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Organic Carbon(%)</th>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Available Nitrogen (mg/kg)</th>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Available Phos-phorus (mg/kg)</th>
-              <th className="px-2 py-2 font-bold" style={{ borderRight: '1px solid #1f2937' }}>Redox Potential (mV)</th>
+            <tr
+              style={{
+                borderBottom: "2px solid #1f2937",
+                backgroundColor: "#d1d5db",
+              }}
+            >
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                Pond No.
+              </th>
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                pH
+              </th>
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                EC (ds/m)
+              </th>
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                CaCO₃ Content(%)
+              </th>
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                Soil texture
+              </th>
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                Organic Carbon(%)
+              </th>
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                Available Nitrogen (mg/kg)
+              </th>
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                Available Phos-phorus (mg/kg)
+              </th>
+              <th
+                className="px-2 py-2 font-bold"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                Redox Potential (mV)
+              </th>
               {/* Remarks column removed */}
             </tr>
           </thead>
           <tbody>
             {samples.map((sample, index) => (
-              <tr key={index} style={{ borderBottom: '1px solid #1f2937' }}>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.pondNo || "-"}</td>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.pH || "-"}</td>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.ec || "-"}</td>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.caco3 || "-"}</td>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.soilTexture || "-"}</td>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.organicCarbon || "-"}</td>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.availableNitrogen || "-"}</td>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.availablePhosphorus || "-"}</td>
-                <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>{sample.redoxPotential || "-"}</td>
+              <tr key={index} style={{ borderBottom: "1px solid #1f2937" }}>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.pondNo || "-"}
+                </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.pH || "-"}
+                </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.ec || "-"}
+                </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.caco3 || "-"}
+                </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.soilTexture || "-"}
+                </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.organicCarbon || "-"}
+                </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.availableNitrogen || "-"}
+                </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.availablePhosphorus || "-"}
+                </td>
+                <td
+                  className="px-2 py-2 text-center"
+                  style={{ borderRight: "1px solid #1f2937" }}
+                >
+                  {sample.redoxPotential || "-"}
+                </td>
                 {/* No remarks cell here anymore */}
               </tr>
             ))}
-            <tr style={{ backgroundColor: '#e5e7eb' }}>
-              <td className="px-2 py-2 text-center font-semibold italic" style={{ borderRight: '1px solid #1f2937' }}>Optimum level</td>
-              <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>7.0-8.0</td>
-              <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>&gt;4</td>
-              <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>&gt;5.0</td>
-              <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}></td>
-              <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>0.5 - 1.5</td>
-              <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>50 - 75</td>
-              <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>4 - 6</td>
-              <td className="px-2 py-2 text-center" style={{ borderRight: '1px solid #1f2937' }}>Less than -150</td>
+            <tr style={{ backgroundColor: "#e5e7eb" }}>
+              <td
+                className="px-2 py-2 text-center font-semibold italic"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                Optimum level
+              </td>
+              <td
+                className="px-2 py-2 text-center"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                7.0-8.0
+              </td>
+              <td
+                className="px-2 py-2 text-center"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                &gt;4
+              </td>
+              <td
+                className="px-2 py-2 text-center"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                &gt;5.0
+              </td>
+              <td
+                className="px-2 py-2 text-center"
+                style={{ borderRight: "1px solid #1f2937" }}
+              ></td>
+              <td
+                className="px-2 py-2 text-center"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                0.5 - 1.5
+              </td>
+              <td
+                className="px-2 py-2 text-center"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                50 - 75
+              </td>
+              <td
+                className="px-2 py-2 text-center"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                4 - 6
+              </td>
+              <td
+                className="px-2 py-2 text-center"
+                style={{ borderRight: "1px solid #1f2937" }}
+              >
+                Less than -150
+              </td>
               {/* No remarks optimum cell */}
             </tr>
           </tbody>
@@ -445,27 +665,44 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
         {/* ────────────────────── Shared Remarks Section ────────────────────── */}
         <div className="mb-6 border border-black p-4">
-          <h3 className="font-bold text-base mb-2 text-red-700 text-[10px]">Remarks & Recommendations:</h3>
+          <h3 className="font-bold text-base mb-2 text-red-700 text-[10px]">
+            Remarks & Recommendations:
+          </h3>
           <div className="text-sm whitespace-pre-wrap min-h-[30px]">
             {remarks || "No remarks provided."}
           </div>
         </div>
 
-        <div className="mb-4" style={{ border: '2px solid #1f2937' }}>
-          <div className="text-xs px-2 py-1" style={{ borderBottom: '1px solid #1f2937' }}>
-            <span className="font-bold">Note :</span> The samples brought by Farmer, the Results Reported above are meant for Guidance only for Aquaculture purpose, Not for any Litigation
+        <div className="mb-4" style={{ border: "2px solid #1f2937" }}>
+          <div
+            className="text-xs px-2 py-1"
+            style={{ borderBottom: "1px solid #1f2937" }}
+          >
+            <span className="font-bold">Note :</span> The samples brought by
+            Farmer, the Results Reported above are meant for Guidance only for
+            Aquaculture purpose, Not for any Litigation
           </div>
           <div className="flex">
-            <div className="px-2 py-1 text-xs" style={{ width: '33.33%', borderRight: '1px solid #1f2937' }}>
-              <span className="font-semibold">Reported by :</span> {formData.reportedBy}
+            <div
+              className="px-2 py-1 text-xs"
+              style={{ width: "33.33%", borderRight: "1px solid #1f2937" }}
+            >
+              <span className="font-semibold">Reported by :</span>{" "}
+              {formData.reportedBy}
             </div>
-            <div className="px-2 py-2 text-xs font-medium" style={{ width: '50%' }}>
+            <div
+              className="px-2 py-2 text-xs font-medium"
+              style={{ width: "50%" }}
+            >
               Checked by: {checkedByName}
             </div>
           </div>
         </div>
 
-        <div className="text-center font-bold text-sm" style={{ color: '#dc2626' }}>
+        <div
+          className="text-center font-bold text-sm"
+          style={{ color: "#dc2626" }}
+        >
           ADC AQUA DIAGNOSTIC CENTER committed for Complete Farming Solutions
         </div>
       </div>
