@@ -444,11 +444,11 @@ if (found) {
               </div>
 
               {/* Sample label */}
-              <div className="py-4 text-center w-full bg-white">
+              {/* <div className="py-4 text-center w-full bg-white">
                 <p className="text-base font-semibold text-gray-900">
                   Sample {r.sampleCode}
                 </p>
-              </div>
+              </div> */}
             </div>
           ))}
       </div>

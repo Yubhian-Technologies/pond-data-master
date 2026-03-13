@@ -637,7 +637,7 @@ setCtCustomMode(
             </div>
 
             <div className="mb-12">
-              <h4 className="font-semibold text-lg mb-4">Gel Electrophoresis Image</h4>
+              <h4 className="font-semibold text-lg mb-4">PCR Amplification Image</h4>
               <input
                 type="file"
                 accept="image/*"
