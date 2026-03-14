@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, User, Edit } from "lucide-react";
+import { Plus, Search, User, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { db } from "./firebase";
@@ -41,6 +41,7 @@ import {
   query,
   where,
   orderBy,
+  deleteDoc,
 } from "firebase/firestore";
 
 import { useUserSession } from "../contexts/UserSessionContext";
@@ -80,6 +81,8 @@ const Farmers = () => {
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [locationCode, setLocationCode] = useState<string>("");
   const [nextFarmerId, setNextFarmerId] = useState<string>("Loading...");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [farmerToDelete, setFarmerToDelete] = useState<Farmer | null>(null);
 
   // Fetch location name and determine code from name
   useEffect(() => {
@@ -106,7 +109,12 @@ const Farmers = () => {
           else if (locationName.includes("juvvalapalem")) matchedCode = "JP";
 
           setLocationCode(matchedCode);
-          console.log("Detected location code:", matchedCode, "from name:", data?.name);
+          console.log(
+            "Detected location code:",
+            matchedCode,
+            "from name:",
+            data?.name,
+          );
         } else {
           toast.error("Location not found.");
           setLocationCode("XXX");
@@ -126,7 +134,12 @@ const Farmers = () => {
     if (!session.locationId || !locationCode || locationCode === "XXX") return;
 
     try {
-      const farmersRef = collection(db, "locations", session.locationId, "farmers");
+      const farmersRef = collection(
+        db,
+        "locations",
+        session.locationId,
+        "farmers",
+      );
       const q = query(farmersRef, orderBy("farmerId", "asc"));
       const snap = await getDocs(q);
 
@@ -148,7 +161,9 @@ const Farmers = () => {
       const maxNum = numbers.length > 0 ? Math.max(...numbers) : 0;
       const nextNum = maxNum + 1;
 
-      setNextFarmerId(`ADC_${locationCode}_FR_${String(nextNum).padStart(3, "0")}`);
+      setNextFarmerId(
+        `ADC_${locationCode}_FR_${String(nextNum).padStart(3, "0")}`,
+      );
     } catch (err) {
       console.error("Error fetching farmers:", err);
       toast.error("Failed to load farmers");
@@ -188,17 +203,58 @@ const Farmers = () => {
     setOpen(true);
   };
 
+  const handleDelete = async (farmer: Farmer) => {
+    setFarmerToDelete(farmer);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!farmerToDelete || !session.locationId) {
+      toast.error("Invalid farmer or location.");
+      return;
+    }
+
+    try {
+      const farmerRef = doc(
+        db,
+        "locations",
+        session.locationId,
+        "farmers",
+        farmerToDelete.id,
+      );
+      await deleteDoc(farmerRef);
+
+      toast.success(`Farmer ${farmerToDelete.name} deleted successfully!`);
+      setDeleteDialogOpen(false);
+      setFarmerToDelete(null);
+      fetchFarmers();
+    } catch (err) {
+      console.error("Error deleting farmer:", err);
+      toast.error("Failed to delete farmer.");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!session.technicianId || !session.locationId || locationCode === "XXX") {
+    if (
+      !session.technicianId ||
+      !session.locationId ||
+      locationCode === "XXX"
+    ) {
       toast.error("Cannot register: Invalid location or code missing.");
       return;
     }
 
     try {
       if (editMode && editFarmerId) {
-        const farmerRef = doc(db, "locations", session.locationId, "farmers", editFarmerId);
+        const farmerRef = doc(
+          db,
+          "locations",
+          session.locationId,
+          "farmers",
+          editFarmerId,
+        );
         await updateDoc(farmerRef, {
           name: formData.name,
           phone: formData.phone,
@@ -212,8 +268,16 @@ const Farmers = () => {
         });
 
         // Sync to invoices (only name & phone)
-        const invoicesRef = collection(db, "locations", session.locationId, "invoices");
-        const invoiceQuery = query(invoicesRef, where("farmerId", "==", editFarmerId));
+        const invoicesRef = collection(
+          db,
+          "locations",
+          session.locationId,
+          "invoices",
+        );
+        const invoiceQuery = query(
+          invoicesRef,
+          where("farmerId", "==", editFarmerId),
+        );
         const invoiceSnap = await getDocs(invoiceQuery);
 
         if (!invoiceSnap.empty) {
@@ -221,7 +285,7 @@ const Farmers = () => {
             updateDoc(inv.ref, {
               farmerName: formData.name,
               farmerPhone: formData.phone,
-            })
+            }),
           );
           await Promise.all(updates);
         }
@@ -247,7 +311,10 @@ const Farmers = () => {
           },
         };
 
-        await addDoc(collection(db, "locations", session.locationId, "farmers"), newFarmer);
+        await addDoc(
+          collection(db, "locations", session.locationId, "farmers"),
+          newFarmer,
+        );
 
         toast.success(`Farmer registered! ID: ${newFarmerId}`);
       }
@@ -257,8 +324,14 @@ const Farmers = () => {
       setEditMode(false);
       setEditFarmerId(null);
       setFormData({
-        name: "", phone: "", address: "", state: "", district: "",
-        waterSource: "", cultureAreas: "", species: "",
+        name: "",
+        phone: "",
+        address: "",
+        state: "",
+        district: "",
+        waterSource: "",
+        cultureAreas: "",
+        species: "",
       });
 
       fetchFarmers();
@@ -272,7 +345,7 @@ const Farmers = () => {
     (farmer) =>
       farmer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       farmer.farmerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      farmer.phone.includes(searchTerm)
+      farmer.phone.includes(searchTerm),
   );
 
   return (
@@ -314,53 +387,127 @@ const Farmers = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Name *</Label>
-                        <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                        <Input
+                          value={formData.name}
+                          onChange={(e) =>
+                            setFormData({ ...formData, name: e.target.value })
+                          }
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label>Phone *</Label>
-                        <Input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} required />
+                        <Input
+                          type="tel"
+                          value={formData.phone}
+                          onChange={(e) =>
+                            setFormData({ ...formData, phone: e.target.value })
+                          }
+                          required
+                        />
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <Label>Address *</Label>
-                      <Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} required />
+                      <Input
+                        value={formData.address}
+                        onChange={(e) =>
+                          setFormData({ ...formData, address: e.target.value })
+                        }
+                        required
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>State *</Label>
-                        <Input value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} required />
+                        <Input
+                          value={formData.state}
+                          onChange={(e) =>
+                            setFormData({ ...formData, state: e.target.value })
+                          }
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label>District *</Label>
-                        <Input value={formData.district} onChange={(e) => setFormData({ ...formData, district: e.target.value })} required />
+                        <Input
+                          value={formData.district}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              district: e.target.value,
+                            })
+                          }
+                          required
+                        />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Water Source *</Label>
-                        <Input value={formData.waterSource} onChange={(e) => setFormData({ ...formData, waterSource: e.target.value })} required />
+                        <Input
+                          value={formData.waterSource}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              waterSource: e.target.value,
+                            })
+                          }
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label>Culture Areas (acres) *</Label>
-                        <Input type="number" value={formData.cultureAreas} onChange={(e) => setFormData({ ...formData, cultureAreas: e.target.value })} required />
+                        <Input
+                          type="number"
+                          value={formData.cultureAreas}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              cultureAreas: e.target.value,
+                            })
+                          }
+                          required
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label>Species *</Label>
-                        <Input value={formData.species} onChange={(e) => setFormData({ ...formData, species: e.target.value })} required />
+                        <Input
+                          value={formData.species}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              species: e.target.value,
+                            })
+                          }
+                          required
+                        />
                       </div>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-6">
-                      <Button variant="outline" type="button" onClick={() => {
-                        setOpen(false);
-                        setEditMode(false);
-                        setEditFarmerId(null);
-                        setFormData({ name: "", phone: "", address: "", state: "", district: "",
-                          waterSource: "", cultureAreas: "", species: "" });
-                      }}>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => {
+                          setOpen(false);
+                          setEditMode(false);
+                          setEditFarmerId(null);
+                          setFormData({
+                            name: "",
+                            phone: "",
+                            address: "",
+                            state: "",
+                            district: "",
+                            waterSource: "",
+                            cultureAreas: "",
+                            species: "",
+                          });
+                        }}
+                      >
                         Cancel
                       </Button>
                       <Button type="submit">
@@ -370,6 +517,35 @@ const Farmers = () => {
                   </form>
                 </DialogContent>
               </Dialog>
+
+              <Dialog
+                open={deleteDialogOpen}
+                onOpenChange={setDeleteDialogOpen}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete Farmer</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to delete {farmerToDelete?.name}?
+                      This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex justify-end gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setDeleteDialogOpen(false);
+                        setFarmerToDelete(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={confirmDelete}>
+                      Delete
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
             <Card>
@@ -377,7 +553,9 @@ const Farmers = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Registered Farmers ({farmers.length})</CardTitle>
-                    <CardDescription>View and edit farmer records</CardDescription>
+                    <CardDescription>
+                      View and edit farmer records
+                    </CardDescription>
                   </div>
                   <div className="relative w-72">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -407,14 +585,19 @@ const Farmers = () => {
                   <TableBody>
                     {filteredFarmers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        <TableCell
+                          colSpan={7}
+                          className="text-center text-muted-foreground"
+                        >
                           No farmers found
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredFarmers.map((farmer) => (
                         <TableRow key={farmer.id}>
-                          <TableCell className="font-medium">{farmer.farmerId}</TableCell>
+                          <TableCell className="font-medium">
+                            {farmer.farmerId}
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -424,20 +607,32 @@ const Farmers = () => {
                             </div>
                           </TableCell>
                           <TableCell>{farmer.phone}</TableCell>
-                          <TableCell><span>{farmer.address}</span>
-   </TableCell>
+                          <TableCell>
+                            <span>{farmer.address}</span>
+                          </TableCell>
                           <TableCell>{farmer.species}</TableCell>
                           <TableCell>{farmer.cultureAreas}</TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-3 border border-cyan-500 text-cyan-600 hover:bg-cyan-50"
-                              onClick={() => handleEdit(farmer)}
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-3 border border-cyan-500 text-cyan-600 hover:bg-cyan-50"
+                                onClick={() => handleEdit(farmer)}
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-3 border border-red-500 text-red-600 hover:bg-red-50"
+                                onClick={() => handleDelete(farmer)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
