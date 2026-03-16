@@ -321,38 +321,31 @@ const Dashboard = () => {
             .map((s: any) => s?.type?.toUpperCase())
             .filter(Boolean);
           const uniqueTypes = [...new Set(types)];
-          typeDisplay = uniqueTypes.join("/");
-          if (uniqueTypes.includes("PL") && uniqueTypes.includes("PCR"))
-            typeDisplay = "PL/PCR";
 
-          // When both PL and PCR are selected, count only PL samples
-          if (uniqueTypes.includes("PL") && uniqueTypes.includes("PCR")) {
-            const plItem = data.sampleType.find(
-              (s: any) => s?.type?.toLowerCase() === "pl",
-            );
-            if (plItem) {
-              sampleCount =
-                Number(
-                  data.actualPlCount !== undefined
-                    ? data.actualPlCount
-                    : plItem.count,
-                ) || 0;
-            }
-          } else {
-            // Otherwise, count all samples normally
-            data.sampleType.forEach((s: any) => {
-              if (s && typeof s === "object") {
-                let count = Number(s.count) || 0;
-                if (
-                  s.type?.toLowerCase() === "pl" &&
-                  data.actualPlCount !== undefined
-                ) {
-                  count = Number(data.actualPlCount) || count;
-                }
-                sampleCount += count;
+          // Display all types
+          typeDisplay = uniqueTypes.join("/");
+
+          // Check if both PL and PCR are selected
+          const hasBothPLAndPCR =
+            uniqueTypes.includes("PL") && uniqueTypes.includes("PCR");
+
+          // Count all samples, but skip PCR count if both PL and PCR are selected
+          data.sampleType.forEach((s: any) => {
+            if (s && typeof s === "object") {
+              const sType = s.type?.toLowerCase();
+
+              // Skip PCR count if both PL and PCR are selected
+              if (hasBothPLAndPCR && sType === "pcr") {
+                return; // Don't count PCR
               }
-            });
-          }
+
+              let count = Number(s.count) || 0;
+              if (sType === "pl" && data.actualPlCount !== undefined) {
+                count = Number(data.actualPlCount) || count;
+              }
+              sampleCount += count;
+            }
+          });
         }
 
         const isReport =
