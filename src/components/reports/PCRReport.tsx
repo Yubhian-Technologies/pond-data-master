@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { 
-  doc, 
-  getDoc, 
-  collection, 
-  getDocs, 
-  query, 
-  where 
+import {
+  doc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 import { db } from "@/pages/firebase";
 import ADC from "@/assets/ADC.jpg";
@@ -69,7 +69,10 @@ export default function PCRReport({
           setRealInvoiceDocId(docSnap.id);
           console.log("PCRReport - Found real docId:", docSnap.id);
         } else {
-          console.error("PCRReport - Invoice document not found for:", invoiceId);
+          console.error(
+            "PCRReport - Invoice document not found for:",
+            invoiceId,
+          );
         }
       } catch (err) {
         console.error("Error fetching invoice docId:", err);
@@ -89,7 +92,8 @@ export default function PCRReport({
       try {
         setLoading(true);
 
-        const shouldShowAll = showAllSamples || (allSampleCount && allSampleCount > 1);
+        const shouldShowAll =
+          showAllSamples || (allSampleCount && allSampleCount > 1);
 
         let techName = "";
 
@@ -100,7 +104,7 @@ export default function PCRReport({
             locationId,
             "invoices",
             realInvoiceDocId,
-            "pcr_reports"
+            "pcr_reports",
           );
 
           const snap = await getDocs(collectionRef);
@@ -139,8 +143,10 @@ export default function PCRReport({
           });
 
           allReports.sort((a, b) => {
-            const numA = parseInt(a.sampleCode.toString().replace(/\D/g, "")) || 0;
-            const numB = parseInt(b.sampleCode.toString().replace(/\D/g, "")) || 0;
+            const numA =
+              parseInt(a.sampleCode.toString().replace(/\D/g, "")) || 0;
+            const numB =
+              parseInt(b.sampleCode.toString().replace(/\D/g, "")) || 0;
             return numA - numB;
           });
 
@@ -157,7 +163,7 @@ export default function PCRReport({
             "invoices",
             realInvoiceDocId,
             "pcr_reports",
-            `sample_${sampleNumber}`
+            `sample_${sampleNumber}`,
           );
 
           const snap = await getDoc(docRef);
@@ -213,7 +219,15 @@ export default function PCRReport({
     if (realInvoiceDocId) {
       fetchPCRReport();
     }
-  }, [realInvoiceDocId, locationId, sampleNumber, showAllSamples, allSampleCount, compact, session]);
+  }, [
+    realInvoiceDocId,
+    locationId,
+    sampleNumber,
+    showAllSamples,
+    allSampleCount,
+    compact,
+    session,
+  ]);
 
   useEffect(() => {
     const fetchLocationDetails = async () => {
@@ -241,11 +255,13 @@ export default function PCRReport({
     if (!dateStr) return "-";
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).replace(/\//g, '-');
+    return date
+      .toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+      .replace(/\//g, "-");
   };
 
   if (loading) {
@@ -258,16 +274,32 @@ export default function PCRReport({
   }
 
   if (!reports.length) {
-    return <p className="text-center py-12 text-red-600 text-xl">No PCR report found.</p>;
+    return (
+      <p className="text-center py-12 text-red-600 text-xl">
+        No PCR report found.
+      </p>
+    );
   }
 
   const allPathogens = Array.from(
-    new Set(reports.flatMap((r) => (r.pathogens || []).map((p: any) => p.name)))
+    new Set(
+      reports.flatMap((r) => (r.pathogens || []).map((p: any) => p.name)),
+    ),
   );
 
-  const displayPathogens = allPathogens.map(p => 
-    p === "PL EHP" ? "EHP" : p
-  );
+  const displayPathogens = allPathogens
+    .map((p) => (p === "PL EHP" ? "EHP" : p))
+    .sort((a, b) => {
+      const pathogenOrder: { [key: string]: number } = {
+        EHP: 1,
+        WSSV: 2,
+        Vibrio: 3,
+        IHHNV: 4,
+        "Water EHP": 5,
+        "Soil EHP": 6,
+      };
+      return (pathogenOrder[a] || 999) - (pathogenOrder[b] || 999);
+    });
 
   const singlePathogen = displayPathogens.length === 1;
   const isSingleSample = reports.length === 1;
@@ -286,12 +318,19 @@ export default function PCRReport({
         <table className="w-[95%] mx-auto border-2 border-gray-800 text-sm">
           <thead className="bg-blue-100">
             <tr>
-              <th rowSpan={2} className="border px-2 py-2 align-middle">Sample Code</th>
-              <th rowSpan={2} className="border px-2 py-2 align-middle">Sample Type</th>
+              <th rowSpan={2} className="border px-2 py-2 align-middle">
+                Sample Code
+              </th>
+              <th rowSpan={2} className="border px-2 py-2 align-middle">
+                Sample Type
+              </th>
 
               {isOneSampleMultiPathogen || singlePathogen ? (
                 <>
-                  <th rowSpan={2} className="border px-2 py-2 align-middle font-bold">
+                  <th
+                    rowSpan={2}
+                    className="border px-2 py-2 align-middle font-bold"
+                  >
                     {"Pathogen"}
                   </th>
                   <th className="border px-2 py-2">Result</th>
@@ -299,7 +338,11 @@ export default function PCRReport({
                 </>
               ) : (
                 displayPathogens.map((p) => (
-                  <th key={p} colSpan={2} className="border px-2 py-2 text-center">
+                  <th
+                    key={p}
+                    colSpan={2}
+                    className="border px-2 py-2 text-center"
+                  >
                     {p}
                   </th>
                 ))
@@ -319,142 +362,171 @@ export default function PCRReport({
           </thead>
 
           <tbody>
-            
-              {reports.map((r, idx) => (
-                <tr key={idx} className="hover:bg-gray-50">
-                  <td className="border px-2 py-2.5 text-center font-semibold">{r.sampleCode}</td>
-                  <td className="border px-2 py-2.5 text-center">{r.sampleType}</td>
+            {reports.map((r, idx) => (
+              <tr key={idx} className="hover:bg-gray-50">
+                <td className="border px-2 py-2.5 text-center font-semibold">
+                  {r.sampleCode}
+                </td>
+                <td className="border px-2 py-2.5 text-center">
+                  {r.sampleType}
+                </td>
 
-                  {singlePathogen ? (
-                    <>
-                      <td className="border px-2 py-2.5 text-center font-medium">
-                        {displayPathogens[0]}
-                      </td>
+                {singlePathogen ? (
+                  <>
+                    <td className="border px-2 py-2.5 text-center font-medium">
+                      {displayPathogens[0]}
+                    </td>
 
-                      {/* Result - colored based on value */}
-                      <td className="border px-2 py-2.5 text-center font-bold">
-                        {(() => {
-                          const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
-                          if (res === "negative" || res === "neg" || res === "-") {
-                            return <span className="text-black">Negative</span>;
-                          }
-                          if (res === "positive" || res === "pos") {
-                            return <span className="text-red-600">Positive</span>;
-                          }
-                          if (res === "suspect" || res.includes("sus")) {
-                            return <span className="text-yellow-600">Suspect</span>;
-                          }
-                          return r.pathogens[0]?.result || "-";
-                        })()}
-                      </td>
+                    {/* Result - colored based on value */}
+                    <td className="border px-2 py-2.5 text-center font-bold">
+                      {(() => {
+                        const res = (r.pathogens[0]?.result || "-")
+                          .trim()
+                          .toLowerCase();
+                        if (
+                          res === "negative" ||
+                          res === "neg" ||
+                          res === "-"
+                        ) {
+                          return <span className="text-black">Negative</span>;
+                        }
+                        if (res === "positive" || res === "pos") {
+                          return <span className="text-red-600">Positive</span>;
+                        }
+                        if (res === "suspect" || res.includes("sus")) {
+                          return (
+                            <span className="text-yellow-600">Suspect</span>
+                          );
+                        }
+                        return r.pathogens[0]?.result || "-";
+                      })()}
+                    </td>
 
-                      {/* C.T - show actual value even for Negative */}
-                      <td className="border px-2 py-2.5 text-center font-bold">
-                        {(() => {
-                          const res = (r.pathogens[0]?.result || "-").trim().toLowerCase();
-                          const ctValue = r.pathogens[0]?.ctValue || "-";
+                    {/* C.T - show actual value even for Negative */}
+                    <td className="border px-2 py-2.5 text-center font-bold">
+                      {(() => {
+                        const res = (r.pathogens[0]?.result || "-")
+                          .trim()
+                          .toLowerCase();
+                        const ctValue = r.pathogens[0]?.ctValue || "-";
 
-                          if (res === "positive" || res === "pos") {
-                            return <span className="text-red-600">{ctValue}</span>;
-                          }
-                          if (res === "suspect" || res.includes("sus")) {
-                            return <span className="text-yellow-600">{ctValue}</span>;
-                          }
-                          // For Negative or other cases → show real ctValue in neutral color
-                          return <span className="text-gray-700">{ctValue}</span>;
-                        })()}
-                      </td>
-                    </>
-                  ) : (
-                    allPathogens.map((originalP) => {
-                      const found = r.pathogens.find((x: any) => x.name === originalP);
-                      const res = (found?.result || "-").trim().toLowerCase();
-                      const ctValue = found?.ctValue || "-";
+                        if (res === "positive" || res === "pos") {
+                          return (
+                            <span className="text-red-600">{ctValue}</span>
+                          );
+                        }
+                        if (res === "suspect" || res.includes("sus")) {
+                          return (
+                            <span className="text-yellow-600">{ctValue}</span>
+                          );
+                        }
+                        // For Negative or other cases → show real ctValue in neutral color
+                        return <span className="text-gray-700">{ctValue}</span>;
+                      })()}
+                    </td>
+                  </>
+                ) : (
+                  allPathogens.map((originalP) => {
+                    const found = r.pathogens.find(
+                      (x: any) => x.name === originalP,
+                    );
+                    const res = (found?.result || "-").trim().toLowerCase();
+                    const ctValue = found?.ctValue || "-";
 
-                     let resultDisplay: React.ReactNode = "-";
-let ctDisplay: React.ReactNode = "-";
+                    let resultDisplay: React.ReactNode = "-";
+                    let ctDisplay: React.ReactNode = "-";
 
-if (found) {
-  const res = (found.result || "").trim().toLowerCase();
-  const ctValue = found.ctValue || "-";
+                    if (found) {
+                      const res = (found.result || "").trim().toLowerCase();
+                      const ctValue = found.ctValue || "-";
 
-  if (res === "negative" || res === "neg") {
-    resultDisplay = <span className="text-black">Negative</span>;
-    ctDisplay = <span className="text-gray-700">{ctValue}</span>;
-  } 
-  else if (res === "positive" || res === "pos") {
-    resultDisplay = <span className="text-red-600">Positive</span>;
-    ctDisplay = <span className="text-red-600">{ctValue}</span>;
-  } 
-  else if (res === "suspect" || res.includes("sus")) {
-    resultDisplay = <span className="text-yellow-600">Suspect</span>;
-    ctDisplay = <span className="text-yellow-600">{ctValue}</span>;
-  } 
-  else {
-    resultDisplay = found.result || "-";
-    ctDisplay = <span className="text-gray-700">{ctValue}</span>;
-  }
-}
+                      if (res === "negative" || res === "neg") {
+                        resultDisplay = (
+                          <span className="text-black">Negative</span>
+                        );
+                        ctDisplay = (
+                          <span className="text-gray-700">{ctValue}</span>
+                        );
+                      } else if (res === "positive" || res === "pos") {
+                        resultDisplay = (
+                          <span className="text-red-600">Positive</span>
+                        );
+                        ctDisplay = (
+                          <span className="text-red-600">{ctValue}</span>
+                        );
+                      } else if (res === "suspect" || res.includes("sus")) {
+                        resultDisplay = (
+                          <span className="text-yellow-600">Suspect</span>
+                        );
+                        ctDisplay = (
+                          <span className="text-yellow-600">{ctValue}</span>
+                        );
+                      } else {
+                        resultDisplay = found.result || "-";
+                        ctDisplay = (
+                          <span className="text-gray-700">{ctValue}</span>
+                        );
+                      }
+                    }
 
-                      return (
-                        <React.Fragment key={originalP}>
-                          <td className="border px-2 py-2.5 text-center font-bold">
-                            {resultDisplay}
-                          </td>
-                          <td className="border px-2 py-2.5 text-center font-bold">
-                            {ctDisplay}
-                          </td>
-                        </React.Fragment>
-                      );
-                    })
-                  )}
-                </tr>
-              ))
-            }
+                    return (
+                      <React.Fragment key={originalP}>
+                        <td className="border px-2 py-2.5 text-center font-bold">
+                          {resultDisplay}
+                        </td>
+                        <td className="border px-2 py-2.5 text-center font-bold">
+                          {ctDisplay}
+                        </td>
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
     );
   };
 
- const GelImagesSection = () => {
-  if (!reports.some((r) => r.gelImageUrl)) return null;
+  const GelImagesSection = () => {
+    if (!reports.some((r) => r.gelImageUrl)) return null;
 
-  return (
-    <div className="mt-12">
-      <h3 className="text-xl font-bold text-center mb-10 text-gray-800">
-        PCR Amplification Images
-      </h3>
+    return (
+      <div className="mt-12">
+        <h3 className="text-xl font-bold text-center mb-10 text-gray-800">
+          PCR Amplification Images
+        </h3>
 
-      <div className="flex flex-col items-center gap-10">
-        {reports
-          .filter((r) => r.gelImageUrl)
-          .map((r, idx) => (
-            <div
-              key={idx}
-              className="w-full max-w-lg flex flex-col items-center border border-gray-200 rounded-xl overflow-hidden shadow-md bg-white"
-            >
-              {/* Image container – smaller padding & size */}
-              <div className="w-full bg-gray-50 flex justify-center items-center p-6 md:p-8">
-                <img
-                  src={r.gelImageUrl}
-                  alt={`Gel electrophoresis image - Sample ${r.sampleCode}`}
-                  className="max-w-full max-h-[420px] object-contain rounded-lg"
-                />
-              </div>
+        <div className="flex flex-col items-center gap-10">
+          {reports
+            .filter((r) => r.gelImageUrl)
+            .map((r, idx) => (
+              <div
+                key={idx}
+                className="w-full max-w-lg flex flex-col items-center border border-gray-200 rounded-xl overflow-hidden shadow-md bg-white"
+              >
+                {/* Image container – smaller padding & size */}
+                <div className="w-full bg-gray-50 flex justify-center items-center p-6 md:p-8">
+                  <img
+                    src={r.gelImageUrl}
+                    alt={`Gel electrophoresis image - Sample ${r.sampleCode}`}
+                    className="max-w-full max-h-[420px] object-contain rounded-lg"
+                  />
+                </div>
 
-              {/* Sample label */}
-              {/* <div className="py-4 text-center w-full bg-white">
+                {/* Sample label */}
+                {/* <div className="py-4 text-center w-full bg-white">
                 <p className="text-base font-semibold text-gray-900">
                   Sample {r.sampleCode}
                 </p>
               </div> */}
-            </div>
-          ))}
+              </div>
+            ))}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   if (compact) {
     return (
@@ -473,14 +545,14 @@ if (found) {
           <h1 className="text-4xl font-bold text-blue-800">
             WATERBASE AQUA DIAGNOSTIC CENTER
           </h1>
-          <p className="text-sm text-black font-semibold">{locationDetails.address || "Loading lab address..."}</p>
-          <p className="text-sm text-black">
-            Contact No: {locationDetails.contactNumber || "Loading..."} | 
-            Mail Id: {locationDetails.email || "Loading..."}
+          <p className="text-sm text-black font-semibold">
+            {locationDetails.address || "Loading lab address..."}
           </p>
           <p className="text-sm text-black">
-            GSTIN: - 37AABCT0601L1ZJ
+            Contact No: {locationDetails.contactNumber || "Loading..."} | Mail
+            Id: {locationDetails.email || "Loading..."}
           </p>
+          <p className="text-sm text-black">GSTIN: - 37AABCT0601L1ZJ</p>
         </div>
         <img src={AV} alt="AV Logo" className="h-28" />
       </div>
@@ -489,28 +561,52 @@ if (found) {
         <table className="w-full mb-10 border-2 border-gray-800 text-sm">
           <tbody>
             <tr>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Farmer Name</td>
-              <td className="border px-6 py-3">{farmerInfo.farmerName || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Address</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">
+                Farmer Name
+              </td>
+              <td className="border px-6 py-3">
+                {farmerInfo.farmerName || "-"}
+              </td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">
+                Address
+              </td>
               <td className="border px-6 py-3">{farmerInfo.address || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Sample Collected</td>
-              <td className="border px-6 py-3">{formatDateDDMMYYYY(farmerInfo.sampleCollectionTime)}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">
+                Sample Collected
+              </td>
+              <td className="border px-6 py-3">
+                {formatDateDDMMYYYY(farmerInfo.sampleCollectionTime)}
+              </td>
             </tr>
             <tr>
               <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
               <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Farmer ID</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">
+                Farmer ID
+              </td>
               <td className="border px-6 py-3">{farmerInfo.farmerId || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Report Date</td>
-              <td className="border px-6 py-3">{formatDateDDMMYYYY(farmerInfo.reportDate)}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">
+                Report Date
+              </td>
+              <td className="border px-6 py-3">
+                {formatDateDDMMYYYY(farmerInfo.reportDate)}
+              </td>
             </tr>
             <tr>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Report Id</td>
-              <td className="border px-6 py-3">{invoiceId || '-'}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">No of samples</td>
-              <td className="border px-6 py-3">{farmerInfo.noOfSamples || allSampleCount || "-"}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">
+                Report Id
+              </td>
+              <td className="border px-6 py-3">{invoiceId || "-"}</td>
+              <td className="border px-6 py-3 font-bold bg-gray-100">
+                No of samples
+              </td>
+              <td className="border px-6 py-3">
+                {farmerInfo.noOfSamples || allSampleCount || "-"}
+              </td>
               <td className="border px-6 py-3 font-bold bg-gray-100">DOC</td>
-              <td className="border px-6 py-3">{farmerInfo.docDifference || "-"}</td>
+              <td className="border px-6 py-3">
+                {farmerInfo.docDifference || "-"}
+              </td>
             </tr>
           </tbody>
         </table>

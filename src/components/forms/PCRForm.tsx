@@ -327,7 +327,7 @@ export default function PCRForm({
           loadedSamples.map((sample) =>
             sample.pathogens.map((p) => {
               const val = p.ctValue?.toLowerCase();
-              return val && val !== "non determined";
+              return val && val !== "Un-determined";
             }),
           ),
         );
@@ -749,8 +749,8 @@ export default function PCRForm({
                               className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="">Select</option>
-                              <option value="Non Determined">
-                                Non Determined
+                              <option value="Un-Determined">
+                                Un-Determined
                               </option>
                               <option value="Others">Others</option>
                             </select>
