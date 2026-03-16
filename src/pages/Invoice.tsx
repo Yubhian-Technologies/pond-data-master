@@ -7,11 +7,23 @@ import { useState, useMemo, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { availableTests } from "@/data/tests";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useUserSession } from "../contexts/UserSessionContext";
-import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "./firebase";
 
 interface SampleSummaryItem {
@@ -45,7 +57,9 @@ const InvoicePage = () => {
 
   const passedTechnician = state?.technician || null;
 
-  const [paymentMode, setPaymentMode] = useState<"" | "cash" | "qr" | "neft" | "rtgs" | "pending">("");
+  const [paymentMode, setPaymentMode] = useState<
+    "" | "cash" | "qr" | "neft" | "rtgs" | "pending"
+  >("");
   const [transactionRef, setTransactionRef] = useState<string>("");
 
   const [isZeroInvoice, setIsZeroInvoice] = useState(false);
@@ -91,7 +105,9 @@ const InvoicePage = () => {
   const pcrCount = sampleSummary.find((s) => s.type === "pcr")?.count || 0;
   const plPcrSampleCount = pcrCount;
 
-  const [activeSampleIndex, setActiveSampleIndex] = useState<{ [key: string]: number }>(() => {
+  const [activeSampleIndex, setActiveSampleIndex] = useState<{
+    [key: string]: number;
+  }>(() => {
     const init: { [key: string]: number } = {};
     sampleSummary.forEach((s) => {
       if (s.type !== "pl" && s.type !== "pcr") {
@@ -147,7 +163,7 @@ const InvoicePage = () => {
   }, [actualPlCount]);
 
   const samplePathogens = useMemo(() => {
-    const result: Record<number, string[]> = {};
+    const result: Record<string, string[]> = {};
     perSampleTests.pcr.forEach((set, index) => {
       const pathogens = new Set<string>();
       set.forEach((testId) => {
@@ -155,33 +171,37 @@ const InvoicePage = () => {
         if (pathogen) pathogens.add(pathogen);
       });
       if (pathogens.size > 0) {
-        result[index + 1] = Array.from(pathogens);
+        result[String(index + 1)] = Array.from(pathogens); // Use string keys to ensure Firebase compatibility
       }
     });
     return result;
   }, [perSampleTests.pcr]);
 
   const generateInvoiceId = (): string => {
-  let prefix = "XXX";
-  if (locationName) {
-    const lowerName = locationName.toLowerCase();
-    if (lowerName.includes("nellore")) prefix = "NLR";
-    else if (lowerName.includes("bhimavaram")) prefix = "BVRM";
-    else if (lowerName.includes("tamarakollu")) prefix = "TMRK";
-    else if (lowerName.includes("ganapavaram")) prefix = "GVRM";
-    else if (lowerName.includes("juvvalapalem")) prefix = "JP";
-  }
+    let prefix = "XXX";
+    if (locationName) {
+      const lowerName = locationName.toLowerCase();
+      if (lowerName.includes("nellore")) prefix = "NLR";
+      else if (lowerName.includes("bhimavaram")) prefix = "BVRM";
+      else if (lowerName.includes("tamarakollu")) prefix = "TMRK";
+      else if (lowerName.includes("ganapavaram")) prefix = "GVRM";
+      else if (lowerName.includes("juvvalapalem")) prefix = "JP";
+    }
 
-  const digits = "0123456789";
-  let randomPart = "";
-  for (let i = 0; i < 4; i++) {
-    randomPart += digits.charAt(Math.floor(Math.random() * digits.length));
-  }
+    const digits = "0123456789";
+    let randomPart = "";
+    for (let i = 0; i < 4; i++) {
+      randomPart += digits.charAt(Math.floor(Math.random() * digits.length));
+    }
 
-  return `ADC ${prefix}${randomPart}`;
-};
+    return `ADC ${prefix}${randomPart}`;
+  };
 
-  const toggleTest = (sampleType: string, sampleIndex: number, testId: string) => {
+  const toggleTest = (
+    sampleType: string,
+    sampleIndex: number,
+    testId: string,
+  ) => {
     setPerSampleTests((prev) => {
       const newSets = [...(prev[sampleType] || [])];
       const set = new Set(newSets[sampleIndex]);
@@ -206,13 +226,21 @@ const InvoicePage = () => {
     });
   };
 
-  const isAppliedToAll = (sampleType: "pl" | "pcr", testId: string): boolean => {
+  const isAppliedToAll = (
+    sampleType: "pl" | "pcr",
+    testId: string,
+  ): boolean => {
     return perSampleTests[sampleType].every((set) => set.has(testId));
   };
 
   const calculateTotals = () => {
     const groupedItems: {
-      [type: string]: { name: string; quantity: number; total: number; price: number }[];
+      [type: string]: {
+        name: string;
+        quantity: number;
+        total: number;
+        price: number;
+      }[];
     } = {};
     let subtotal = 0;
 
@@ -228,11 +256,18 @@ const InvoicePage = () => {
       });
       groupedItems["pcr"] = Object.entries(pcrTestCount)
         .map(([testId, qty]) => {
-          const test = availableTests.find((t) => t.id === testId && t.sampleType === "pcr");
+          const test = availableTests.find(
+            (t) => t.id === testId && t.sampleType === "pcr",
+          );
           if (!test) return null;
           const itemTotal = qty * test.price;
           subtotal += itemTotal;
-          return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
+          return {
+            name: test.name,
+            quantity: qty,
+            price: test.price,
+            total: itemTotal,
+          };
         })
         .filter(Boolean) as any;
     }
@@ -250,17 +285,27 @@ const InvoicePage = () => {
 
       // LOGIC: Only apply proportional billing if both PL and PCR tests are actually selected
       const isComboActive = actualPlCount > 0 && actualPcrCount > 0;
-      const effectiveChargedCount = isComboActive ? chargedPlCount : actualPlCount;
-      const ratio = actualPlCount > 0 ? effectiveChargedCount / actualPlCount : 0;
+      const effectiveChargedCount = isComboActive
+        ? chargedPlCount
+        : actualPlCount;
+      const ratio =
+        actualPlCount > 0 ? effectiveChargedCount / actualPlCount : 0;
 
       groupedItems["pl"] = Object.entries(plTestCount)
         .map(([testId, qty]) => {
-          const test = availableTests.find((t) => t.id === testId && t.sampleType === "pl");
+          const test = availableTests.find(
+            (t) => t.id === testId && t.sampleType === "pl",
+          );
           if (!test) return null;
-          const billedQty = Math.floor(qty * ratio); 
+          const billedQty = Math.floor(qty * ratio);
           const itemTotal = billedQty * test.price;
           subtotal += itemTotal;
-          return { name: test.name, quantity: billedQty, price: test.price, total: itemTotal };
+          return {
+            name: test.name,
+            quantity: billedQty,
+            price: test.price,
+            total: itemTotal,
+          };
         })
         .filter(Boolean) as any;
     }
@@ -280,7 +325,12 @@ const InvoicePage = () => {
           if (!test) return null;
           const itemTotal = qty * test.price;
           subtotal += itemTotal;
-          return { name: test.name, quantity: qty, price: test.price, total: itemTotal };
+          return {
+            name: test.name,
+            quantity: qty,
+            price: test.price,
+            total: itemTotal,
+          };
         })
         .filter(Boolean) as any;
     });
@@ -305,10 +355,15 @@ const InvoicePage = () => {
     };
   };
 
-  const { subtotal, discountAmount, grandTotal, groupedItems } = calculateTotals();
+  const { subtotal, discountAmount, grandTotal, groupedItems } =
+    calculateTotals();
 
   const handleGenerateInvoice = async () => {
-    if (!isZeroInvoice && grandTotal === 0 && Object.keys(groupedItems).length === 0) {
+    if (
+      !isZeroInvoice &&
+      grandTotal === 0 &&
+      Object.keys(groupedItems).length === 0
+    ) {
       toast({
         title: "Error",
         description: "Please select at least one test",
@@ -326,7 +381,12 @@ const InvoicePage = () => {
       return;
     }
 
-    if (!isZeroInvoice && paymentMode !== "pending" && paymentMode !== "cash" && !transactionRef.trim()) {
+    if (
+      !isZeroInvoice &&
+      paymentMode !== "pending" &&
+      paymentMode !== "cash" &&
+      !transactionRef.trim()
+    ) {
       toast({
         title: "Error",
         description: "Please enter transaction/reference number",
@@ -338,7 +398,9 @@ const InvoicePage = () => {
     const today = new Date();
     const formattedDate = `${today.getDate().toString().padStart(2, "0")}-${(
       today.getMonth() + 1
-    ).toString().padStart(2, "0")}-${today.getFullYear()}`;
+    )
+      .toString()
+      .padStart(2, "0")}-${today.getFullYear()}`;
 
     const invoiceId = generateInvoiceId();
 
@@ -352,7 +414,8 @@ const InvoicePage = () => {
         perSampleSelectedTests[type] = {};
         perSampleTests[type].forEach((selectedSet, sampleIndex) => {
           if (selectedSet.size > 0) {
-            perSampleSelectedTests[type][sampleIndex + 1] = Array.from(selectedSet);
+            perSampleSelectedTests[type][sampleIndex + 1] =
+              Array.from(selectedSet);
           }
         });
       }
@@ -360,7 +423,12 @@ const InvoicePage = () => {
 
     const sampleType = sampleSummary.map((s) => ({
       type: s.type.toLowerCase(),
-      count: s.type === "pl" ? actualPlCount : s.type === "pcr" ? actualPcrCount : s.count,
+      count:
+        s.type === "pl"
+          ? actualPlCount
+          : s.type === "pcr"
+            ? actualPcrCount
+            : s.count,
     }));
 
     const reportsProgress: { [key: string]: string } = {};
@@ -392,8 +460,12 @@ const InvoicePage = () => {
       isPartialPayment = true;
     }
 
-    const technicianId = passedTechnician?.technicianId || session.technicianId || "unknown";
-    const technicianName = passedTechnician?.technicianName || session.technicianName || "Unknown Technician";
+    const technicianId =
+      passedTechnician?.technicianId || session.technicianId || "unknown";
+    const technicianName =
+      passedTechnician?.technicianName ||
+      session.technicianName ||
+      "Unknown Technician";
 
     const invoiceData = {
       invoiceId,
@@ -406,13 +478,17 @@ const InvoicePage = () => {
       dateOfCulture,
       tests: groupedItems,
       subtotal: isZeroInvoice ? 0 : subtotal,
-      discountPercent: applyDiscount && discountPercent ? parseFloat(discountPercent) : 0,
+      discountPercent:
+        applyDiscount && discountPercent ? parseFloat(discountPercent) : 0,
       discountAmount: isZeroInvoice ? 0 : discountAmount,
       total: isZeroInvoice ? 0 : grandTotal,
       village,
       mobile,
       paymentMode: isZeroInvoice ? "pending" : paymentMode,
-      transactionRef: paymentMode !== "cash" && paymentMode !== "pending" ? transactionRef.trim() : null,
+      transactionRef:
+        paymentMode !== "cash" && paymentMode !== "pending"
+          ? transactionRef.trim()
+          : null,
       isPartialPayment,
       paidAmount,
       balanceAmount,
@@ -425,11 +501,23 @@ const InvoicePage = () => {
       note: isZeroInvoice ? "Lab Equipment Testing - Zero Charge" : null,
       perSampleSelectedTests,
       plActualCount: actualPlCount,
-      plChargedCount: (actualPlCount > 0 && actualPcrCount > 0) ? chargedPlCount : actualPlCount,
+      plChargedCount:
+        actualPlCount > 0 && actualPcrCount > 0
+          ? chargedPlCount
+          : actualPlCount,
     };
 
     try {
-      await addDoc(collection(db, "locations", locationId, "invoices"), invoiceData);
+      console.log(
+        "🔵 Invoice.tsx - Saving samplePathogens to Firebase:",
+        JSON.stringify(samplePathogens, null, 2),
+      );
+      console.log("🔵 Invoice.tsx - perSampleTests.pcr:", perSampleTests.pcr);
+
+      await addDoc(
+        collection(db, "locations", locationId, "invoices"),
+        invoiceData,
+      );
 
       navigate("/invoice-template", {
         state: {
@@ -482,10 +570,17 @@ const InvoicePage = () => {
                             {Array.from({ length: s.count }).map((_, i) => (
                               <Button
                                 key={i}
-                                variant={activeSampleIndex[s.type] === i ? "default" : "outline"}
+                                variant={
+                                  activeSampleIndex[s.type] === i
+                                    ? "default"
+                                    : "outline"
+                                }
                                 size="sm"
                                 onClick={() =>
-                                  setActiveSampleIndex((prev) => ({ ...prev, [s.type]: i }))
+                                  setActiveSampleIndex((prev) => ({
+                                    ...prev,
+                                    [s.type]: i,
+                                  }))
                                 }
                               >
                                 Sample {i + 1}
@@ -496,11 +591,16 @@ const InvoicePage = () => {
                             {availableTests
                               .filter((t) => t.sampleType === s.type)
                               .map((test) => {
-                                const currentIdx = activeSampleIndex[s.type] ?? 0;
+                                const currentIdx =
+                                  activeSampleIndex[s.type] ?? 0;
                                 const isChecked =
-                                  perSampleTests[s.type]?.[currentIdx]?.has(test.id) || false;
+                                  perSampleTests[s.type]?.[currentIdx]?.has(
+                                    test.id,
+                                  ) || false;
                                 const appliedToAll =
-                                  perSampleTests[s.type]?.every((set) => set.has(test.id)) || false;
+                                  perSampleTests[s.type]?.every((set) =>
+                                    set.has(test.id),
+                                  ) || false;
 
                                 return (
                                   <div
@@ -511,21 +611,35 @@ const InvoicePage = () => {
                                       <Checkbox
                                         checked={isChecked}
                                         onCheckedChange={() =>
-                                          toggleTest(s.type, currentIdx, test.id)
+                                          toggleTest(
+                                            s.type,
+                                            currentIdx,
+                                            test.id,
+                                          )
                                         }
                                       />
                                       <div>
-                                        <p className="font-medium">{test.name}</p>
-                                        <p className="text-sm text-muted-foreground">₹{test.price}</p>
+                                        <p className="font-medium">
+                                          {test.name}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                          ₹{test.price}
+                                        </p>
                                       </div>
                                     </div>
                                     <Button
                                       size="sm"
-                                      variant={appliedToAll ? "default" : "outline"}
-                                      onClick={() => applyToAll(s.type as any, test.id)}
+                                      variant={
+                                        appliedToAll ? "default" : "outline"
+                                      }
+                                      onClick={() =>
+                                        applyToAll(s.type as any, test.id)
+                                      }
                                       disabled={appliedToAll}
                                     >
-                                      {appliedToAll ? "Applied to All" : "Apply to All"}
+                                      {appliedToAll
+                                        ? "Applied to All"
+                                        : "Apply to All"}
                                     </Button>
                                   </div>
                                 );
@@ -540,28 +654,48 @@ const InvoicePage = () => {
                           PL / PCR Samples ({plPcrSampleCount})
                         </h4>
                         <div className="flex flex-wrap gap-2 mb-4">
-                          {Array.from({ length: plPcrSampleCount }).map((_, i) => (
-                            <Button
-                              key={i}
-                              variant={activeSampleIndex["pl_pcr"] === i ? "default" : "outline"}
-                              size="sm"
-                              onClick={() =>
-                                setActiveSampleIndex((prev) => ({ ...prev, pl_pcr: i }))
-                              }
-                            >
-                              Sample {i + 1}
-                            </Button>
-                          ))}
+                          {Array.from({ length: plPcrSampleCount }).map(
+                            (_, i) => (
+                              <Button
+                                key={i}
+                                variant={
+                                  activeSampleIndex["pl_pcr"] === i
+                                    ? "default"
+                                    : "outline"
+                                }
+                                size="sm"
+                                onClick={() =>
+                                  setActiveSampleIndex((prev) => ({
+                                    ...prev,
+                                    pl_pcr: i,
+                                  }))
+                                }
+                              >
+                                Sample {i + 1}
+                              </Button>
+                            ),
+                          )}
                         </div>
                         <div className="space-y-3">
                           {availableTests
-                            .filter((t) => t.sampleType === "pl" || t.sampleType === "pcr")
+                            .filter(
+                              (t) =>
+                                t.sampleType === "pl" || t.sampleType === "pcr",
+                            )
                             .map((test) => {
-                              const currentIdx = activeSampleIndex["pl_pcr"] ?? 0;
-                              const sampleType = test.sampleType as "pl" | "pcr";
+                              const currentIdx =
+                                activeSampleIndex["pl_pcr"] ?? 0;
+                              const sampleType = test.sampleType as
+                                | "pl"
+                                | "pcr";
                               const isChecked =
-                                perSampleTests[sampleType][currentIdx]?.has(test.id) || false;
-                              const appliedToAll = isAppliedToAll(sampleType, test.id);
+                                perSampleTests[sampleType][currentIdx]?.has(
+                                  test.id,
+                                ) || false;
+                              const appliedToAll = isAppliedToAll(
+                                sampleType,
+                                test.id,
+                              );
 
                               return (
                                 <div
@@ -572,7 +706,11 @@ const InvoicePage = () => {
                                     <Checkbox
                                       checked={isChecked}
                                       onCheckedChange={() =>
-                                        toggleTest(sampleType, currentIdx, test.id)
+                                        toggleTest(
+                                          sampleType,
+                                          currentIdx,
+                                          test.id,
+                                        )
                                       }
                                     />
                                     <div>
@@ -582,16 +720,24 @@ const InvoicePage = () => {
                                           ({test.sampleType.toUpperCase()})
                                         </span>
                                       </p>
-                                      <p className="text-sm text-muted-foreground">₹{test.price}</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        ₹{test.price}
+                                      </p>
                                     </div>
                                   </div>
                                   <Button
                                     size="sm"
-                                    variant={appliedToAll ? "default" : "outline"}
-                                    onClick={() => applyToAll(sampleType, test.id)}
+                                    variant={
+                                      appliedToAll ? "default" : "outline"
+                                    }
+                                    onClick={() =>
+                                      applyToAll(sampleType, test.id)
+                                    }
                                     disabled={appliedToAll}
                                   >
-                                    {appliedToAll ? "Applied to All" : "Apply to All"}
+                                    {appliedToAll
+                                      ? "Applied to All"
+                                      : "Apply to All"}
                                   </Button>
                                 </div>
                               );
@@ -623,11 +769,21 @@ const InvoicePage = () => {
                         {Object.entries(groupedItems).map(([type, items]) => (
                           <div key={type} className="mb-4">
                             <h5 className="font-semibold capitalize mb-2">
-                              {type === "pl" ? "PL" : type === "pcr" ? "PCR" : type} Tests
+                              {type === "pl"
+                                ? "PL"
+                                : type === "pcr"
+                                  ? "PCR"
+                                  : type}{" "}
+                              Tests
                             </h5>
                             {items.map((item: any, idx: number) => (
-                              <div key={idx} className="flex justify-between text-sm">
-                                <span>{item.name} × {item.quantity}</span>
+                              <div
+                                key={idx}
+                                className="flex justify-between text-sm"
+                              >
+                                <span>
+                                  {item.name} × {item.quantity}
+                                </span>
                                 <span>₹{item.total}</span>
                               </div>
                             ))}
@@ -651,7 +807,9 @@ const InvoicePage = () => {
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value, 10);
                                   if (!isNaN(val)) {
-                                    setChargedPlCount(Math.max(0, Math.min(val, actualPlCount)));
+                                    setChargedPlCount(
+                                      Math.max(0, Math.min(val, actualPlCount)),
+                                    );
                                   }
                                 }}
                                 className="w-24"
@@ -662,7 +820,8 @@ const InvoicePage = () => {
                             </div>
                             {chargedPlCount < actualPlCount && (
                               <p className="text-xs text-amber-600 font-medium">
-                                {actualPlCount - chargedPlCount} PL sample(s) free (Combo)
+                                {actualPlCount - chargedPlCount} PL sample(s)
+                                free (Combo)
                               </p>
                             )}
                           </div>
@@ -683,7 +842,10 @@ const InvoicePage = () => {
                                 if (!checked) setDiscountPercent("");
                               }}
                             />
-                            <Label htmlFor="apply-discount" className="text-sm font-medium leading-none cursor-pointer">
+                            <Label
+                              htmlFor="apply-discount"
+                              className="text-sm font-medium leading-none cursor-pointer"
+                            >
                               Apply Discount
                             </Label>
                           </div>
@@ -696,7 +858,10 @@ const InvoicePage = () => {
                                 value={discountPercent}
                                 onChange={(e) => {
                                   const val = e.target.value;
-                                  if (val === "" || (/^\d+$/.test(val) && parseInt(val) <= 100)) {
+                                  if (
+                                    val === "" ||
+                                    (/^\d+$/.test(val) && parseInt(val) <= 100)
+                                  ) {
                                     setDiscountPercent(val);
                                   }
                                 }}
@@ -704,7 +869,9 @@ const InvoicePage = () => {
                                 min={0}
                                 max={100}
                               />
-                              <span className="text-sm text-muted-foreground">%</span>
+                              <span className="text-sm text-muted-foreground">
+                                %
+                              </span>
                             </div>
                           )}
 
@@ -749,7 +916,10 @@ const InvoicePage = () => {
                           }
                         }}
                       />
-                      <Label htmlFor="zero-invoice" className="text-sm font-medium leading-none cursor-pointer">
+                      <Label
+                        htmlFor="zero-invoice"
+                        className="text-sm font-medium leading-none cursor-pointer"
+                      >
                         Zero Invoice (Lab Equipment Testing)
                       </Label>
                     </div>
@@ -760,7 +930,15 @@ const InvoicePage = () => {
                           <Label>Payment Mode</Label>
                           <Select
                             value={paymentMode}
-                            onValueChange={(value: "cash" | "qr" | "neft" | "rtgs" | "pending" | "") => {
+                            onValueChange={(
+                              value:
+                                | "cash"
+                                | "qr"
+                                | "neft"
+                                | "rtgs"
+                                | "pending"
+                                | "",
+                            ) => {
                               setPaymentMode(value);
                               if (value === "cash" || value === "pending") {
                                 setTransactionRef("");
@@ -774,20 +952,30 @@ const InvoicePage = () => {
                               <SelectItem value="pending">Pending</SelectItem>
                               <SelectItem value="cash">Cash</SelectItem>
                               <SelectItem value="qr">QR Code / UPI</SelectItem>
-                              <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
-                              <SelectItem value="rtgs">RTGS / Bank Transfer</SelectItem>
+                              <SelectItem value="neft">
+                                NEFT / Bank Transfer
+                              </SelectItem>
+                              <SelectItem value="rtgs">
+                                RTGS / Bank Transfer
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
-                        {(paymentMode === "qr" || paymentMode === "neft" || paymentMode === "rtgs") && (
+                        {(paymentMode === "qr" ||
+                          paymentMode === "neft" ||
+                          paymentMode === "rtgs") && (
                           <div>
-                            <Label htmlFor="transactionRef">Transaction ID / Reference No.</Label>
+                            <Label htmlFor="transactionRef">
+                              Transaction ID / Reference No.
+                            </Label>
                             <Input
                               id="transactionRef"
                               type="text"
                               value={transactionRef}
-                              onChange={(e) => setTransactionRef(e.target.value)}
+                              onChange={(e) =>
+                                setTransactionRef(e.target.value)
+                              }
                               placeholder="Enter transaction reference"
                             />
                           </div>
@@ -800,9 +988,13 @@ const InvoicePage = () => {
                       className="w-full"
                       size="lg"
                       disabled={
-                        (!isZeroInvoice && grandTotal === 0 && Object.keys(groupedItems).length === 0) ||
+                        (!isZeroInvoice &&
+                          grandTotal === 0 &&
+                          Object.keys(groupedItems).length === 0) ||
                         !paymentMode ||
-                        (!isZeroInvoice && ["qr", "neft", "rtgs"].includes(paymentMode) && !transactionRef.trim())
+                        (!isZeroInvoice &&
+                          ["qr", "neft", "rtgs"].includes(paymentMode) &&
+                          !transactionRef.trim())
                       }
                     >
                       Generate Invoice & Proceed

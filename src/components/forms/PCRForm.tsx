@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  setDoc, 
-  updateDoc, 
-  where 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import { useNavigate } from "react-router-dom";
@@ -15,7 +15,7 @@ import { useUserSession } from "../../contexts/UserSessionContext";
 
 interface FarmerInfo {
   farmerName: string;
-  address: string;          // ← Changed from village to address
+  address: string; // ← Changed from village to address
   mobile: string;
   farmerId: string;
   sampleCollectionTime: string;
@@ -58,19 +58,23 @@ export default function PCRForm({
 
   const totalSamples = useMemo(() => {
     const count = Number(
-      localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr")?.count || 0
+      localInvoice?.sampleType?.find(
+        (s: any) => s.type?.toLowerCase() === "pcr",
+      )?.count || 0,
     );
     console.log("PCR totalSamples calculated:", {
       rawSampleType: localInvoice?.sampleType,
-      foundPCR: localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "pcr"),
-      count
+      foundPCR: localInvoice?.sampleType?.find(
+        (s: any) => s.type?.toLowerCase() === "pcr",
+      ),
+      count,
     });
     return count;
   }, [localInvoice]);
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
     farmerName: "",
-    address: "",                // ← Changed from village
+    address: "", // ← Changed from village
     mobile: "",
     farmerId: "—",
     sampleCollectionTime: today,
@@ -123,9 +127,10 @@ export default function PCRForm({
           const docId = docSnap.id;
 
           setLocalInvoice({ ...data, docId });
-          console.log("PCRForm - Invoice loaded OK:", { 
-            docId, 
-            invoiceId: data.invoiceId || data.id || "unknown" 
+          console.log("🟢 PCRForm.tsx - Invoice loaded from Firebase:", {
+            docId,
+            invoiceId: data.invoiceId || data.id || "unknown",
+            samplePathogens: data.samplePathogens,
           });
         } else {
           console.error("PCRForm - Invoice NOT FOUND for ID:", invoiceId);
@@ -139,9 +144,9 @@ export default function PCRForm({
   }, [locationId, invoiceId]);
 
   useEffect(() => {
-    setFarmerInfo(prev => ({
+    setFarmerInfo((prev) => ({
       ...prev,
-      noOfSamples: totalSamples
+      noOfSamples: totalSamples,
     }));
   }, [totalSamples]);
 
@@ -150,18 +155,24 @@ export default function PCRForm({
       if (!localInvoice?.farmerId || !locationId) return;
 
       try {
-        const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
+        const farmerRef = doc(
+          db,
+          "locations",
+          locationId,
+          "farmers",
+          localInvoice.farmerId,
+        );
         const snap = await getDoc(farmerRef);
 
         if (snap.exists()) {
           const farmer = snap.data();
 
-          setFarmerInfo(prev => ({
+          setFarmerInfo((prev) => ({
             ...prev,
-            farmerId: farmer.farmerId || "",   
+            farmerId: farmer.farmerId || "",
             farmerName: farmer.name || prev.farmerName,
             mobile: farmer.phone || prev.mobile,
-            address: farmer.address || prev.address   // ← Changed: use address from master
+            address: farmer.address || prev.address, // ← Changed: use address from master
           }));
         }
       } catch (err) {
@@ -175,33 +186,35 @@ export default function PCRForm({
   }, [localInvoice?.farmerId, locationId]);
 
   useEffect(() => {
-  const fetchTechnicians = async () => {
-    if (!locationId) return;
+    const fetchTechnicians = async () => {
+      if (!locationId) return;
 
-    try {
-      const techRef = collection(db, "locations", locationId, "technicians");
-      const snapshot = await getDocs(techRef);
+      try {
+        const techRef = collection(db, "locations", locationId, "technicians");
+        const snapshot = await getDocs(techRef);
 
-      const techNames = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return data.name;
-      });
+        const techNames = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return data.name;
+        });
 
-      setTechnicians(techNames);
-    } catch (err) {
-      console.error("Error fetching technicians:", err);
-    }
-  };
+        setTechnicians(techNames);
+      } catch (err) {
+        console.error("Error fetching technicians:", err);
+      }
+    };
 
-  fetchTechnicians();
-}, [locationId]);
+    fetchTechnicians();
+  }, [locationId]);
 
   // Auto-calculate difference
   useEffect(() => {
     if (farmerInfo.sampleCollectionTime && farmerInfo.reportDate) {
       const collectionDate = new Date(farmerInfo.sampleCollectionTime);
       const reportDateObj = new Date(farmerInfo.reportDate);
-      const diffTime = Math.abs(reportDateObj.getTime() - collectionDate.getTime());
+      const diffTime = Math.abs(
+        reportDateObj.getTime() - collectionDate.getTime(),
+      );
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       setFarmerInfo((prev) => ({
         ...prev,
@@ -221,7 +234,7 @@ export default function PCRForm({
         setLoading(true);
 
         const loadedSamples: SamplePCRData[] = [];
-        let firstCheckedBy = technicianName;  // Default fallback
+        let firstCheckedBy = technicianName; // Default fallback
 
         for (let i = 1; i <= totalSamples; i++) {
           const pcrDocRef = doc(
@@ -231,7 +244,7 @@ export default function PCRForm({
             "invoices",
             localInvoice.docId,
             "pcr_reports",
-            `sample_${i}`
+            `sample_${i}`,
           );
 
           const snap = await getDoc(pcrDocRef);
@@ -254,13 +267,28 @@ export default function PCRForm({
               firstCheckedBy = data.checkedBy;
             }
           } else {
-            const selectedForThisSample = localInvoice?.samplePathogens?.[i] || [];
+            // Access with string key since Firebase converts numeric keys to strings
+            const selectedForThisSample =
+              localInvoice?.samplePathogens?.[String(i)] ||
+              localInvoice?.samplePathogens?.[i] ||
+              [];
+            console.log(
+              `🟡 PCRForm.tsx - Sample ${i} - selectedForThisSample from samplePathogens:`,
+              selectedForThisSample,
+            );
 
-            const initialPathogens = selectedForThisSample.map((testId: string) => ({
-              name: PATHOGEN_NAME_MAP[testId] || testId,
-              result: "",
-              ctValue: "",
-            }));
+            const initialPathogens = selectedForThisSample.map(
+              (pathogenName: string) => ({
+                name: pathogenName, // samplePathogens already contains pathogen names, not testIds
+                result: "",
+                ctValue: "",
+              }),
+            );
+
+            console.log(
+              `🟡 PCRForm.tsx - Sample ${i} - initialPathogens:`,
+              initialPathogens,
+            );
 
             loadedSamples.push({
               sampleCode: "",
@@ -272,17 +300,19 @@ export default function PCRForm({
         }
 
         setSamplesData(loadedSamples);
-setCheckedBy(firstCheckedBy);
+        console.log("🟡 PCRForm.tsx - Final loadedSamples:", loadedSamples);
 
-// Initialize CT custom mode for each pathogen
-setCtCustomMode(
-  loadedSamples.map(sample =>
-    sample.pathogens.map(p => {
-      const val = p.ctValue?.toLowerCase();
-      return val && val !== "non determined";
-    })
-  )
-);
+        setCheckedBy(firstCheckedBy);
+
+        // Initialize CT custom mode for each pathogen
+        setCtCustomMode(
+          loadedSamples.map((sample) =>
+            sample.pathogens.map((p) => {
+              const val = p.ctValue?.toLowerCase();
+              return val && val !== "non determined";
+            }),
+          ),
+        );
       } catch (err) {
         console.error("Error loading PCR data:", err);
       } finally {
@@ -295,7 +325,11 @@ setCtCustomMode(
     }
   }, [localInvoice, invoiceId, locationId, totalSamples, technicianName]);
 
-  const handleBasicInput = (sampleIndex: number, field: keyof SamplePCRData, value: string) => {
+  const handleBasicInput = (
+    sampleIndex: number,
+    field: keyof SamplePCRData,
+    value: string,
+  ) => {
     setSamplesData((prev) => {
       const updated = [...prev];
       (updated[sampleIndex] as any)[field] = value;
@@ -307,18 +341,24 @@ setCtCustomMode(
     sampleIndex: number,
     pathogenIndex: number,
     field: keyof Omit<PathogenResult, "name">,
-    value: string
+    value: string,
   ) => {
     setSamplesData((prev) => {
       const updated = [...prev];
       const pathogens = [...updated[sampleIndex].pathogens];
-      pathogens[pathogenIndex] = { ...pathogens[pathogenIndex], [field]: value };
+      pathogens[pathogenIndex] = {
+        ...pathogens[pathogenIndex],
+        [field]: value,
+      };
       updated[sampleIndex] = { ...updated[sampleIndex], pathogens };
       return updated;
     });
   };
 
-  const handleImageUpload = async (sampleIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (
+    sampleIndex: number,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -338,12 +378,15 @@ setCtCustomMode(
 
       const res = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        { method: "POST", body: formDataObj }
+        { method: "POST", body: formDataObj },
       );
       const data = await res.json();
 
       if (data.secure_url) {
-        setGelImages((prev) => ({ ...prev, [sampleIndex + 1]: data.secure_url }));
+        setGelImages((prev) => ({
+          ...prev,
+          [sampleIndex + 1]: data.secure_url,
+        }));
       } else {
         alert("Upload failed: " + (data.error?.message || "Unknown error"));
       }
@@ -371,25 +414,35 @@ setCtCustomMode(
           "invoices",
           localInvoice.docId,
           "pcr_reports",
-          `sample_${sampleNum}`
+          `sample_${sampleNum}`,
         );
 
-        await setDoc(ref, {
-          sampleNumber: sampleNum,
-          ...farmerInfo,
-          sampleCode: sample.sampleCode,
-          sampleType: sample.sampleType,
-          pathogens: sample.pathogens,
-          gelImageUrl: gelImages[sampleNum] || "",
-          updatedAt: new Date().toISOString(),
-          checkedBy: checkedBy.trim() || technicianName || "N/A",
-        }, { merge: true });
+        await setDoc(
+          ref,
+          {
+            sampleNumber: sampleNum,
+            ...farmerInfo,
+            sampleCode: sample.sampleCode,
+            sampleType: sample.sampleType,
+            pathogens: sample.pathogens,
+            gelImageUrl: gelImages[sampleNum] || "",
+            updatedAt: new Date().toISOString(),
+            checkedBy: checkedBy.trim() || technicianName || "N/A",
+          },
+          { merge: true },
+        );
       });
 
       await Promise.all(savePromises);
 
       // Also save checkedBy to main invoice
-      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
+      const invoiceRef = doc(
+        db,
+        "locations",
+        locationId,
+        "invoices",
+        localInvoice.docId,
+      );
       await updateDoc(invoiceRef, {
         checkedBy: checkedBy.trim() || technicianName || "N/A",
       });
@@ -403,9 +456,7 @@ setCtCustomMode(
 
   if (loading) {
     return (
-      <div className="p-10 text-center text-gray-600">
-        Loading PCR data...
-      </div>
+      <div className="p-10 text-center text-gray-600">Loading PCR data...</div>
     );
   }
 
@@ -425,7 +476,9 @@ setCtCustomMode(
 
       {/* Shared Farmer Info */}
       <section className="mb-10 bg-gray-50 p-6 rounded-lg">
-        <h3 className="font-semibold text-xl mb-5 text-gray-800">Farmer Information</h3>
+        <h3 className="font-semibold text-xl mb-5 text-gray-800">
+          Farmer Information
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {Object.entries(farmerInfo).map(([key, value]) => (
             <div key={key}>
@@ -433,14 +486,14 @@ setCtCustomMode(
                 {key === "sampleCollectionTime"
                   ? "Sample Collection Time"
                   : key === "dateOfCulture"
-                  ? "Sample Collection Time"
-                  : key === "docDifference"
-                  ? "DOC"
-                  : key === "noOfSamples"
-                  ? "No. of Samples"
-                  : key === "address"
-                  ? "Address"             
-                  : key.replace(/([A-Z])/g, " $1").trim()}
+                    ? "Sample Collection Time"
+                    : key === "docDifference"
+                      ? "DOC"
+                      : key === "noOfSamples"
+                        ? "No. of Samples"
+                        : key === "address"
+                          ? "Address"
+                          : key.replace(/([A-Z])/g, " $1").trim()}
               </label>
 
               {key === "sampleCollectionTime" || key === "reportDate" ? (
@@ -448,23 +501,28 @@ setCtCustomMode(
                   type="date"
                   value={value}
                   onChange={(e) =>
-                    setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
+                    setFarmerInfo((prev) => ({
+                      ...prev,
+                      [key]: e.target.value,
+                    }))
                   }
                   className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
                 />
               ) : key === "docDifference" ? (
                 <div className="relative">
-    <input
-      type="text"
-      value={value}
-      onChange={(e) =>
-        setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
-      }
-      className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500 pr-24"
-      placeholder="e.g. 15 days"
-    />
-    
-  </div>
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) =>
+                      setFarmerInfo((prev) => ({
+                        ...prev,
+                        [key]: e.target.value,
+                      }))
+                    }
+                    className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500 pr-24"
+                    placeholder="e.g. 15 days"
+                  />
+                </div>
               ) : key === "noOfSamples" || key === "farmerId" ? (
                 <input
                   type="text"
@@ -477,7 +535,10 @@ setCtCustomMode(
                   type="text"
                   value={value}
                   onChange={(e) =>
-                    setFarmerInfo((prev) => ({ ...prev, [key]: e.target.value }))
+                    setFarmerInfo((prev) => ({
+                      ...prev,
+                      [key]: e.target.value,
+                    }))
                   }
                   className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
                 />
@@ -493,13 +554,18 @@ setCtCustomMode(
       {samplesData.map((sample, sampleIndex) => {
         const sampleNum = sampleIndex + 1;
 
-        const selectedForThisSample = localInvoice?.samplePathogens?.[sampleNum] || [];
-        const selectedNames = selectedForThisSample.map(
-          (id: string) => PATHOGEN_NAME_MAP[id] || id
-        );
+        // Access with string key since Firebase converts numeric keys to strings
+        const selectedForThisSample =
+          localInvoice?.samplePathogens?.[String(sampleNum)] ||
+          localInvoice?.samplePathogens?.[sampleNum] ||
+          [];
+        const selectedNames = selectedForThisSample.map((name: string) => name); // Already contains names
 
         return (
-          <section key={sampleIndex} className="mb-16 pb-12 border-b-2 border-gray-200 last:border-0">
+          <section
+            key={sampleIndex}
+            className="mb-16 pb-12 border-b-2 border-gray-200 last:border-0"
+          >
             <h3 className="text-2xl font-bold mb-8 text-blue-800">
               Sample {sampleNum}
             </h3>
@@ -528,19 +594,27 @@ setCtCustomMode(
 
             <div className="mb-10 grid grid-cols-1 md:grid-cols-2 gap-8">
               <div>
-                <label className="block text-sm font-medium mb-1">Sample Code</label>
+                <label className="block text-sm font-medium mb-1">
+                  Sample Code
+                </label>
                 <input
                   value={sample.sampleCode}
-                  onChange={(e) => handleBasicInput(sampleIndex, "sampleCode", e.target.value)}
+                  onChange={(e) =>
+                    handleBasicInput(sampleIndex, "sampleCode", e.target.value)
+                  }
                   placeholder="e.g., S001-PCR"
                   className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Sample Type</label>
+                <label className="block text-sm font-medium mb-1">
+                  Sample Type
+                </label>
                 <input
                   value={sample.sampleType}
-                  onChange={(e) => handleBasicInput(sampleIndex, "sampleType", e.target.value)}
+                  onChange={(e) =>
+                    handleBasicInput(sampleIndex, "sampleType", e.target.value)
+                  }
                   placeholder="PL / Water / Soil"
                   className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
                 />
@@ -550,13 +624,17 @@ setCtCustomMode(
             <div className="mb-10">
               <h4 className="font-semibold text-lg mb-5">Pathogen Results</h4>
               {sample.pathogens.length === 0 ? (
-                <p className="text-gray-500 italic">No pathogens selected for this sample.</p>
+                <p className="text-gray-500 italic">
+                  No pathogens selected for this sample.
+                </p>
               ) : (
                 <div className="space-y-5">
                   {sample.pathogens.map((p, i) => (
                     <div key={i} className="grid grid-cols-3 gap-6 items-end">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Pathogen</label>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Pathogen
+                        </label>
                         <input
                           value={p.name === "PL EHP" ? "EHP" : p.name}
                           disabled
@@ -564,11 +642,18 @@ setCtCustomMode(
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Result</label>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Result
+                        </label>
                         <select
                           value={p.result}
                           onChange={(e) =>
-                            handlePathogenChange(sampleIndex, i, "result", e.target.value)
+                            handlePathogenChange(
+                              sampleIndex,
+                              i,
+                              "result",
+                              e.target.value,
+                            )
                           }
                           className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
                         >
@@ -579,56 +664,80 @@ setCtCustomMode(
                         </select>
                       </div>
                       <div>
-                       <div>
-  <label className="block text-sm font-medium text-gray-700">CT Value</label>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">
+                            CT Value
+                          </label>
 
-  {ctCustomMode[sampleIndex]?.[i] ? (
-    <div className="flex gap-2">
-      <input
-        placeholder="Enter CT value"
-        value={p.ctValue}
-        onChange={(e) =>
-          handlePathogenChange(sampleIndex, i, "ctValue", e.target.value)
-        }
-        className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
-      />
+                          {ctCustomMode[sampleIndex]?.[i] ? (
+                            <div className="flex gap-2">
+                              <input
+                                placeholder="Enter CT value"
+                                value={p.ctValue}
+                                onChange={(e) =>
+                                  handlePathogenChange(
+                                    sampleIndex,
+                                    i,
+                                    "ctValue",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                              />
 
-      <button
-        type="button"
-        onClick={() => {
-          const updated = [...ctCustomMode];
-          updated[sampleIndex][i] = false;
-          setCtCustomMode(updated);
-          handlePathogenChange(sampleIndex, i, "ctValue", "");
-        }}
-        className="text-xs px-3 py-2 bg-gray-200 rounded"
-      >
-        Select
-      </button>
-    </div>
-  ) : (
-    <select
-      value={p.ctValue}
-      onChange={(e) => {
-        const val = e.target.value;
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...ctCustomMode];
+                                  updated[sampleIndex][i] = false;
+                                  setCtCustomMode(updated);
+                                  handlePathogenChange(
+                                    sampleIndex,
+                                    i,
+                                    "ctValue",
+                                    "",
+                                  );
+                                }}
+                                className="text-xs px-3 py-2 bg-gray-200 rounded"
+                              >
+                                Select
+                              </button>
+                            </div>
+                          ) : (
+                            <select
+                              value={p.ctValue}
+                              onChange={(e) => {
+                                const val = e.target.value;
 
-        if (val === "Others") {
-          const updated = [...ctCustomMode];
-          updated[sampleIndex][i] = true;
-          setCtCustomMode(updated);
-          handlePathogenChange(sampleIndex, i, "ctValue", "");
-        } else {
-          handlePathogenChange(sampleIndex, i, "ctValue", val);
-        }
-      }}
-      className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
-    >
-      <option value="">Select</option>
-      <option value="Non Determined">Non Determined</option>
-      <option value="Others">Others</option>
-    </select>
-  )}
-</div>
+                                if (val === "Others") {
+                                  const updated = [...ctCustomMode];
+                                  updated[sampleIndex][i] = true;
+                                  setCtCustomMode(updated);
+                                  handlePathogenChange(
+                                    sampleIndex,
+                                    i,
+                                    "ctValue",
+                                    "",
+                                  );
+                                } else {
+                                  handlePathogenChange(
+                                    sampleIndex,
+                                    i,
+                                    "ctValue",
+                                    val,
+                                  );
+                                }
+                              }}
+                              className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="">Select</option>
+                              <option value="Non Determined">
+                                Non Determined
+                              </option>
+                              <option value="Others">Others</option>
+                            </select>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -637,7 +746,9 @@ setCtCustomMode(
             </div>
 
             <div className="mb-12">
-              <h4 className="font-semibold text-lg mb-4">PCR Amplification Image</h4>
+              <h4 className="font-semibold text-lg mb-4">
+                PCR Amplification Image
+              </h4>
               <input
                 type="file"
                 accept="image/*"
@@ -645,33 +756,35 @@ setCtCustomMode(
                 disabled={uploading === sampleIndex}
                 className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
-              {uploading === sampleIndex && <p className="mt-2 text-sm text-blue-600">Uploading image...</p>}
+              {uploading === sampleIndex && (
+                <p className="mt-2 text-sm text-blue-600">Uploading image...</p>
+              )}
               {gelImages[sampleNum] && (
-  <div className="mt-6">
-    <img
-      src={gelImages[sampleNum]}
-      alt={`Gel image for Sample ${sampleNum}`}
-      className="max-w-lg rounded-lg border shadow-lg"
-    />
+                <div className="mt-6">
+                  <img
+                    src={gelImages[sampleNum]}
+                    alt={`Gel image for Sample ${sampleNum}`}
+                    className="max-w-lg rounded-lg border shadow-lg"
+                  />
 
-    <div className="mt-3 flex gap-3">
-      {/* Delete button */}
-      <button
-        type="button"
-        onClick={() => {
-          setGelImages((prev) => {
-            const updated = { ...prev };
-            delete updated[sampleNum];
-            return updated;
-          });
-        }}
-        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-      >
-        Delete Image
-      </button>
+                  <div className="mt-3 flex gap-3">
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGelImages((prev) => {
+                          const updated = { ...prev };
+                          delete updated[sampleNum];
+                          return updated;
+                        });
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                    >
+                      Delete Image
+                    </button>
 
-      {/* Choose new file */}
-      {/* <label className="px-4 py-2 bg-blue-600 text-white rounded cursor-pointer hover:bg-blue-700">
+                    {/* Choose new file */}
+                    {/* <label className="px-4 py-2 bg-blue-600 text-white rounded cursor-pointer hover:bg-blue-700">
         Choose New File
         <input
           type="file"
@@ -680,9 +793,9 @@ setCtCustomMode(
           className="hidden"
         />
       </label> */}
-    </div>
-  </div>
-)}
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         );
@@ -694,19 +807,19 @@ setCtCustomMode(
           Checked by
         </label>
         <select
-  value={checkedBy}
-  onChange={(e) => setCheckedBy(e.target.value)}
-  required
-  className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
->
-  <option value="">Select Technician</option>
+          value={checkedBy}
+          onChange={(e) => setCheckedBy(e.target.value)}
+          required
+          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+        >
+          <option value="">Select Technician</option>
 
-  {technicians.map((tech, index) => (
-    <option key={index} value={tech}>
-      {tech}
-    </option>
-  ))}
-</select>
+          {technicians.map((tech, index) => (
+            <option key={index} value={tech}>
+              {tech}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="text-center mt-12">
