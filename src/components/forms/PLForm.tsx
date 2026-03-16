@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  setDoc, 
-  updateDoc, 
-  where 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import { useNavigate } from "react-router-dom";
@@ -42,8 +42,7 @@ export default function PLForm({
   const currentTime = useMemo(() => new Date().toTimeString().slice(0, 5), []);
 
   /* ---------- helpers ---------- */
-  const createEmptyArray = (length: number) =>
-    Array.from({ length }, () => "");
+  const createEmptyArray = (length: number) => Array.from({ length }, () => "");
 
   const normalizeArray = (arr: string[] = [], length: number) =>
     Array.from({ length }, (_, i) => arr[i] ?? "");
@@ -96,18 +95,18 @@ export default function PLForm({
 
   // Dropdown options for special fields
   const fieldOptions: Record<string, string[]> = {
-    hp: ['Full', 'Shrink'],
-    shg: ['Present', 'Absent'],
-    necAppend: ['Absent'],
-    necRostrum: ['Absent'],
-    necGill: ['Absent'],
-    necMuscle: ['Absent'],
-    foulAppend: ['Absent'],
-    foulGill: ['Absent'],
-    foulAbdomen: ['Absent'],
-    salinityPercent: ['100%', '90%', '80%'],
-    sizeVariation: ['<5%', '<10%'],
-    totalScore: Array.from({ length: 11 }, (_, i) => (90 + i+"%").toString()),
+    hp: ["Full", "Shrink"],
+    shg: ["Present", "Absent"],
+    necAppend: ["Absent"],
+    necRostrum: ["Absent"],
+    necGill: ["Absent"],
+    necMuscle: ["Absent"],
+    foulAppend: ["Absent"],
+    foulGill: ["Absent"],
+    foulAbdomen: ["Absent"],
+    salinityPercent: ["100%", "90%", "80%"],
+    sizeVariation: ["<5%", "<10%"],
+    totalScore: Array.from({ length: 11 }, (_, i) => (90 + i + "%").toString()),
     // NEW: MGR and MGR% will be handled separately below
   };
 
@@ -165,33 +164,33 @@ export default function PLForm({
   }, [invoiceId, locationId]);
 
   useEffect(() => {
-  const fetchTechnicians = async () => {
-    if (!locationId) return;
+    const fetchTechnicians = async () => {
+      if (!locationId) return;
 
-    try {
-      const techRef = collection(db, "locations", locationId, "technicians");
-      const snapshot = await getDocs(techRef);
+      try {
+        const techRef = collection(db, "locations", locationId, "technicians");
+        const snapshot = await getDocs(techRef);
 
-      const techNames = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return data.name;
-      });
+        const techNames = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return data.name;
+        });
 
-      setTechnicians(techNames);
-    } catch (err) {
-      console.error("Error fetching technicians:", err);
-    }
-  };
+        setTechnicians(techNames);
+      } catch (err) {
+        console.error("Error fetching technicians:", err);
+      }
+    };
 
-  fetchTechnicians();
-}, [locationId]);
+    fetchTechnicians();
+  }, [locationId]);
 
   // Combined loading logic
   useEffect(() => {
     if (!localInvoice) return;
 
     const plType = localInvoice.sampleType?.find(
-      (s: any) => s.type?.toLowerCase() === "pl"
+      (s: any) => s.type?.toLowerCase() === "pl",
     );
     const count = Number(plType?.count || 1);
 
@@ -203,7 +202,13 @@ export default function PLForm({
         // Pre-fill farmer info (unchanged)
         let loadedFarmerId = "";
         if (localInvoice?.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
+          const farmerRef = doc(
+            db,
+            "locations",
+            locationId,
+            "farmers",
+            localInvoice.farmerId,
+          );
           const farmerSnap = await getDoc(farmerRef);
           if (farmerSnap.exists()) {
             const farmerData = farmerSnap.data();
@@ -229,7 +234,7 @@ export default function PLForm({
           "invoices",
           localInvoice.docId,
           "plReports",
-          "data"
+          "data",
         );
 
         const snap = await getDoc(plReportRef);
@@ -244,7 +249,10 @@ export default function PLForm({
               farmerName: data.farmerInfo.farmerName || farmerInfo.farmerName,
               address: data.farmerInfo.address || farmerInfo.address,
               mobile: data.farmerInfo.mobile || farmerInfo.mobile,
-              sampleDate: data.farmerInfo.sampleDate || localInvoice?.dateOfCulture || today,
+              sampleDate:
+                data.farmerInfo.sampleDate ||
+                localInvoice?.dateOfCulture ||
+                today,
               sampleTime: data.farmerInfo.sampleTime || "",
               reportDate: data.farmerInfo.reportDate || today,
               reportTime: data.farmerInfo.reportTime || currentTime,
@@ -267,8 +275,14 @@ export default function PLForm({
 
           if (data.checkedBy) {
             setCheckedBy(data.checkedBy);
+          } else if (localInvoice?.checkedBy) {
+            setCheckedBy(localInvoice.checkedBy);
           }
         } else {
+          // If no saved data, try loading from invoice
+          if (localInvoice?.checkedBy) {
+            setCheckedBy(localInvoice.checkedBy);
+          }
           const fresh: any = {};
           Object.keys(emptyPLData).forEach((key) => {
             fresh[key] = createEmptyArray(count);
@@ -304,7 +318,6 @@ export default function PLForm({
         });
 
         setCustomModes(initModes);
-
       } catch (error) {
         console.error("Error loading PL data:", error);
         const fallback: any = {};
@@ -342,7 +355,7 @@ export default function PLForm({
         "invoices",
         localInvoice.docId,
         "plReports",
-        "data"
+        "data",
       );
 
       await setDoc(
@@ -355,10 +368,16 @@ export default function PLForm({
           updatedAt: new Date().toISOString(),
           checkedBy: checkedBy.trim() || technicianName || "N/A",
         },
-        { merge: true }
+        { merge: true },
       );
 
-      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
+      const invoiceRef = doc(
+        db,
+        "locations",
+        locationId,
+        "invoices",
+        localInvoice.docId,
+      );
       await updateDoc(invoiceRef, {
         checkedBy: checkedBy.trim() || technicianName || "N/A",
       });
@@ -408,34 +427,50 @@ export default function PLForm({
 
       {/* Farmer Information - unchanged */}
       <section className="mb-10 bg-gray-50 p-5 rounded-lg">
-        <h2 className="text-lg font-semibold mb-4 text-gray-800">Farmer Information</h2>
+        <h2 className="text-lg font-semibold mb-4 text-gray-800">
+          Farmer Information
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Farmer Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Farmer Name
+            </label>
             <input
               className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={farmerInfo.farmerName}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, farmerName: e.target.value })}
+              onChange={(e) =>
+                setFarmerInfo({ ...farmerInfo, farmerName: e.target.value })
+              }
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Address
+            </label>
             <input
               className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
               value={farmerInfo.address}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, address: e.target.value })}
+              onChange={(e) =>
+                setFarmerInfo({ ...farmerInfo, address: e.target.value })
+              }
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Mobile
+            </label>
             <input
               className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500"
               value={farmerInfo.mobile}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, mobile: e.target.value })}
+              onChange={(e) =>
+                setFarmerInfo({ ...farmerInfo, mobile: e.target.value })
+              }
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Farmer UID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Farmer UID
+            </label>
             <input
               className="w-full border border-gray-300 p-2 rounded bg-gray-100"
               value={farmerUID}
@@ -444,7 +479,9 @@ export default function PLForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sample Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sample Date
+            </label>
             <input
               type="date"
               className="w-full border border-gray-300 p-2 rounded bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -454,16 +491,22 @@ export default function PLForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Report Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Report Date
+            </label>
             <input
               type="date"
               className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={farmerInfo.reportDate}
-              onChange={(e) => setFarmerInfo({ ...farmerInfo, reportDate: e.target.value })}
+              onChange={(e) =>
+                setFarmerInfo({ ...farmerInfo, reportDate: e.target.value })
+              }
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Report Time</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Report Time
+            </label>
             <input
               type="time"
               className="w-full border border-gray-300 p-2 rounded bg-gray-100"
@@ -473,7 +516,9 @@ export default function PLForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">No. of Samples</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              No. of Samples
+            </label>
             <input
               type="text"
               className="w-full border border-gray-300 p-2 rounded bg-gray-100"
@@ -482,7 +527,9 @@ export default function PLForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sample Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sample Type
+            </label>
             <input
               type="text"
               className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -496,7 +543,9 @@ export default function PLForm({
 
       {/* PL Test Values Table */}
       <section className="mb-10">
-        <h2 className="text-lg font-semibold mb-5 text-gray-800">PL Test Parameters</h2>
+        <h2 className="text-lg font-semibold mb-5 text-gray-800">
+          PL Test Parameters
+        </h2>
 
         {plRows.map((row) => (
           <div key={row.key as string} className="mb-7">
@@ -515,25 +564,32 @@ export default function PLForm({
 
                 // ── Special handling for MGR and MGR% ───────────────────────
                 if (fieldKey === "mgr" || fieldKey === "mgrPercent") {
-                  const options = fieldKey === "mgr" ? mgrOptions : mgrPercentOptions;
+                  const options =
+                    fieldKey === "mgr" ? mgrOptions : mgrPercentOptions;
                   const isCustom = customModes[fieldKey]?.[i] ?? false;
 
                   return (
                     <div key={i} className="flex flex-col">
-                      <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
+                      <span className="text-xs text-gray-500 mb-1 text-center">
+                        {i + 1}
+                      </span>
                       {isCustom ? (
                         <div>
                           <input
                             className="w-full border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             placeholder="Enter custom value"
                             value={value}
-                            onChange={(e) => updateColumn(fieldKey, i, e.target.value)}
+                            onChange={(e) =>
+                              updateColumn(fieldKey, i, e.target.value)
+                            }
                           />
                           <button
                             className="text-xs text-blue-600 underline mt-1 block mx-auto"
                             onClick={() => {
                               const newModes = { ...customModes };
-                              newModes[fieldKey] = [...(newModes[fieldKey] || [])];
+                              newModes[fieldKey] = [
+                                ...(newModes[fieldKey] || []),
+                              ];
                               newModes[fieldKey][i] = false;
                               setCustomModes(newModes);
                               updateColumn(fieldKey, i, ""); // reset when switching back
@@ -550,7 +606,9 @@ export default function PLForm({
                             const newVal = e.target.value;
                             if (newVal === "Others") {
                               const newModes = { ...customModes };
-                              newModes[fieldKey] = [...(newModes[fieldKey] || [])];
+                              newModes[fieldKey] = [
+                                ...(newModes[fieldKey] || []),
+                              ];
                               newModes[fieldKey][i] = true;
                               setCustomModes(newModes);
                               updateColumn(fieldKey, i, value || ""); // keep current if any
@@ -577,14 +635,18 @@ export default function PLForm({
                   const isCustom = customModes[fieldKey]?.[i] ?? false;
                   return (
                     <div key={i} className="flex flex-col">
-                      <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
+                      <span className="text-xs text-gray-500 mb-1 text-center">
+                        {i + 1}
+                      </span>
                       {isCustom ? (
                         <div>
                           <input
                             className="w-full border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             placeholder={`Enter custom value`}
                             value={value}
-                            onChange={(e) => updateColumn(fieldKey, i, e.target.value)}
+                            onChange={(e) =>
+                              updateColumn(fieldKey, i, e.target.value)
+                            }
                           />
                           <button
                             className="text-xs text-blue-600 underline mt-1 block mx-auto"
@@ -593,7 +655,7 @@ export default function PLForm({
                               newModes[fieldKey] = [...newModes[fieldKey]];
                               newModes[fieldKey][i] = false;
                               setCustomModes(newModes);
-                              updateColumn(fieldKey, i, ''); 
+                              updateColumn(fieldKey, i, "");
                             }}
                           >
                             Select from options
@@ -605,12 +667,12 @@ export default function PLForm({
                           value={value}
                           onChange={(e) => {
                             const newVal = e.target.value;
-                            if (newVal === 'Others' && hasOthers[fieldKey]) {
+                            if (newVal === "Others" && hasOthers[fieldKey]) {
                               const newModes = { ...customModes };
                               newModes[fieldKey] = [...newModes[fieldKey]];
                               newModes[fieldKey][i] = true;
                               setCustomModes(newModes);
-                              updateColumn(fieldKey, i, '');
+                              updateColumn(fieldKey, i, "");
                             } else {
                               updateColumn(fieldKey, i, newVal);
                             }
@@ -622,7 +684,9 @@ export default function PLForm({
                               {opt}
                             </option>
                           ))}
-                          {hasOthers[fieldKey] && <option value="Others">Others</option>}
+                          {hasOthers[fieldKey] && (
+                            <option value="Others">Others</option>
+                          )}
                         </select>
                       )}
                     </div>
@@ -632,7 +696,9 @@ export default function PLForm({
                 // Normal text input for remaining fields
                 return (
                   <div key={i} className="flex flex-col">
-                    <span className="text-xs text-gray-500 mb-1 text-center">{i + 1}</span>
+                    <span className="text-xs text-gray-500 mb-1 text-center">
+                      {i + 1}
+                    </span>
                     <input
                       className="border border-gray-300 p-3 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder={`S${i + 1}`}
@@ -655,19 +721,19 @@ export default function PLForm({
           Checked by
         </label>
         <select
-  value={checkedBy}
-  onChange={(e) => setCheckedBy(e.target.value)}
-  required
-  className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
->
-  <option value="">Select Technician</option>
+          value={checkedBy}
+          onChange={(e) => setCheckedBy(e.target.value)}
+          required
+          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+        >
+          <option value="">Select Technician</option>
 
-  {technicians.map((tech, index) => (
-    <option key={index} value={tech}>
-      {tech}
-    </option>
-  ))}
-</select>
+          {technicians.map((tech, index) => (
+            <option key={index} value={tech}>
+              {tech}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Submit Button - unchanged */}

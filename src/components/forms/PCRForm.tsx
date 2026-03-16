@@ -250,7 +250,7 @@ export default function PCRForm({
         samplesWithPathogens.sort((a, b) => a - b);
 
         const loadedSamples: SamplePCRData[] = [];
-        let firstCheckedBy = technicianName; // Default fallback
+        let firstCheckedBy = localInvoice?.checkedBy || technicianName; // Load from invoice first, then default fallback
 
         for (const i of samplesWithPathogens) {
           const pcrDocRef = doc(

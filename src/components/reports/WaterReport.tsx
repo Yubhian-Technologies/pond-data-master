@@ -395,6 +395,20 @@ const WaterReport: React.FC<WaterReportProps> = ({
       .replace(/\//g, "-");
   };
 
+  const formatTimeWithAMPM = (timeStr: string | undefined): string => {
+    if (!timeStr || timeStr === "-") return "-";
+    try {
+      const [hours, minutes] = timeStr.split(":");
+      const hour = parseInt(hours, 10);
+      const isAM = hour < 12;
+      const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+      const period = isAM ? "AM" : "PM";
+      return `${displayHour.toString().padStart(2, "0")}:${minutes} ${period}`;
+    } catch {
+      return timeStr;
+    }
+  };
+
   // Refs for dynamic row height matching on screen
   const waterDataRows = useRef([]);
   const bactDataRows = useRef([]);
@@ -494,7 +508,7 @@ const WaterReport: React.FC<WaterReportProps> = ({
                   Sample Collection time
                 </td>
                 <td className="border px-4 py-2">
-                  {formatDateDDMMYYYY(formData.sampleCollectionTime)}
+                  {formatTimeWithAMPM(formData.sampleCollectionTime)}
                 </td>
               </tr>
               <tr>

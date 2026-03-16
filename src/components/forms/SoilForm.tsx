@@ -244,9 +244,11 @@ export default function SoilForm({
             cmisBy: headerData.technicianName || technicianName,
             sampleDate: headerData.sampleDate || localInvoice.dateOfCulture || today,
           }));
-          setCheckedBy(headerData.checkedBy || technicianName || "");
+          setCheckedBy(headerData.checkedBy || localInvoice?.checkedBy || technicianName || "");
           setSharedRemarks(headerData.remarks || ""); // ← load shared remarks
-        }
+        } else if (localInvoice?.checkedBy) {
+          // If no header data exists, try loading from invoice
+          setCheckedBy(localInvoice.checkedBy);
 
         // Load all soil samples
         const samplesCollection = collection(

@@ -426,9 +426,11 @@ export default function PCRReport({
                     </td>
                   </>
                 ) : (
-                  allPathogens.map((originalP) => {
+                  displayPathogens.map((displayP) => {
+                    // Map display name back to original name for lookup
+                    const originalName = displayP === "EHP" ? "PL EHP" : displayP;
                     const found = r.pathogens.find(
-                      (x: any) => x.name === originalP,
+                      (x: any) => x.name === originalName,
                     );
                     const res = (found?.result || "-").trim().toLowerCase();
                     const ctValue = found?.ctValue || "-";
@@ -470,7 +472,7 @@ export default function PCRReport({
                     }
 
                     return (
-                      <React.Fragment key={originalP}>
+                      <React.Fragment key={displayP}>
                         <td className="border px-2 py-2.5 text-center font-bold">
                           {resultDisplay}
                         </td>
