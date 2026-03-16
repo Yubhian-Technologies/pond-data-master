@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  setDoc, 
-  updateDoc, 
-  where 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../../pages/firebase";
 import { useNavigate } from "react-router-dom";
@@ -59,21 +59,21 @@ export default function SoilForm({
   const { session } = useUserSession();
   const technicianName = session?.technicianName || "";
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
   const currentTime = new Date().toTimeString().slice(0, 5);
 
   const [formData, setFormData] = useState<FormData>({
-    farmerName: '',
-    farmerUID: '',
-    farmerAddress: '',
-    soilType: '',
-    sourceOfSoil: '',
-    noOfSamples: '1',
-    mobile: '',
+    farmerName: "",
+    farmerUID: "",
+    farmerAddress: "",
+    soilType: "",
+    sourceOfSoil: "",
+    noOfSamples: "1",
+    mobile: "",
     sampleDate: today,
     reportDate: today,
-    sampleCollectionTime: '',
-    sampleTime: '',
+    sampleCollectionTime: "",
+    sampleTime: "",
     reportTime: currentTime,
     reportedBy: technicianName,
     checkedBy: technicianName,
@@ -90,9 +90,9 @@ export default function SoilForm({
 
   // Mapping: which test IDs control which soil fields
   const testToSoilFields: Record<string, (keyof Sample)[]> = {
-    "soil_ph": ["pH"],
-    "soil_ec": ["ec"],
-    "soil_oc": ["organicCarbon"],
+    soil_ph: ["pH"],
+    soil_ec: ["ec"],
+    soil_oc: ["organicCarbon"],
     // Add others if you have more granular soil tests
   };
 
@@ -100,26 +100,26 @@ export default function SoilForm({
   const alwaysShowFields = new Set<keyof Sample>(["pondNo"]); // remarks removed
 
   useEffect(() => {
-  const fetchTechnicians = async () => {
-    if (!locationId) return;
+    const fetchTechnicians = async () => {
+      if (!locationId) return;
 
-    try {
-      const techRef = collection(db, "locations", locationId, "technicians");
-      const snapshot = await getDocs(techRef);
+      try {
+        const techRef = collection(db, "locations", locationId, "technicians");
+        const snapshot = await getDocs(techRef);
 
-      const techNames = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return data.name;
-      });
+        const techNames = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return data.name;
+        });
 
-      setTechnicians(techNames);
-    } catch (err) {
-      console.error("Error fetching technicians:", err);
-    }
-  };
+        setTechnicians(techNames);
+      } catch (err) {
+        console.error("Error fetching technicians:", err);
+      }
+    };
 
-  fetchTechnicians();
-}, [locationId]);
+    fetchTechnicians();
+  }, [locationId]);
 
   // Fetch invoice
   useEffect(() => {
@@ -146,9 +146,9 @@ export default function SoilForm({
           const docId = docSnap.id;
 
           setLocalInvoice({ ...data, docId });
-          console.log("SoilForm - Invoice loaded OK:", { 
-            docId, 
-            invoiceId: data.invoiceId || data.id || "unknown" 
+          console.log("SoilForm - Invoice loaded OK:", {
+            docId,
+            invoiceId: data.invoiceId || data.id || "unknown",
           });
         } else {
           console.error("SoilForm - Invoice NOT FOUND for ID:", invoiceId);
@@ -162,10 +162,12 @@ export default function SoilForm({
   }, [locationId, invoiceId]);
 
   const totalSamples = Number(
-    localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")?.count || 1
+    localInvoice?.sampleType?.find((s: any) => s.type?.toLowerCase() === "soil")
+      ?.count || 1,
   );
 
-  const perSampleSelectedTests = localInvoice?.perSampleSelectedTests?.soil || {};
+  const perSampleSelectedTests =
+    localInvoice?.perSampleSelectedTests?.soil || {};
 
   const testNameMap: Record<string, string> = {
     pondNo: "Pond No.",
@@ -182,11 +184,15 @@ export default function SoilForm({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSampleChange = (index: number, field: keyof Sample, value: string) => {
-    setSamples(prev => {
+  const handleSampleChange = (
+    index: number,
+    field: keyof Sample,
+    value: string,
+  ) => {
+    setSamples((prev) => {
       const newSamples = [...prev];
       newSamples[index] = { ...newSamples[index], [field]: value };
       return newSamples;
@@ -195,7 +201,10 @@ export default function SoilForm({
 
   useEffect(() => {
     if (formData.sampleCollectionTime && !formData.sampleTime) {
-      setFormData(prev => ({ ...prev, sampleTime: formData.sampleCollectionTime }));
+      setFormData((prev) => ({
+        ...prev,
+        sampleTime: formData.sampleCollectionTime,
+      }));
     }
   }, [formData.sampleCollectionTime]);
 
@@ -211,15 +220,22 @@ export default function SoilForm({
 
         // Pre-fill farmer info
         if (localInvoice.farmerId) {
-          const farmerRef = doc(db, "locations", locationId, "farmers", localInvoice.farmerId);
+          const farmerRef = doc(
+            db,
+            "locations",
+            locationId,
+            "farmers",
+            localInvoice.farmerId,
+          );
           const farmerSnap = await getDoc(farmerRef);
           if (farmerSnap.exists()) {
             const farmer = farmerSnap.data();
-            setFormData(prev => ({
+            setFormData((prev) => ({
               ...prev,
               farmerName: farmer.name || "",
               farmerUID: farmer.farmerId || "",
-              farmerAddress: `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
+              farmerAddress:
+                `${farmer.address || ""}, ${farmer.city || ""}`.trim(),
               mobile: farmer.phone || "",
               noOfSamples: String(totalSamples),
               sampleDate: localInvoice.dateOfCulture || today,
@@ -228,11 +244,17 @@ export default function SoilForm({
         }
 
         // Load existing report header
-        const reportHeaderRef = doc(db, "locations", locationId, "reports", invoiceId);
+        const reportHeaderRef = doc(
+          db,
+          "locations",
+          locationId,
+          "reports",
+          invoiceId,
+        );
         const headerSnap = await getDoc(reportHeaderRef);
         if (headerSnap.exists()) {
           const headerData = headerSnap.data();
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             soilType: headerData.soilType || "",
             sourceOfSoil: headerData.sourceOfSoil || "",
@@ -242,13 +264,20 @@ export default function SoilForm({
             reportedBy: headerData.technicianName || technicianName,
             checkedBy: headerData.technicianName || technicianName,
             cmisBy: headerData.technicianName || technicianName,
-            sampleDate: headerData.sampleDate || localInvoice.dateOfCulture || today,
+            sampleDate:
+              headerData.sampleDate || localInvoice.dateOfCulture || today,
           }));
-          setCheckedBy(headerData.checkedBy || localInvoice?.checkedBy || technicianName || "");
+          setCheckedBy(
+            headerData.checkedBy ||
+              localInvoice?.checkedBy ||
+              technicianName ||
+              "",
+          );
           setSharedRemarks(headerData.remarks || ""); // ← load shared remarks
         } else if (localInvoice?.checkedBy) {
           // If no header data exists, try loading from invoice
           setCheckedBy(localInvoice.checkedBy);
+        }
 
         // Load all soil samples
         const samplesCollection = collection(
@@ -257,27 +286,29 @@ export default function SoilForm({
           locationId,
           "reports",
           invoiceId,
-          "soil samples"
+          "soil samples",
         );
         const samplesSnap = await getDocs(samplesCollection);
 
         const loadedSamples: Sample[] = [];
 
         for (let i = 1; i <= totalSamples; i++) {
-          const sampleDoc = samplesSnap.docs.find(d => d.id === `sample_${i}`);
+          const sampleDoc = samplesSnap.docs.find(
+            (d) => d.id === `sample_${i}`,
+          );
           if (sampleDoc) {
             loadedSamples.push(sampleDoc.data() as Sample);
           } else {
             loadedSamples.push({
               pondNo: `S${i}`,
-              pH: '',
-              ec: '',
-              caco3: '',
-              soilTexture: '',
-              organicCarbon: '',
-              availableNitrogen: '',
-              availablePhosphorus: '',
-              redoxPotential: '',
+              pH: "",
+              ec: "",
+              caco3: "",
+              soilTexture: "",
+              organicCarbon: "",
+              availableNitrogen: "",
+              availablePhosphorus: "",
+              redoxPotential: "",
             });
           }
         }
@@ -303,18 +334,28 @@ export default function SoilForm({
 
     try {
       // Save shared header — including remarks
-      const reportHeaderRef = doc(db, "locations", locationId, "reports", invoiceId);
-      await setDoc(reportHeaderRef, {
-        soilType: formData.soilType,
-        sourceOfSoil: formData.sourceOfSoil,
-        sampleCollectionTime: formData.sampleCollectionTime,
-        sampleTime: formData.sampleTime,
-        reportTime: formData.reportTime,
-        technicianName: technicianName,
-        sampleDate: formData.sampleDate,
-        checkedBy: checkedBy.trim() || technicianName || "N/A",
-        remarks: sharedRemarks.trim(), // ← save shared remarks here
-      }, { merge: true });
+      const reportHeaderRef = doc(
+        db,
+        "locations",
+        locationId,
+        "reports",
+        invoiceId,
+      );
+      await setDoc(
+        reportHeaderRef,
+        {
+          soilType: formData.soilType,
+          sourceOfSoil: formData.sourceOfSoil,
+          sampleCollectionTime: formData.sampleCollectionTime,
+          sampleTime: formData.sampleTime,
+          reportTime: formData.reportTime,
+          technicianName: technicianName,
+          sampleDate: formData.sampleDate,
+          checkedBy: checkedBy.trim() || technicianName || "N/A",
+          remarks: sharedRemarks.trim(), // ← save shared remarks here
+        },
+        { merge: true },
+      );
 
       // Save all samples (without remarks field)
       const savePromises = samples.map(async (sample, index) => {
@@ -325,25 +366,38 @@ export default function SoilForm({
 
         // Reset unselected fields to "-"
         [
-          "pH", "ec", "caco3", "soilTexture", "organicCarbon",
-          "availableNitrogen", "availablePhosphorus", "redoxPotential"
-        ].forEach(field => {
+          "pH",
+          "ec",
+          "caco3",
+          "soilTexture",
+          "organicCarbon",
+          "availableNitrogen",
+          "availablePhosphorus",
+          "redoxPotential",
+        ].forEach((field) => {
           (dataToSave as any)[field] = "-";
         });
 
         // Restore only selected fields
-        selectedIds.forEach(testId => {
+        selectedIds.forEach((testId) => {
           const fields = testToSoilFields[testId];
           if (fields) {
-            fields.forEach(field => {
+            fields.forEach((field) => {
               (dataToSave as any)[field] = sample[field] || "";
             });
           }
         });
 
         const sampleDocRef = doc(
-          collection(db, "locations", locationId, "reports", invoiceId, "soil samples"),
-          `sample_${sampleNumber}`
+          collection(
+            db,
+            "locations",
+            locationId,
+            "reports",
+            invoiceId,
+            "soil samples",
+          ),
+          `sample_${sampleNumber}`,
         );
 
         return setDoc(sampleDocRef, dataToSave, { merge: true });
@@ -352,12 +406,17 @@ export default function SoilForm({
       await Promise.all(savePromises);
 
       // Mark as completed
-      const invoiceRef = doc(db, "locations", locationId, "invoices", localInvoice.docId);
+      const invoiceRef = doc(
+        db,
+        "locations",
+        locationId,
+        "invoices",
+        localInvoice.docId,
+      );
       await updateDoc(invoiceRef, {
         "reportsProgress.soil": "completed",
         checkedBy: checkedBy.trim() || technicianName || "N/A",
       });
-
     } catch (err) {
       console.error("Error saving soil data:", err);
       alert("Failed to save. Please try again.");
@@ -375,7 +434,7 @@ export default function SoilForm({
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-bold mb-4" style={{ color: '#1e40af' }}>
+      <h2 className="text-xl font-bold mb-4" style={{ color: "#1e40af" }}>
         Enter Soil Report Details - All Samples ({totalSamples})
       </h2>
 
@@ -384,20 +443,44 @@ export default function SoilForm({
         <h3 className="font-bold mb-3 text-gray-700">Farmer Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Farmer Name</label>
-            <input type="text" value={formData.farmerName} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
+            <label className="block text-sm font-medium mb-1">
+              Farmer Name
+            </label>
+            <input
+              type="text"
+              value={formData.farmerName}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Farmer UID</label>
-            <input type="text" value={formData.farmerUID} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
+            <input
+              type="text"
+              value={formData.farmerUID}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Mobile</label>
-            <input type="text" value={formData.mobile} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
+            <input
+              type="text"
+              value={formData.mobile}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
+            />
           </div>
           <div className="md:col-span-3">
-            <label className="block text-sm font-medium mb-1">Farmer Address</label>
-            <input type="text" value={formData.farmerAddress} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
+            <label className="block text-sm font-medium mb-1">
+              Farmer Address
+            </label>
+            <input
+              type="text"
+              value={formData.farmerAddress}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
+            />
           </div>
         </div>
       </div>
@@ -408,39 +491,73 @@ export default function SoilForm({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Soil Type</label>
-            <input type="text" name="soilType" value={formData.soilType} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <input
+              type="text"
+              name="soilType"
+              value={formData.soilType}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Source of Soil</label>
-            <input type="text" name="sourceOfSoil" value={formData.sourceOfSoil} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <label className="block text-sm font-medium mb-1">
+              Source of Soil
+            </label>
+            <input
+              type="text"
+              name="sourceOfSoil"
+              value={formData.sourceOfSoil}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">No. of Samples</label>
-            <input type="text" value={totalSamples} readOnly className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Sample Date</label>
-            <input 
-              type="date" 
-              name="sampleDate" 
-              value={formData.sampleDate} 
-              readOnly 
+            <label className="block text-sm font-medium mb-1">
+              No. of Samples
+            </label>
+            <input
+              type="text"
+              value={totalSamples}
+              readOnly
               className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Sample Collection Time</label>
-            <input type="time" name="sampleCollectionTime" value={formData.sampleCollectionTime} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            <label className="block text-sm font-medium mb-1">
+              Sample Date
+            </label>
+            <input
+              type="date"
+              name="sampleDate"
+              value={formData.sampleDate}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Sample Collection Time
+            </label>
+            <input
+              type="time"
+              name="sampleCollectionTime"
+              value={formData.sampleCollectionTime}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Report Time</label>
-            <input type="time" value={formData.reportTime} readOnly
-              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"/>
+            <label className="block text-sm font-medium mb-1">
+              Report Time
+            </label>
+            <input
+              type="time"
+              value={formData.reportTime}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50"
+            />
           </div>
         </div>
       </div>
@@ -450,16 +567,16 @@ export default function SoilForm({
         const sampleNumber = index + 1;
         const sampleSelectedIds = perSampleSelectedTests[sampleNumber] || [];
         const sampleSelectedNames = sampleSelectedIds
-          .map(id => testNameMap[id] || id)
+          .map((id) => testNameMap[id] || id)
           .filter(Boolean);
 
         // Determine which fields to show for this sample
         const enabledFields = new Set<keyof Sample>();
 
-        sampleSelectedIds.forEach(testId => {
+        sampleSelectedIds.forEach((testId) => {
           const fields = testToSoilFields[testId];
           if (fields) {
-            fields.forEach(f => enabledFields.add(f));
+            fields.forEach((f) => enabledFields.add(f));
           }
         });
 
@@ -478,7 +595,7 @@ export default function SoilForm({
 
         // Filter to show only enabled + always shown
         const displayedFields = allSoilFields.filter(
-          f => alwaysShowFields.has(f.key) || enabledFields.has(f.key)
+          (f) => alwaysShowFields.has(f.key) || enabledFields.has(f.key),
         );
 
         return (
@@ -508,7 +625,10 @@ export default function SoilForm({
             <h3 className="font-bold mb-3 text-gray-700">
               Test Results - Sample {sampleNumber} of {totalSamples}
             </h3>
-            <div className="border border-gray-300 rounded p-4 mb-4" style={{ backgroundColor: '#f9fafb' }}>
+            <div
+              className="border border-gray-300 rounded p-4 mb-4"
+              style={{ backgroundColor: "#f9fafb" }}
+            >
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {displayedFields.map(({ key, label }) => (
                   <div key={key}>
@@ -518,7 +638,9 @@ export default function SoilForm({
                     <input
                       type="text"
                       value={sample[key] || ""}
-                      onChange={(e) => handleSampleChange(index, key, e.target.value)}
+                      onChange={(e) =>
+                        handleSampleChange(index, key, e.target.value)
+                      }
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -549,19 +671,19 @@ export default function SoilForm({
           Checked by
         </label>
         <select
-  value={checkedBy}
-  onChange={(e) => setCheckedBy(e.target.value)}
-  required
-  className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
->
-  <option value="">Select Technician</option>
+          value={checkedBy}
+          onChange={(e) => setCheckedBy(e.target.value)}
+          required
+          className="w-full border border-gray-400 rounded px-4 py-3 text-base focus:border-blue-600 focus:outline-none"
+        >
+          <option value="">Select Technician</option>
 
-  {technicians.map((tech, index) => (
-    <option key={index} value={tech}>
-      {tech}
-    </option>
-  ))}
-</select>
+          {technicians.map((tech, index) => (
+            <option key={index} value={tech}>
+              {tech}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Final Submit Button */}
