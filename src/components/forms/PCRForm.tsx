@@ -85,6 +85,7 @@ export default function PCRForm({
   });
 
   const [samplesData, setSamplesData] = useState<SamplePCRData[]>([]);
+  const [sampleNumbers, setSampleNumbers] = useState<number[]>([]); // Track actual sample numbers
   const [gelImages, setGelImages] = useState<Record<number, string>>({});
   const [uploading, setUploading] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -225,7 +226,7 @@ export default function PCRForm({
 
   useEffect(() => {
     const loadAllData = async () => {
-      if (!localInvoice || !invoiceId || !locationId || totalSamples === 0) {
+      if (!localInvoice || !invoiceId || !locationId) {
         setLoading(false);
         return;
       }
@@ -233,10 +234,25 @@ export default function PCRForm({
       try {
         setLoading(true);
 
+        // Get all sample numbers that have pathogens selected
+        const samplesWithPathogens: number[] = [];
+        if (localInvoice?.samplePathogens) {
+          Object.keys(localInvoice.samplePathogens).forEach((key) => {
+            const sampleNum = parseInt(key, 10);
+            const pathogens = localInvoice.samplePathogens[key];
+            if (pathogens && pathogens.length > 0) {
+              samplesWithPathogens.push(sampleNum);
+            }
+          });
+        }
+
+        // Sort numerically
+        samplesWithPathogens.sort((a, b) => a - b);
+
         const loadedSamples: SamplePCRData[] = [];
         let firstCheckedBy = technicianName; // Default fallback
 
-        for (let i = 1; i <= totalSamples; i++) {
+        for (const i of samplesWithPathogens) {
           const pcrDocRef = doc(
             db,
             "locations",
@@ -300,7 +316,9 @@ export default function PCRForm({
         }
 
         setSamplesData(loadedSamples);
+        setSampleNumbers(samplesWithPathogens);
         console.log("🟡 PCRForm.tsx - Final loadedSamples:", loadedSamples);
+        console.log("🟡 PCRForm.tsx - Sample numbers:", samplesWithPathogens);
 
         setCheckedBy(firstCheckedBy);
 
@@ -323,7 +341,7 @@ export default function PCRForm({
     if (localInvoice) {
       loadAllData();
     }
-  }, [localInvoice, invoiceId, locationId, totalSamples, technicianName]);
+  }, [localInvoice, invoiceId, locationId, technicianName]);
 
   const handleBasicInput = (
     sampleIndex: number,
@@ -460,10 +478,10 @@ export default function PCRForm({
     );
   }
 
-  if (totalSamples === 0) {
+  if (samplesData.length === 0) {
     return (
       <div className="p-10 text-center text-gray-500">
-        No PCR samples in this invoice.
+        No samples with PCR pathogens selected in this invoice.
       </div>
     );
   }
@@ -471,7 +489,7 @@ export default function PCRForm({
   return (
     <div className="bg-white p-8 rounded-xl shadow-lg max-w-5xl mx-auto">
       <h2 className="text-3xl font-bold mb-10 text-blue-900 text-center">
-        RT-qPCR Analysis – All Samples ({totalSamples})
+        RT-qPCR Analysis – All Samples ({samplesData.length})
       </h2>
 
       {/* Shared Farmer Info */}
@@ -552,7 +570,7 @@ export default function PCRForm({
 
       {/* Each Sample Section */}
       {samplesData.map((sample, sampleIndex) => {
-        const sampleNum = sampleIndex + 1;
+        const sampleNum = sampleNumbers[sampleIndex] || sampleIndex + 1; // Use actual sample number
 
         // Access with string key since Firebase converts numeric keys to strings
         const selectedForThisSample =

@@ -58,7 +58,12 @@ import {
   DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { formatDistanceToNow, startOfMonth, endOfMonth, format } from "date-fns";
+import {
+  formatDistanceToNow,
+  startOfMonth,
+  endOfMonth,
+  format,
+} from "date-fns";
 import * as XLSX from "xlsx";
 
 interface Location {
@@ -99,7 +104,7 @@ interface ModalFarmer {
   farmerId: string;
   farmerName: string;
   phone: string;
-  locationDisplay: string;      // ← Changed: now combined village/district fallback
+  locationDisplay: string; // ← Changed: now combined village/district fallback
   species: string;
   cultureAreas: number;
 }
@@ -130,17 +135,23 @@ const Dashboard = () => {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
 
   const [branchTechnicians, setBranchTechnicians] = useState<Technician[]>([]);
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>("all");
+  const [selectedTechnicianId, setSelectedTechnicianId] =
+    useState<string>("all");
 
   const [exportData, setExportData] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalData, setModalData] = useState<ModalData>({ type: null, title: "" });
+  const [modalData, setModalData] = useState<ModalData>({
+    type: null,
+    title: "",
+  });
   const [modalContent, setModalContent] = useState<any[]>([]);
 
   const [selectedSampleType, setSelectedSampleType] = useState<string>("all");
-  const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>([]);
+  const [availableSampleTypes, setAvailableSampleTypes] = useState<string[]>(
+    [],
+  );
 
   const handleExit = () => {
     clearTechnician();
@@ -170,11 +181,16 @@ const Dashboard = () => {
     const fetchTechnicians = async () => {
       if (!selectedLocationId) return;
       try {
-        const techRef = collection(db, "locations", selectedLocationId, "technicians");
+        const techRef = collection(
+          db,
+          "locations",
+          selectedLocationId,
+          "technicians",
+        );
         const snap = await getDocs(techRef);
-        const techs: Technician[] = snap.docs.map(d => ({
+        const techs: Technician[] = snap.docs.map((d) => ({
           id: d.id,
-          name: d.data().name || "Unknown Technician"
+          name: d.data().name || "Unknown Technician",
         }));
         setBranchTechnicians(techs);
       } catch (err) {
@@ -201,28 +217,26 @@ const Dashboard = () => {
         db,
         "locations",
         locationIdToUse,
-        "farmers"
+        "farmers",
       );
 
       const invoicesColl: CollectionReference<DocumentData> = collection(
         db,
         "locations",
         locationIdToUse,
-        "invoices"
+        "invoices",
       );
 
       const farmersSnap = await getDocs(farmersColl);
       const farmerAddressMap: Record<string, string> = {};
 
-farmersSnap.forEach((farmerDoc) => {
-  const f = farmerDoc.data();
+      farmersSnap.forEach((farmerDoc) => {
+        const f = farmerDoc.data();
 
-  const fullAddress =
-    (f.address ? f.address : "") 
-    
+        const fullAddress = f.address ? f.address : "";
 
-  farmerAddressMap[farmerDoc.id] = fullAddress || "N/A";
-});
+        farmerAddressMap[farmerDoc.id] = fullAddress || "N/A";
+      });
       const totalFarmers = farmersSnap.size;
 
       const isDateFiltered = !!startDate && !!endDate;
@@ -241,18 +255,20 @@ farmersSnap.forEach((farmerDoc) => {
         newFarmersQuery = query(
           farmersColl,
           where("createdAt", ">=", startT),
-          where("createdAt", "<=", endT)
+          where("createdAt", "<=", endT),
         );
       } else {
         const now = new Date();
         const monthStart = startOfMonth(now);
         const monthEnd = endOfMonth(now);
         const monthStartT = Timestamp.fromDate(monthStart);
-        const monthEndT = Timestamp.fromDate(new Date(monthEnd.getTime() + 86399999));
+        const monthEndT = Timestamp.fromDate(
+          new Date(monthEnd.getTime() + 86399999),
+        );
         newFarmersQuery = query(
           farmersColl,
           where("createdAt", ">=", monthStartT),
-          where("createdAt", "<=", monthEndT)
+          where("createdAt", "<=", monthEndT),
         );
       }
 
@@ -261,7 +277,7 @@ farmersSnap.forEach((farmerDoc) => {
 
       let invoicesQuery: Query<DocumentData> = query(
         invoicesColl,
-        orderBy("createdAt", "desc")
+        orderBy("createdAt", "desc"),
       );
 
       if (isDateFiltered && startT && endT) {
@@ -269,7 +285,7 @@ farmersSnap.forEach((farmerDoc) => {
           invoicesColl,
           where("createdAt", ">=", startT),
           where("createdAt", "<=", endT),
-          orderBy("createdAt", "desc")
+          orderBy("createdAt", "desc"),
         );
       }
 
@@ -278,12 +294,17 @@ farmersSnap.forEach((farmerDoc) => {
       const allInvoices: InvoiceItem[] = [];
       const tempExportRows: any[] = [];
 
-      const locationName = allLocations.find((l) => l.id === locationIdToUse)?.name || "Unknown Lab";
+      const locationName =
+        allLocations.find((l) => l.id === locationIdToUse)?.name ||
+        "Unknown Lab";
 
       invoicesSnap.forEach((doc) => {
         const data = doc.data();
 
-        if (selectedTechnicianId !== "all" && data.technicianId !== selectedTechnicianId) {
+        if (
+          selectedTechnicianId !== "all" &&
+          data.technicianId !== selectedTechnicianId
+        ) {
           return;
         }
 
@@ -296,25 +317,49 @@ farmersSnap.forEach((farmerDoc) => {
         let sampleCount = 0;
 
         if (data.sampleType && Array.isArray(data.sampleType)) {
-          const types = data.sampleType.map((s: any) => s?.type?.toUpperCase()).filter(Boolean);
+          const types = data.sampleType
+            .map((s: any) => s?.type?.toUpperCase())
+            .filter(Boolean);
           const uniqueTypes = [...new Set(types)];
           typeDisplay = uniqueTypes.join("/");
-          if (uniqueTypes.includes("PL") && uniqueTypes.includes("PCR")) typeDisplay = "PL/PCR";
+          if (uniqueTypes.includes("PL") && uniqueTypes.includes("PCR"))
+            typeDisplay = "PL/PCR";
 
-          data.sampleType.forEach((s: any) => {
-            if (s && typeof s === "object") {
-              let count = Number(s.count) || 0;
-              if (s.type?.toLowerCase() === "pl" && data.actualPlCount !== undefined) {
-                count = Number(data.actualPlCount) || count;
-              }
-              sampleCount += count;
+          // When both PL and PCR are selected, count only PL samples
+          if (uniqueTypes.includes("PL") && uniqueTypes.includes("PCR")) {
+            const plItem = data.sampleType.find(
+              (s: any) => s?.type?.toLowerCase() === "pl",
+            );
+            if (plItem) {
+              sampleCount =
+                Number(
+                  data.actualPlCount !== undefined
+                    ? data.actualPlCount
+                    : plItem.count,
+                ) || 0;
             }
-          });
+          } else {
+            // Otherwise, count all samples normally
+            data.sampleType.forEach((s: any) => {
+              if (s && typeof s === "object") {
+                let count = Number(s.count) || 0;
+                if (
+                  s.type?.toLowerCase() === "pl" &&
+                  data.actualPlCount !== undefined
+                ) {
+                  count = Number(data.actualPlCount) || count;
+                }
+                sampleCount += count;
+              }
+            });
+          }
         }
 
         const isReport =
           data.reportsProgress &&
-          Object.values(data.reportsProgress).every((status: any) => status === "completed");
+          Object.values(data.reportsProgress).every(
+            (status: any) => status === "completed",
+          );
 
         const title = isReport
           ? `${typeDisplay || "Analysis"} Report Generated`
@@ -347,19 +392,20 @@ farmersSnap.forEach((farmerDoc) => {
 
         let displayPaymentMode = "Pending";
         if (data.paymentMode === "cash") displayPaymentMode = "Cash";
-        else if (data.paymentMode === "qr") displayPaymentMode = "QR Code / UPI";
+        else if (data.paymentMode === "qr")
+          displayPaymentMode = "QR Code / UPI";
         else if (data.paymentMode === "neft") displayPaymentMode = "NEFT";
         else if (data.paymentMode === "rtgs") displayPaymentMode = "RTGS";
 
         tempExportRows.push({
-          "Date": data.formattedDate || format(createdAt, "dd-MM-yyyy"),
+          Date: data.formattedDate || format(createdAt, "dd-MM-yyyy"),
           "Invoice ID": invoiceId,
-          
-          "Farmer Name": farmerName,
-          "Address": farmerAddressMap[data.farmerId] || "N/A",
-"Farmer Mobile": data.farmerPhone || data.phone || "N/A",
 
-          "Technician": techName,
+          "Farmer Name": farmerName,
+          Address: farmerAddressMap[data.farmerId] || "N/A",
+          "Farmer Mobile": data.farmerPhone || data.phone || "N/A",
+
+          Technician: techName,
           "Sample Types": typeDisplay || "-",
           "Sample Count": sampleCount,
           "Bill Amount (₹)": Number(data.total || 0),
@@ -367,7 +413,7 @@ farmersSnap.forEach((farmerDoc) => {
           "Payment Mode": displayPaymentMode,
           "UTR No": data.transactionRef || "",
           "Pending Amount (₹)": Number(data.balanceAmount || 0),
-          "Status": isReport ? "Report Completed" : "Sample Submitted",
+          Status: isReport ? "Report Completed" : "Sample Submitted",
         });
       });
 
@@ -380,7 +426,7 @@ farmersSnap.forEach((farmerDoc) => {
               inv.farmerName.toLowerCase().includes(searchLower) ||
               inv.invoiceId.toLowerCase().includes(searchLower) ||
               inv.title.toLowerCase().includes(searchLower) ||
-              inv.typeDisplay.toLowerCase().includes(searchLower)
+              inv.typeDisplay.toLowerCase().includes(searchLower),
           )
         : allInvoices;
 
@@ -458,7 +504,7 @@ farmersSnap.forEach((farmerDoc) => {
 
     invoices.forEach((inv) => {
       if (inv.typeDisplay && inv.typeDisplay.trim()) {
-        inv.typeDisplay.split("/").forEach(t => {
+        inv.typeDisplay.split("/").forEach((t) => {
           const clean = t.trim();
           if (clean) typesSet.add(clean);
         });
@@ -473,7 +519,12 @@ farmersSnap.forEach((farmerDoc) => {
     if (!selectedLocationId) return [];
 
     try {
-      const farmersRef = collection(db, "locations", selectedLocationId, "farmers");
+      const farmersRef = collection(
+        db,
+        "locations",
+        selectedLocationId,
+        "farmers",
+      );
       const q = query(farmersRef, orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
 
@@ -481,18 +532,15 @@ farmersSnap.forEach((farmerDoc) => {
         const data = doc.data();
         console.log(data);
         // Improved location display: prefer village → district → fallback
-        const fullAddress =
-  (data.address ? data.address : "")
-  
+        const fullAddress = data.address ? data.address : "";
 
-const locationDisplay = fullAddress || "—";
-
+        const locationDisplay = fullAddress || "—";
 
         return {
           farmerId: data.farmerId || "N/A",
           farmerName: data.name || "Unknown",
           phone: data.phone || "N/A",
-          locationDisplay,                    // ← now used in table
+          locationDisplay, // ← now used in table
           species: data.species || "Not specified",
           cultureAreas: Number(data.cultureAreas || 0),
         } as ModalFarmer;
@@ -533,32 +581,44 @@ const locationDisplay = fullAddress || "—";
     } else if (type === "revenue") {
       title = "Revenue by Payment Mode";
 
-      const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
-      const pendingAmount = invoices.reduce((sum, inv) => sum + Number(inv.balanceAmount || 0), 0);
+      const totalRevenue = invoices.reduce(
+        (sum, inv) => sum + Number(inv.paidAmount || 0),
+        0,
+      );
+      const pendingAmount = invoices.reduce(
+        (sum, inv) => sum + Number(inv.balanceAmount || 0),
+        0,
+      );
 
       const cash = invoices
-        .filter(inv => inv.paymentMode === "cash")
+        .filter((inv) => inv.paymentMode === "cash")
         .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
 
       const qr = invoices
-        .filter(inv => inv.paymentMode === "qr")
+        .filter((inv) => inv.paymentMode === "qr")
         .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
 
       const neft = invoices
-        .filter(inv => inv.paymentMode === "neft")
+        .filter((inv) => inv.paymentMode === "neft")
         .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
 
       const rtgs = invoices
-        .filter(inv => inv.paymentMode === "rtgs")
+        .filter((inv) => inv.paymentMode === "rtgs")
         .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
 
       content = [
-        { label: "Total Revenue (Paid Amount)", value: `₹${totalRevenue.toLocaleString("en-IN")}` },
+        {
+          label: "Total Revenue (Paid Amount)",
+          value: `₹${totalRevenue.toLocaleString("en-IN")}`,
+        },
         { label: "Paid via Cash", value: `₹${cash.toLocaleString("en-IN")}` },
         { label: "Paid via QR / UPI", value: `₹${qr.toLocaleString("en-IN")}` },
         { label: "Paid via NEFT", value: `₹${neft.toLocaleString("en-IN")}` },
         { label: "Paid via RTGS", value: `₹${rtgs.toLocaleString("en-IN")}` },
-        { label: "Total Pending Amount", value: `₹${pendingAmount.toLocaleString("en-IN")}` },
+        {
+          label: "Total Pending Amount",
+          value: `₹${pendingAmount.toLocaleString("en-IN")}`,
+        },
       ];
     }
 
@@ -579,80 +639,84 @@ const locationDisplay = fullAddress || "—";
         amountPaid: acc.amountPaid + row["Amount Paid (₹)"],
         pending: acc.pending + row["Pending Amount (₹)"],
       }),
-      { 
-        invoices: 0, 
-        samples: 0, 
-        reports: 0, 
-        billAmount: 0, 
-        amountPaid: 0, 
-        pending: 0 
-      }
+      {
+        invoices: 0,
+        samples: 0,
+        reports: 0,
+        billAmount: 0,
+        amountPaid: 0,
+        pending: 0,
+      },
     );
 
     const summaryRow = {
-  "Invoice ID": "TOTALS",
-  "Date": `${totals.invoices} Invoices`,
-  "Farmer Name": "",
-  "Address": "",
-  "Farmer Mobile": "",
-  
-  "Technician": "",
-  "Sample Types": "",
-  "Sample Count": totals.samples,
-  "Bill Amount (₹)": totals.billAmount,
-  "Amount Paid (₹)": totals.amountPaid,
-  "Payment Mode": "",
-  "UTR No": "",
-  "Pending Amount (₹)": totals.pending,
-  "Status": `${totals.reports} Reports Completed`,
-};
+      "Invoice ID": "TOTALS",
+      Date: `${totals.invoices} Invoices`,
+      "Farmer Name": "",
+      Address: "",
+      "Farmer Mobile": "",
 
-  const orderedExportData = [...exportData].reverse();
+      Technician: "",
+      "Sample Types": "",
+      "Sample Count": totals.samples,
+      "Bill Amount (₹)": totals.billAmount,
+      "Amount Paid (₹)": totals.amountPaid,
+      "Payment Mode": "",
+      "UTR No": "",
+      "Pending Amount (₹)": totals.pending,
+      Status: `${totals.reports} Reports Completed`,
+    };
 
-const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
+    const orderedExportData = [...exportData].reverse();
+
+    const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
 
     const ws = XLSX.utils.json_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Lab Report");
 
     ws["!cols"] = [
-  { wch: 18 },  // Invoice ID
-  { wch: 14 },  // Date
-  { wch: 25 },  // Farmer Name
-  { wch: 35 },  // Address
-  { wch: 18 },  // Farmer Mobile
-  
-  { wch: 20 },  // Technician
-  { wch: 16 },  // Sample Types
-  { wch: 14 },  // Sample Count
-  { wch: 18 },  // Bill Amount
-  { wch: 18 },  // Amount Paid
-  { wch: 18 },  // Payment Mode
-  { wch: 22 },  // Transaction Ref
-  { wch: 18 },  // Pending
-  { wch: 22 },  // Status
-];
+      { wch: 18 }, // Invoice ID
+      { wch: 14 }, // Date
+      { wch: 25 }, // Farmer Name
+      { wch: 35 }, // Address
+      { wch: 18 }, // Farmer Mobile
 
-    const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
+      { wch: 20 }, // Technician
+      { wch: 16 }, // Sample Types
+      { wch: 14 }, // Sample Count
+      { wch: 18 }, // Bill Amount
+      { wch: 18 }, // Amount Paid
+      { wch: 18 }, // Payment Mode
+      { wch: 22 }, // Transaction Ref
+      { wch: 18 }, // Pending
+      { wch: 22 }, // Status
+    ];
+
+    const currentLocationName =
+      allLocations.find((l) => l.id === selectedLocationId)?.name || "Lab";
     const fileName = `Lab_Dashboard_${currentLocationName.replace(/[^a-zA-Z0-9]/g, "_")}_${format(new Date(), "dd-MM-yyyy")}.xlsx`;
 
     XLSX.writeFile(wb, fileName);
   };
 
-  const hasAnyFilter = !!startDate || !!endDate || !!searchTerm || selectedTechnicianId !== "all";
-  const currentLocationName = allLocations.find((l) => l.id === selectedLocationId)?.name || "Loading...";
+  const hasAnyFilter =
+    !!startDate || !!endDate || !!searchTerm || selectedTechnicianId !== "all";
+  const currentLocationName =
+    allLocations.find((l) => l.id === selectedLocationId)?.name || "Loading...";
 
   return (
     <DashboardLayout>
       <div className="h-screen flex flex-col">
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
-         
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
               <div>
                 <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-                <p className="text-muted-foreground mt-1">Laboratory operations overview</p>
+                <p className="text-muted-foreground mt-1">
+                  Laboratory operations overview
+                </p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 bg-blue-50 px-4 py-2.5 rounded-full shadow-sm border border-blue-100">
@@ -683,8 +747,18 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-                  <Input type="date" className="h-11" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                  <Input type="date" className="h-11" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  <Input
+                    type="date"
+                    className="h-11"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                  <Input
+                    type="date"
+                    className="h-11"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
                   <div className="flex gap-2">
                     <Button className="h-11 flex-1" onClick={handleApply}>
                       Apply Filters
@@ -707,17 +781,20 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                       <MapPin className="w-4 h-4 text-blue-600" />
                       <span className="font-medium">Lab Branch:</span>
                     </div>
-                    <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                    <Select
+                      value={selectedLocationId}
+                      onValueChange={setSelectedLocationId}
+                    >
                       <SelectTrigger className="w-64 h-11">
                         <SelectValue placeholder="Select lab branch" />
                       </SelectTrigger>
                       <SelectContent>
                         {allLocations.map((loc) => (
                           <SelectItem key={loc.id} value={loc.id}>
-                            {loc.name} 
+                            {loc.name}
                           </SelectItem>
                         ))}
-                      </SelectContent>  
+                      </SelectContent>
                     </Select>
                   </div>
 
@@ -726,7 +803,10 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                       <Users className="w-4 h-4 text-purple-600" />
                       <span className="font-medium">Technician:</span>
                     </div>
-                    <Select value={selectedTechnicianId} onValueChange={setSelectedTechnicianId}>
+                    <Select
+                      value={selectedTechnicianId}
+                      onValueChange={setSelectedTechnicianId}
+                    >
                       <SelectTrigger className="w-64 h-11">
                         <SelectValue placeholder="All Technicians" />
                       </SelectTrigger>
@@ -742,80 +822,97 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-3 ml-1">
-                  Currently viewing: <span className="font-semibold text-blue-800">{currentLocationName}</span>
+                  Currently viewing:{" "}
+                  <span className="font-semibold text-blue-800">
+                    {currentLocationName}
+                  </span>
                 </p>
               </CardContent>
             </Card>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-              <Card 
+              <Card
                 className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-blue-50 to-white cursor-pointer"
                 onClick={() => openModal("farmers")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Farmers</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Total Farmers
+                    </CardTitle>
                     <div className="p-2.5 bg-blue-100 rounded-full">
                       <Users className="w-5 h-5 text-blue-600" />
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-gray-800">{loading ? "-" : stats.totalFarmers}</div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {loading ? "-" : stats.totalFarmers}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     +{stats.newFarmers} new this month
                   </p>
                 </CardContent>
               </Card>
 
-              <Card 
+              <Card
                 className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-purple-50 to-white cursor-pointer"
                 onClick={() => openModal("samples")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Samples Processed</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Samples Processed
+                    </CardTitle>
                     <div className="p-2.5 bg-purple-100 rounded-full">
                       <FlaskConical className="w-5 h-5 text-purple-600" />
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-gray-800">{loading ? "-" : stats.samplesProcessed}</div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {loading ? "-" : stats.samplesProcessed}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     {hasAnyFilter ? "In filtered results" : "All time"}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card 
+              <Card
                 className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-green-50 to-white cursor-pointer"
                 onClick={() => openModal("reports")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Reports Finalized</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Reports Finalized
+                    </CardTitle>
                     <div className="p-2.5 bg-green-100 rounded-full">
                       <FileText className="w-5 h-5 text-green-600" />
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-gray-800">{loading ? "-" : stats.reportsGenerated}</div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {loading ? "-" : stats.reportsGenerated}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     {hasAnyFilter ? "In filtered results" : "All time"}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card 
+              <Card
                 className="shadow-md hover:shadow-lg transition-shadow border-0 bg-gradient-to-br from-emerald-50 to-white cursor-pointer"
                 onClick={() => openModal("revenue")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Revenue
+                    </CardTitle>
                     <div className="p-2.5 bg-emerald-100 rounded-full">
                       <TrendingUp className="w-5 h-5 text-emerald-600" />
                     </div>
@@ -823,7 +920,9 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-gray-800">
-                    {loading ? "-" : `₹${stats.revenue.toLocaleString("en-IN")}`}
+                    {loading
+                      ? "-"
+                      : `₹${stats.revenue.toLocaleString("en-IN")}`}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     Total amount paid • Selected period
@@ -851,7 +950,9 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                 ) : recentActivities.length === 0 ? (
                   <div className="text-center py-16">
                     <FileText className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-                    <p className="text-muted-foreground">No recent activity matching filters</p>
+                    <p className="text-muted-foreground">
+                      No recent activity matching filters
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -861,29 +962,52 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                         className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-2xl hover:shadow-md transition-all duration-300"
                       >
                         <div className="flex items-center gap-5">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${act.isReport ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"}`}>
-                            {act.isReport ? <CheckCircle2 className="w-6 h-6" /> : <FlaskConical className="w-6 h-6" />}
+                          <div
+                            className={`w-12 h-12 rounded-full flex items-center justify-center ${act.isReport ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"}`}
+                          >
+                            {act.isReport ? (
+                              <CheckCircle2 className="w-6 h-6" />
+                            ) : (
+                              <FlaskConical className="w-6 h-6" />
+                            )}
                           </div>
                           <div>
                             <div className="flex items-center gap-3">
-                              <p className="font-medium text-gray-800">{act.title}</p>
-                              {act.isReport && <span className="px-2 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded-full uppercase">Completed</span>}
+                              <p className="font-medium text-gray-800">
+                                {act.title}
+                              </p>
+                              {act.isReport && (
+                                <span className="px-2 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded-full uppercase">
+                                  Completed
+                                </span>
+                              )}
                             </div>
                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
                               <p className="flex items-center gap-1.5">
                                 <User className="w-3.5 h-3.5" />
-                                <span className="font-medium text-gray-700">{act.subtitle}</span>
+                                <span className="font-medium text-gray-700">
+                                  {act.subtitle}
+                                </span>
                               </p>
                               <p className="flex items-center gap-1.5">
                                 <UserCircle className="w-3.5 h-3.5 text-purple-500" />
-                                <span>Submitted by: <span className="font-medium text-gray-700">{act.technicianName}</span></span>
+                                <span>
+                                  Submitted by:{" "}
+                                  <span className="font-medium text-gray-700">
+                                    {act.technicianName}
+                                  </span>
+                                </span>
                               </p>
-                              <p className="font-mono text-xs bg-gray-50 px-2 py-0.5 rounded border">ID: {act.invoiceId}</p>
+                              <p className="font-mono text-xs bg-gray-50 px-2 py-0.5 rounded border">
+                                ID: {act.invoiceId}
+                              </p>
                             </div>
                           </div>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(act.timestamp, { addSuffix: true })}
+                          {formatDistanceToNow(act.timestamp, {
+                            addSuffix: true,
+                          })}
                         </p>
                       </div>
                     ))}
@@ -911,7 +1035,8 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                         <TableHead>Farmer ID</TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Phone</TableHead>
-                        <TableHead>Location</TableHead>           {/* ← Updated label if you want */}
+                        <TableHead>Location</TableHead>{" "}
+                        {/* ← Updated label if you want */}
                         <TableHead>Species</TableHead>
                         <TableHead>Culture Areas (acres)</TableHead>
                       </TableRow>
@@ -919,17 +1044,23 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                     <TableBody>
                       {modalContent.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                          <TableCell
+                            colSpan={6}
+                            className="text-center text-muted-foreground"
+                          >
                             No farmers found
                           </TableCell>
                         </TableRow>
                       ) : (
                         (modalContent as ModalFarmer[]).map((f, i) => (
                           <TableRow key={i}>
-                            <TableCell className="font-medium">{f.farmerId}</TableCell>
+                            <TableCell className="font-medium">
+                              {f.farmerId}
+                            </TableCell>
                             <TableCell>{f.farmerName}</TableCell>
                             <TableCell>{f.phone}</TableCell>
-                            <TableCell>{f.locationDisplay}</TableCell>   {/* ← Now shows proper location */}
+                            <TableCell>{f.locationDisplay}</TableCell>{" "}
+                            {/* ← Now shows proper location */}
                             <TableCell>{f.species}</TableCell>
                             <TableCell>{f.cultureAreas}</TableCell>
                           </TableRow>
@@ -940,18 +1071,23 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                 </div>
               )}
 
-              {(modalData.type === "samples" || modalData.type === "reports") && (
+              {(modalData.type === "samples" ||
+                modalData.type === "reports") && (
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h3 className="text-lg font-semibold">
-                      {modalData.type === "samples" ? "Sample Submissions" : "Completed Reports"}
+                      {modalData.type === "samples"
+                        ? "Sample Submissions"
+                        : "Completed Reports"}
                     </h3>
 
                     {availableSampleTypes.length > 1 && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600 whitespace-nowrap">Filter by type:</span>
-                        <Select 
-                          value={selectedSampleType} 
+                        <span className="text-sm text-gray-600 whitespace-nowrap">
+                          Filter by type:
+                        </span>
+                        <Select
+                          value={selectedSampleType}
                           onValueChange={setSelectedSampleType}
                         >
                           <SelectTrigger className="w-44">
@@ -976,8 +1112,12 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                         <TableHead>Farmer</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Type</TableHead>
-                        {modalData.type === "samples" && <TableHead>Count</TableHead>}
-                        {modalData.type === "samples" && <TableHead>Status</TableHead>}
+                        {modalData.type === "samples" && (
+                          <TableHead>Count</TableHead>
+                        )}
+                        {modalData.type === "samples" && (
+                          <TableHead>Status</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -986,24 +1126,32 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
 
                         if (selectedSampleType !== "all") {
                           filteredContent = modalContent.filter((item: any) =>
-                            item.types?.includes(selectedSampleType)
+                            item.types?.includes(selectedSampleType),
                           );
                         }
 
                         if (modalData.type === "reports") {
-                          filteredContent = filteredContent.filter((item: any) =>
-                            selectedSampleType === "all" || item.types?.includes(selectedSampleType)
+                          filteredContent = filteredContent.filter(
+                            (item: any) =>
+                              selectedSampleType === "all" ||
+                              item.types?.includes(selectedSampleType),
                           );
                         }
 
                         return filteredContent.length === 0 ? (
                           <TableRow>
-                            <TableCell 
-                              colSpan={modalData.type === "samples" ? 6 : 4} 
+                            <TableCell
+                              colSpan={modalData.type === "samples" ? 6 : 4}
                               className="text-center py-8 text-muted-foreground"
                             >
-                              No {modalData.type === "samples" ? "samples" : "reports"} found
-                              {selectedSampleType !== "all" ? ` matching type "${selectedSampleType}"` : ""}
+                              No{" "}
+                              {modalData.type === "samples"
+                                ? "samples"
+                                : "reports"}{" "}
+                              found
+                              {selectedSampleType !== "all"
+                                ? ` matching type "${selectedSampleType}"`
+                                : ""}
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -1013,8 +1161,12 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                               <TableCell>{item.farmerName}</TableCell>
                               <TableCell>{item.date}</TableCell>
                               <TableCell>{item.types}</TableCell>
-                              {modalData.type === "samples" && <TableCell>{item.count}</TableCell>}
-                              {modalData.type === "samples" && <TableCell>{item.status}</TableCell>}
+                              {modalData.type === "samples" && (
+                                <TableCell>{item.count}</TableCell>
+                              )}
+                              {modalData.type === "samples" && (
+                                <TableCell>{item.status}</TableCell>
+                              )}
                             </TableRow>
                           ))
                         );
@@ -1029,13 +1181,21 @@ const worksheetData = [{}, ...orderedExportData, {}, summaryRow];
                   <h3 className="text-lg font-semibold">Revenue Summary</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {modalContent.map((item, i) => (
-                      <Card 
-                        key={i} 
-                        className={item.label.includes("Pending") ? "bg-red-50 border-red-200" : ""}
+                      <Card
+                        key={i}
+                        className={
+                          item.label.includes("Pending")
+                            ? "bg-red-50 border-red-200"
+                            : ""
+                        }
                       >
                         <CardContent className="pt-6">
-                          <p className="text-sm text-muted-foreground">{item.label}</p>
-                          <p className="text-2xl font-bold mt-1">{item.value}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {item.label}
+                          </p>
+                          <p className="text-2xl font-bold mt-1">
+                            {item.value}
+                          </p>
                         </CardContent>
                       </Card>
                     ))}
