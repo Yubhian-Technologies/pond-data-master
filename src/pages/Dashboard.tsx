@@ -329,23 +329,100 @@ const Dashboard = () => {
           const hasBothPLAndPCR =
             uniqueTypes.includes("PL") && uniqueTypes.includes("PCR");
 
-          // Count all samples, but skip PCR count if both PL and PCR are selected
+          // First pass: calculate PL and PCR counts
+          let plCount = 0;
+          let pcrCount = 0;
+
           data.sampleType.forEach((s: any) => {
             if (s && typeof s === "object") {
               const sType = s.type?.toLowerCase();
+              let count = Number(s.count) || 0;
 
-              // Skip PCR count if both PL and PCR are selected
-              if (hasBothPLAndPCR && sType === "pcr") {
-                return; // Don't count PCR
+              if (sType === "pl") {
+                if (data.actualPlCount !== undefined) {
+                  count = Number(data.actualPlCount) || count;
+                }
+                plCount = count;
+              } else if (sType === "pcr") {
+                if (data.actualPcrCount !== undefined) {
+                  count = Number(data.actualPcrCount) || count;
+                }
+                pcrCount = count;
+              }
+            }
+          });
+
+          console.log("🔍 PL/PCR Count Analysis:", {
+            invoiceId,
+            hasBothPLAndPCR,
+            plCount,
+            pcrCount,
+          });
+
+          // Second pass: count samples based on logic
+          data.sampleType.forEach((s: any) => {
+            if (s && typeof s === "object") {
+              const sType = s.type?.toLowerCase();
+              let count = Number(s.count) || 0;
+
+              // Handle PL/PCR special logic
+              if (hasBothPLAndPCR) {
+                // If PL > 0: count only PL (skip PCR)
+                if (sType === "pl" && plCount > 0) {
+                  sampleCount += plCount;
+                  console.log("✅ Both exist, PL > 0: adding PL", plCount);
+                  return;
+                }
+                // If PL = 0: count only PCR (skip PL)
+                if (sType === "pl" && plCount === 0) {
+                  console.log("⏭️ Both exist, PL = 0: skipping PL");
+                  return;
+                }
+                if (sType === "pcr" && plCount === 0) {
+                  sampleCount += pcrCount;
+                  console.log("✅ Both exist, PL = 0: adding PCR", pcrCount);
+                  return;
+                }
+                if (sType === "pcr" && plCount > 0) {
+                  console.log("⏭️ Both exist, PL > 0: skipping PCR");
+                  return;
+                }
+                // For other types (WATER, SOIL, MICROBIOLOGY, etc), count them
+                if (sType !== "pl" && sType !== "pcr") {
+                  if (data.actualPlCount !== undefined && sType === "pl") {
+                    count = Number(data.actualPlCount) || count;
+                  }
+                  if (data.actualPcrCount !== undefined && sType === "pcr") {
+                    count = Number(data.actualPcrCount) || count;
+                  }
+                  if (count > 0) {
+                    sampleCount += count;
+                    console.log("✅ Adding other type", sType, ":", count);
+                  }
+                }
+                return;
               }
 
-              let count = Number(s.count) || 0;
+              // If only one type exists, count it
               if (sType === "pl" && data.actualPlCount !== undefined) {
                 count = Number(data.actualPlCount) || count;
               }
-              sampleCount += count;
+              if (sType === "pcr" && data.actualPcrCount !== undefined) {
+                count = Number(data.actualPcrCount) || count;
+              }
+
+              if (count > 0) {
+                sampleCount += count;
+                console.log("✅ Single type", sType, ": adding count", count);
+              }
             }
           });
+
+          console.log(
+            "📈 Final sampleCount for invoice:",
+            invoiceId,
+            sampleCount,
+          );
         }
 
         const isReport =
