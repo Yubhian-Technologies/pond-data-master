@@ -315,13 +315,19 @@ export default function PCRReport({
             RT-qPCR Analysis
           </h2>
         </div>
-        <table className="w-[95%] mx-auto border-2 border-gray-800 text-sm">
+        <table className="w-[95%] mx-auto border-4 border-black text-sm">
           <thead className="bg-blue-100">
             <tr>
-              <th rowSpan={2} className="border px-2 py-2 align-middle">
+              <th
+                rowSpan={2}
+                className="border-2 border-black px-2 py-2 align-middle"
+              >
                 Sample Code
               </th>
-              <th rowSpan={2} className="border px-2 py-2 align-middle">
+              <th
+                rowSpan={2}
+                className="border-2 border-black px-2 py-2 align-middle"
+              >
                 Sample Type
               </th>
 
@@ -329,19 +335,19 @@ export default function PCRReport({
                 <>
                   <th
                     rowSpan={2}
-                    className="border px-2 py-2 align-middle font-bold"
+                    className="border-2 border-black px-2 py-2 align-middle font-bold"
                   >
                     {"Pathogen"}
                   </th>
-                  <th className="border px-2 py-2">Result</th>
-                  <th className="border px-2 py-2">C.T</th>
+                  <th className="border-2 border-black px-2 py-2">Result</th>
+                  <th className="border-2 border-black px-2 py-2">C.T</th>
                 </>
               ) : (
                 displayPathogens.map((p) => (
                   <th
                     key={p}
                     colSpan={2}
-                    className="border px-2 py-2 text-center"
+                    className="border-2 border-black px-2 py-2 text-center"
                   >
                     {p}
                   </th>
@@ -353,8 +359,10 @@ export default function PCRReport({
               <tr>
                 {displayPathogens.map((p) => (
                   <React.Fragment key={p}>
-                    <th className="border px-2 py-2.5">Result</th>
-                    <th className="border px-2 py-2.5">C.T</th>
+                    <th className="border-2 border-black px-2 py-2.5">
+                      Result
+                    </th>
+                    <th className="border-2 border-black px-2 py-2.5">C.T</th>
                   </React.Fragment>
                 ))}
               </tr>
@@ -364,21 +372,21 @@ export default function PCRReport({
           <tbody>
             {reports.map((r, idx) => (
               <tr key={idx} className="hover:bg-gray-50">
-                <td className="border px-2 py-2.5 text-center font-semibold">
+                <td className="border-2 border-black px-2 py-2.5 text-center font-semibold">
                   {r.sampleCode}
                 </td>
-                <td className="border px-2 py-2.5 text-center">
+                <td className="border-2 border-black px-2 py-2.5 text-center">
                   {r.sampleType}
                 </td>
 
                 {singlePathogen ? (
                   <>
-                    <td className="border px-2 py-2.5 text-center font-medium">
+                    <td className="border-2 border-black px-2 py-2.5 text-center font-medium">
                       {displayPathogens[0]}
                     </td>
 
                     {/* Result - colored based on value */}
-                    <td className="border px-2 py-2.5 text-center font-bold">
+                    <td className="border-2 border-black px-2 py-2.5 text-center font-bold">
                       {(() => {
                         const res = (r.pathogens[0]?.result || "-")
                           .trim()
@@ -403,7 +411,7 @@ export default function PCRReport({
                     </td>
 
                     {/* C.T - show actual value even for Negative */}
-                    <td className="border px-2 py-2.5 text-center font-bold">
+                    <td className="border-2 border-black px-2 py-2.5 text-center font-bold">
                       {(() => {
                         const res = (r.pathogens[0]?.result || "-")
                           .trim()
@@ -428,7 +436,8 @@ export default function PCRReport({
                 ) : (
                   displayPathogens.map((displayP) => {
                     // Map display name back to original name for lookup
-                    const originalName = displayP === "EHP" ? "PL EHP" : displayP;
+                    const originalName =
+                      displayP === "EHP" ? "PL EHP" : displayP;
                     const found = r.pathogens.find(
                       (x: any) => x.name === originalName,
                     );
@@ -473,10 +482,10 @@ export default function PCRReport({
 
                     return (
                       <React.Fragment key={displayP}>
-                        <td className="border px-2 py-2.5 text-center font-bold">
+                        <td className="border-2 border-black px-2 py-2.5 text-center font-bold">
                           {resultDisplay}
                         </td>
-                        <td className="border px-2 py-2.5 text-center font-bold">
+                        <td className="border-2 border-black px-2 py-2.5 text-center font-bold">
                           {ctDisplay}
                         </td>
                       </React.Fragment>
@@ -541,7 +550,7 @@ export default function PCRReport({
 
   return (
     <div className="p-8 rounded-lg bg-white">
-      <div className="flex justify-between items-center border-b-4 border-blue-700 pb-8 mb-8">
+      <div className="flex justify-between items-center border-b-4 border-black pb-8 mb-8">
         <img src={ADC} alt="ADC Logo" className="h-28" />
         <div className="text-center">
           <h1 className="text-4xl font-bold text-blue-800">
@@ -560,53 +569,65 @@ export default function PCRReport({
       </div>
 
       {farmerInfo && (
-        <table className="w-full mb-10 border-2 border-gray-800 text-sm">
+        <table className="w-full mb-10 border-4 border-black text-sm">
           <tbody>
             <tr>
-              <td className="border px-6 py-3 font-bold bg-gray-100">
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 Farmer Name
               </td>
-              <td className="border px-6 py-3">
+              <td className="border-2 border-black px-6 py-3">
                 {farmerInfo.farmerName || "-"}
               </td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 Address
               </td>
-              <td className="border px-6 py-3">{farmerInfo.address || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">
+              <td className="border-2 border-black px-6 py-3">
+                {farmerInfo.address || "-"}
+              </td>
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 Sample Collected
               </td>
-              <td className="border px-6 py-3">
+              <td className="border-2 border-black px-6 py-3">
                 {formatDateDDMMYYYY(farmerInfo.sampleCollectionTime)}
               </td>
             </tr>
             <tr>
-              <td className="border px-6 py-3 font-bold bg-gray-100">Mobile</td>
-              <td className="border px-6 py-3">{farmerInfo.mobile || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
+                Mobile
+              </td>
+              <td className="border-2 border-black px-6 py-3">
+                {farmerInfo.mobile || "-"}
+              </td>
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 Farmer ID
               </td>
-              <td className="border px-6 py-3">{farmerInfo.farmerId || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">
+              <td className="border-2 border-black px-6 py-3">
+                {farmerInfo.farmerId || "-"}
+              </td>
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 Report Date
               </td>
-              <td className="border px-6 py-3">
+              <td className="border-2 border-black px-6 py-3">
                 {formatDateDDMMYYYY(farmerInfo.reportDate)}
               </td>
             </tr>
             <tr>
-              <td className="border px-6 py-3 font-bold bg-gray-100">
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 Report Id
               </td>
-              <td className="border px-6 py-3">{invoiceId || "-"}</td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">
+              <td className="border-2 border-black px-6 py-3">
+                {invoiceId || "-"}
+              </td>
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 No of samples
               </td>
-              <td className="border px-6 py-3">
+              <td className="border-2 border-black px-6 py-3">
                 {farmerInfo.noOfSamples || allSampleCount || "-"}
               </td>
-              <td className="border px-6 py-3 font-bold bg-gray-100">DOC</td>
-              <td className="border px-6 py-3">
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
+                DOC
+              </td>
+              <td className="border-2 border-black px-6 py-3">
                 {farmerInfo.docDifference || "-"}
               </td>
             </tr>

@@ -472,16 +472,16 @@ export default function MicrobiologyReport({
                 </th>
               </tr>
               <tr className="bg-gray-200">
-                <th className="border px-4 py-1.5 font-semibold text-sm print:py-1">
+                <th className="border px-4 py-1.5 font-semibold text-sm align-middle print:py-1">
                   Test Code
                 </th>
-                <th className="border px-4 py-1.5 font-semibold text-sm bg-yellow-200 print:py-1">
+                <th className="border px-4 py-1.5 font-semibold text-sm bg-yellow-200 align-middle print:py-1">
                   Yellow Colonies
                 </th>
-                <th className="border px-4 py-1.5 font-semibold text-sm bg-green-300 print:py-1">
+                <th className="border px-4 py-1.5 font-semibold text-sm bg-green-300 align-middle print:py-1">
                   Green Colonies
                 </th>
-                <th className="border px-4 py-1.5 font-semibold text-sm print:py-1">
+                <th className="border px-4 py-1.5 font-semibold text-sm align-middle print:py-1">
                   TPC
                 </th>
               </tr>
@@ -489,31 +489,31 @@ export default function MicrobiologyReport({
             <tbody>
               {Array.from({ length: allSampleCount }, (_, i) => (
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="border px-4 py-1.5 text-center text-sm font-medium print:py-1">
+                  <td className="border px-4 py-1.5 text-center text-sm font-medium align-middle print:py-1">
                     {data.testCode?.[i] || `Sample ${i + 1}`}
                   </td>
-                  <td className="border px-4 py-1.5 text-center text-sm print:py-1">
+                  <td className="border px-4 py-1.5 text-center text-sm align-middle print:py-1">
                     {data.yellowColonies?.[i] || "-"}
                   </td>
-                  <td className="border px-4 py-1.5 text-center text-sm print:py-1">
+                  <td className="border px-4 py-1.5 text-center text-sm align-middle print:py-1">
                     {data.greenColonies?.[i] || "-"}
                   </td>
-                  <td className="border px-4 py-1.5 text-center text-sm print:py-1">
+                  <td className="border px-4 py-1.5 text-center text-sm align-middle print:py-1">
                     {data.tpc?.[i] || "-"}
                   </td>
                 </tr>
               ))}
               <tr className="bg-red-50 font-semibold">
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">
+                <td className="border px-4 py-1.5 text-center text-red-700 text-sm align-middle print:py-1">
                   Optimum Values
                 </td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">
+                <td className="border px-4 py-1.5 text-center text-red-700 text-sm align-middle print:py-1">
                   &lt; 300
                 </td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">
+                <td className="border px-4 py-1.5 text-center text-red-700 text-sm align-middle print:py-1">
                   &lt; 50
                 </td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm print:py-1">
+                <td className="border px-4 py-1.5 text-center text-red-700 text-sm align-middle print:py-1">
                   &lt; 1000
                 </td>
               </tr>

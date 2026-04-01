@@ -27,7 +27,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Search, Download, Eye, X, Upload } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Search,
+  Download,
+  Eye,
+  X,
+  Upload,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { db } from "./firebase";
@@ -39,6 +48,9 @@ import {
   orderBy,
   doc,
   updateDoc,
+  deleteDoc,
+  getDoc,
+  setDoc,
   Timestamp,
 } from "firebase/firestore";
 
@@ -75,7 +87,9 @@ const CMIS = () => {
   const { session } = useUserSession();
 
   // Tab / section switch
-  const [activeSection, setActiveSection] = useState<"overview" | "payments" | "assets">("overview");
+  const [activeSection, setActiveSection] = useState<
+    "overview" | "payments" | "assets"
+  >("overview");
 
   // Payments state
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -114,12 +128,48 @@ const CMIS = () => {
   });
   const [totalAssetsValue, setTotalAssetsValue] = useState<number>(0);
 
+  // Monthly Bills state
+  const [monthlyBills, setMonthlyBills] = useState<
+    Record<
+      string,
+      {
+        fileUrl: string;
+        fileName: string;
+        filePublicId: string;
+        uploadedAt: Timestamp;
+      }
+    >
+  >({});
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    new Date().toISOString().slice(0, 7),
+  ); // YYYY-MM format
+  const [monthlyFile, setMonthlyFile] = useState<File | null>(null);
+  const [uploadingMonth, setUploadingMonth] = useState<boolean>(false);
+
+  // Helper function to format date as DD/MM/YYYY
+  const formatDateDMY = (dateString: string): string => {
+    if (!dateString) return "-";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateString;
+    }
+  };
+
   // Cloudinary Config from .env
   const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+  const CLOUDINARY_UPLOAD_PRESET = import.meta.env
+    .VITE_CLOUDINARY_UPLOAD_PRESET;
 
   // Upload file to Cloudinary
-  const uploadToCloudinary = async (file: File): Promise<{ url: string; public_id: string } | null> => {
+  const uploadToCloudinary = async (
+    file: File,
+  ): Promise<{ url: string; public_id: string } | null> => {
     if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
       toast.error("Cloudinary configuration missing.");
       return null;
@@ -135,7 +185,7 @@ const CMIS = () => {
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
-        }
+        },
       );
 
       return {
@@ -149,13 +199,111 @@ const CMIS = () => {
     }
   };
 
+  // Fetch monthly bills
+  const fetchMonthlyBills = async () => {
+    if (!session.locationId) return;
+    try {
+      const ref = doc(
+        db,
+        "locations",
+        session.locationId,
+        "monthlyBills",
+        "data",
+      );
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        setMonthlyBills(snap.data() || {});
+      }
+    } catch (err) {
+      console.error("Error fetching monthly bills:", err);
+    }
+  };
+
+  // Upload monthly bill file
+  const handleUploadMonthlyBill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!monthlyFile || !session.locationId) {
+      toast.error("Please select a file");
+      return;
+    }
+
+    if (monthlyFile.size > 10 * 1024 * 1024) {
+      toast.error("File size must be under 10 MB");
+      return;
+    }
+
+    setUploadingMonth(true);
+    try {
+      const uploadResult = await uploadToCloudinary(monthlyFile);
+      if (!uploadResult) {
+        setUploadingMonth(false);
+        return;
+      }
+
+      const updatedBills = {
+        ...monthlyBills,
+        [selectedMonth]: {
+          fileUrl: uploadResult.url,
+          fileName: monthlyFile.name,
+          filePublicId: uploadResult.public_id,
+          uploadedAt: Timestamp.now(),
+        },
+      };
+
+      const ref = doc(
+        db,
+        "locations",
+        session.locationId,
+        "monthlyBills",
+        "data",
+      );
+      await updateDoc(ref, updatedBills).catch(async () => {
+        // Create if doesn't exist
+        await setDoc(ref, updatedBills);
+      });
+
+      setMonthlyBills(updatedBills);
+      setMonthlyFile(null);
+      toast.success(`Bill uploaded for ${selectedMonth}`);
+      fetchMonthlyBills();
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast.error("Failed to upload bill");
+    } finally {
+      setUploadingMonth(false);
+    }
+  };
+
+  // Delete monthly bill file
+  const handleDeleteMonthlyBill = async (month: string) => {
+    if (!session.locationId) return;
+    try {
+      const updatedBills = { ...monthlyBills };
+      delete updatedBills[month];
+
+      const ref = doc(
+        db,
+        "locations",
+        session.locationId,
+        "monthlyBills",
+        "data",
+      );
+      await updateDoc(ref, updatedBills);
+      setMonthlyBills(updatedBills);
+      toast.success("Bill deleted");
+    } catch (err) {
+      console.error("Delete error:", err);
+      toast.error("Failed to delete bill");
+    }
+  };
+
   // Fetch payments
   const fetchPayments = async () => {
     if (!session.locationId) return;
     const ref = collection(db, "locations", session.locationId, "payments");
     const q = query(ref, orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
-    
+
     const list: Payment[] = snap.docs.map((d) => ({
       id: d.id,
       date: d.data().date || "",
@@ -169,6 +317,13 @@ const CMIS = () => {
       createdAt: d.data().createdAt,
     })) as Payment[];
 
+    // Sort by date field in ascending order (earliest first)
+    list.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateA - dateB;
+    });
+
     const total = list.reduce((sum, p) => sum + (p.amount || 0), 0);
     setTotalPayments(total);
     setPayments(list);
@@ -180,7 +335,7 @@ const CMIS = () => {
     const ref = collection(db, "locations", session.locationId, "assets");
     const q = query(ref, orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
-    
+
     const list: Asset[] = snap.docs.map((d) => ({
       id: d.id,
       ...d.data(),
@@ -195,6 +350,7 @@ const CMIS = () => {
   useEffect(() => {
     fetchPayments();
     fetchAssets();
+    fetchMonthlyBills();
   }, [session.locationId]);
 
   // Handle payment submit
@@ -202,45 +358,31 @@ const CMIS = () => {
     e.preventDefault();
     if (!session.locationId) return;
 
-    let fileUrl = existingFileUrl || "";
-    let filePublicId = existingPublicId || "";
-    let fileName = paymentFile?.name || (existingFileUrl ? "Previous file" : "");
-
-    if (paymentFile) {
-      if (paymentFile.size > 2 * 1024 * 1024) {
-        toast.error("File too large! Please upload files under 2 MB.");
-        return;
-      }
-    }
-
-    if (paymentFile) {
-      const uploadResult = await uploadToCloudinary(paymentFile);
-      if (!uploadResult) return;
-
-      fileUrl = uploadResult.url;
-      filePublicId = uploadResult.public_id;
-      fileName = paymentFile.name;
-    }
-
     const paymentData = {
       date: paymentFormData.date,
       particulars: paymentFormData.particulars,
       toPay: paymentFormData.toPay,
       amount: Number(paymentFormData.amount),
       invoiceId: paymentFormData.invoiceId,
-      fileUrl,
-      filePublicId,
-      fileName,
       createdAt: Timestamp.now(),
     };
 
     try {
       if (editPaymentMode && editPaymentId) {
-        const ref = doc(db, "locations", session.locationId, "payments", editPaymentId);
+        const ref = doc(
+          db,
+          "locations",
+          session.locationId,
+          "payments",
+          editPaymentId,
+        );
         await updateDoc(ref, paymentData);
         toast.success("Payment updated successfully!");
       } else {
-        await addDoc(collection(db, "locations", session.locationId, "payments"), paymentData);
+        await addDoc(
+          collection(db, "locations", session.locationId, "payments"),
+          paymentData,
+        );
         toast.success("Payment added successfully!");
       }
       setOpenPaymentDialog(false);
@@ -267,11 +409,20 @@ const CMIS = () => {
 
     try {
       if (editAssetMode && editAssetId) {
-        const ref = doc(db, "locations", session.locationId, "assets", editAssetId);
+        const ref = doc(
+          db,
+          "locations",
+          session.locationId,
+          "assets",
+          editAssetId,
+        );
         await updateDoc(ref, assetData);
         toast.success("Asset updated successfully!");
       } else {
-        await addDoc(collection(db, "locations", session.locationId, "assets"), assetData);
+        await addDoc(
+          collection(db, "locations", session.locationId, "assets"),
+          assetData,
+        );
         toast.success("Asset added successfully!");
       }
       setOpenAssetDialog(false);
@@ -290,9 +441,6 @@ const CMIS = () => {
       amount: "",
       invoiceId: "",
     });
-    setPaymentFile(null);
-    setExistingFileUrl(null);
-    setExistingPublicId(null);
     setEditPaymentMode(false);
     setEditPaymentId(null);
   };
@@ -318,9 +466,6 @@ const CMIS = () => {
       amount: payment.amount.toString(),
       invoiceId: payment.invoiceId,
     });
-    setExistingFileUrl(payment.fileUrl || null);
-    setExistingPublicId(payment.filePublicId || null);
-    setPaymentFile(null);
     setEditPaymentMode(true);
     setEditPaymentId(payment.id);
     setOpenPaymentDialog(true);
@@ -343,12 +488,54 @@ const CMIS = () => {
   // Delete file reference from Firestore
   const handleDeleteFile = async (paymentId: string) => {
     try {
-      const docRef = doc(db, "locations", session.locationId!, "payments", paymentId);
+      const docRef = doc(
+        db,
+        "locations",
+        session.locationId!,
+        "payments",
+        paymentId,
+      );
       await updateDoc(docRef, { fileUrl: "", filePublicId: "", fileName: "" });
       toast.success("File attachment removed");
       fetchPayments();
     } catch (err) {
       toast.error("Failed to remove file attachment");
+    }
+  };
+
+  // Delete entire payment record
+  const handleDeletePayment = async (paymentId: string) => {
+    try {
+      const docRef = doc(
+        db,
+        "locations",
+        session.locationId!,
+        "payments",
+        paymentId,
+      );
+      await deleteDoc(docRef);
+      toast.success("Payment deleted successfully!");
+      fetchPayments();
+    } catch (err) {
+      toast.error("Failed to delete payment");
+    }
+  };
+
+  // Delete entire asset record
+  const handleDeleteAsset = async (assetId: string) => {
+    try {
+      const docRef = doc(
+        db,
+        "locations",
+        session.locationId!,
+        "assets",
+        assetId,
+      );
+      await deleteDoc(docRef);
+      toast.success("Asset deleted successfully!");
+      fetchAssets();
+    } catch (err) {
+      toast.error("Failed to delete asset");
     }
   };
 
@@ -370,7 +557,8 @@ const CMIS = () => {
   const filteredAssets = assets.filter((a) => {
     const matchesSearch =
       a.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
-      (a.description?.toLowerCase().includes(assetSearch.toLowerCase()) ?? false);
+      (a.description?.toLowerCase().includes(assetSearch.toLowerCase()) ??
+        false);
 
     const matchesDate =
       (!assetStartDate || a.acquiredDate >= assetStartDate) &&
@@ -384,12 +572,26 @@ const CMIS = () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Payments");
 
-    sheet.addRow(["S.No", "Date", "Particulars", "To Pay", "Amount (₹)", "Invoice ID"]);
+    sheet.addRow([
+      "S.No",
+      "Date",
+      "Particulars",
+      "To Pay",
+      "Amount (₹)",
+      "Invoice ID",
+    ]);
 
-    filteredPayments.forEach((payment, index) => {
+    // Sort filtered payments by date in ascending order before export
+    const sortedPayments = [...filteredPayments].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateA - dateB;
+    });
+
+    sortedPayments.forEach((payment, index) => {
       sheet.addRow([
         index + 1,
-        payment.date,
+        formatDateDMY(payment.date),
         payment.particulars,
         payment.toPay,
         payment.amount,
@@ -417,7 +619,14 @@ const CMIS = () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Assets");
 
-    sheet.addRow(["S.No", "Name", "Description", "Value (₹)", "Acquired Date", "Working Condition"]);
+    sheet.addRow([
+      "S.No",
+      "Name",
+      "Description",
+      "Value (₹)",
+      "Acquired Date",
+      "Working Condition",
+    ]);
 
     filteredAssets.forEach((asset, index) => {
       sheet.addRow([
@@ -425,7 +634,7 @@ const CMIS = () => {
         asset.name,
         asset.description || "N/A",
         asset.value,
-        asset.acquiredDate,
+        formatDateDMY(asset.acquiredDate),
         asset.workingCondition,
       ]);
     });
@@ -451,15 +660,19 @@ const CMIS = () => {
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
           <div className="max-w-7xl mx-auto">
             <div className="mb-12">
-              <h1 className="text-3xl font-bold text-foreground mb-2">CMIS - Lab Management</h1>
-              <p className="text-muted-foreground">Manage laboratory expenses, assets, and payments</p>
+              <h1 className="text-3xl font-bold text-foreground mb-2">
+                CMIS - Lab Management
+              </h1>
+              <p className="text-muted-foreground">
+                Manage laboratory expenses, assets, and payments
+              </p>
             </div>
 
             {/* Overview Cards - Shown only in overview mode */}
             {activeSection === "overview" && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
                 {/* Payments Card */}
-                <Card 
+                <Card
                   className="shadow-lg hover:shadow-xl transition-all cursor-pointer border-cyan-200"
                   onClick={() => setActiveSection("payments")}
                 >
@@ -468,11 +681,15 @@ const CMIS = () => {
                       <div className="flex items-center gap-3">
                         <div>
                           <CardTitle className="text-2xl">Payments</CardTitle>
-                          <CardDescription>Track and manage lab payments</CardDescription>
+                          <CardDescription>
+                            Track and manage lab payments
+                          </CardDescription>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Total Amount</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Amount
+                        </p>
                         <p className="text-xl font-bold text-emerald-700">
                           ₹{totalPayments.toLocaleString("en-IN")}
                         </p>
@@ -487,7 +704,7 @@ const CMIS = () => {
                 </Card>
 
                 {/* Assets Card */}
-                <Card 
+                <Card
                   className="shadow-lg hover:shadow-xl transition-all cursor-pointer border-indigo-200"
                   onClick={() => setActiveSection("assets")}
                 >
@@ -495,12 +712,18 @@ const CMIS = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div>
-                          <CardTitle className="text-2xl">Lab Equipment & Inventory</CardTitle>
-                          <CardDescription>Manage lab assets and particulars</CardDescription>
+                          <CardTitle className="text-2xl">
+                            Lab Equipment & Inventory
+                          </CardTitle>
+                          <CardDescription>
+                            Manage lab assets and particulars
+                          </CardDescription>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Total Asset Value</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Asset Value
+                        </p>
                         <p className="text-xl font-bold text-indigo-700">
                           ₹{totalAssetsValue.toLocaleString("en-IN")}
                         </p>
@@ -522,17 +745,21 @@ const CMIS = () => {
                 <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 flex flex-row items-center justify-between flex-wrap gap-4">
                   <div>
                     <CardTitle className="text-2xl">Payments</CardTitle>
-                    <CardDescription>Track and manage lab payments</CardDescription>
+                    <CardDescription>
+                      Track and manage lab payments
+                    </CardDescription>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Total Amount</p>
+                      <p className="text-sm text-muted-foreground">
+                        Total Amount
+                      </p>
                       <p className="text-xl font-bold text-emerald-700">
                         ₹{totalPayments.toLocaleString("en-IN")}
                       </p>
                     </div>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => setActiveSection("overview")}
                     >
                       Back to Overview
@@ -552,14 +779,251 @@ const CMIS = () => {
                       />
                     </div>
                     <div className="flex gap-2">
-                      <Input type="date" value={paymentStartDate} onChange={(e) => setPaymentStartDate(e.target.value)} />
-                      <Input type="date" value={paymentEndDate} onChange={(e) => setPaymentEndDate(e.target.value)} />
+                      <Input
+                        type="date"
+                        value={paymentStartDate}
+                        onChange={(e) => setPaymentStartDate(e.target.value)}
+                      />
+                      <Input
+                        type="date"
+                        value={paymentEndDate}
+                        onChange={(e) => setPaymentEndDate(e.target.value)}
+                      />
                     </div>
-                    <Button onClick={exportPaymentsToExcel} variant="outline" className="gap-2">
+                    <Button
+                      onClick={exportPaymentsToExcel}
+                      variant="outline"
+                      className="gap-2"
+                    >
                       <Download className="w-4 h-4" />
                       Export Excel
                     </Button>
                   </div>
+
+                  {/* Monthly Bills Upload Section */}
+                  <Card className="mb-8 shadow-lg border-0">
+                    <CardHeader className="bg-gradient-to-r from-blue-50 via-cyan-50 to-teal-50 border-b-2 border-cyan-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-2xl text-cyan-900">
+                            Monthly Bills Management
+                          </CardTitle>
+                          <CardDescription className="text-cyan-700 mt-1">
+                            Upload consolidated monthly bills (Max 10 MB PDF)
+                          </CardDescription>
+                        </div>
+                        <div className="text-3xl">📄</div>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="pt-8">
+                      {/* Month Selection Grid - Current Year Only */}
+                      <div className="mb-8">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                          <span className="w-1 h-6 bg-cyan-600 rounded"></span>
+                          {new Date().getFullYear()} Month Calendar
+                        </h3>
+                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                          {Array.from({ length: 12 }, (_, i) => {
+                            const date = new Date(
+                              new Date().getFullYear(),
+                              i,
+                              1,
+                            );
+                            const monthStr = date.toISOString().slice(0, 7);
+                            const isSelected = selectedMonth === monthStr;
+                            const billExists = monthlyBills[monthStr];
+                            const monthName = new Date(
+                              monthStr + "-01",
+                            ).toLocaleDateString("en-IN", { month: "short" });
+
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => setSelectedMonth(monthStr)}
+                                className={`relative p-3 rounded-lg font-semibold transition-all transform hover:scale-105 ${
+                                  isSelected
+                                    ? "bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg ring-2 ring-cyan-300"
+                                    : billExists
+                                      ? "bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-900 border-2 border-emerald-300 hover:from-emerald-200 hover:to-teal-200"
+                                      : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
+                                }`}
+                              >
+                                {monthName}
+                                {billExists && (
+                                  <span className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Upload Section */}
+                      <div className="bg-gradient-to-br from-cyan-50 via-blue-50 to-teal-50 border-2 border-cyan-300 rounded-xl p-8 shadow-md">
+                        <div className="mb-8 pb-6 border-b-2 border-cyan-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-bold text-cyan-600 uppercase tracking-wide mb-1">
+                                Selected Month
+                              </p>
+                              <h4 className="text-2xl font-bold text-cyan-900">
+                                {new Date(
+                                  selectedMonth + "-01",
+                                ).toLocaleDateString("en-IN", {
+                                  month: "long",
+                                  year: "numeric",
+                                })}
+                              </h4>
+                            </div>
+                            <div className="text-4xl">📅</div>
+                          </div>
+                          {monthlyBills[selectedMonth] && (
+                            <div className="mt-4 p-3 bg-emerald-100 border-l-4 border-emerald-600 rounded">
+                              <p className="text-sm text-emerald-800 font-semibold flex items-center gap-2">
+                                <span className="text-lg">✓</span> Bill already
+                                exists - Upload to replace
+                              </p>
+                              <p className="text-xs text-emerald-700 mt-1 break-words">
+                                Current file:{" "}
+                                {monthlyBills[selectedMonth].fileName}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* File Input */}
+                          <div className="space-y-3">
+                            <Label className="text-sm font-bold text-cyan-900">
+                              Select PDF File (Max 10 MB)
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                type="file"
+                                accept=".pdf"
+                                onChange={(e) =>
+                                  setMonthlyFile(e.target.files?.[0] || null)
+                                }
+                                className="file:bg-cyan-600 file:text-white file:font-semibold file:cursor-pointer cursor-pointer border-2 border-cyan-300 focus:border-cyan-600 hover:border-cyan-500 transition-colors"
+                              />
+                            </div>
+
+                            {monthlyFile && (
+                              <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-300">
+                                <span className="text-xl">✓</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-emerald-900 truncate">
+                                    {monthlyFile.name}
+                                  </p>
+                                  <p className="text-xs text-emerald-700">
+                                    {(monthlyFile.size / (1024 * 1024)).toFixed(
+                                      2,
+                                    )}{" "}
+                                    MB
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Upload Button */}
+                          <div className="flex flex-col justify-end">
+                            <Button
+                              onClick={handleUploadMonthlyBill}
+                              disabled={!monthlyFile || uploadingMonth}
+                              className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold py-6 gap-2 shadow-lg hover:shadow-xl inactive:opacity-50"
+                            >
+                              <Upload className="w-5 h-5" />
+                              {uploadingMonth
+                                ? "Uploading... Please wait"
+                                : "Upload Bill"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Uploaded Bills Grid */}
+                      {Object.entries(monthlyBills).length > 0 && (
+                        <div className="mt-10 pt-10 border-t-2 border-gray-200">
+                          <h4 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <span className="w-1 h-6 bg-emerald-600 rounded"></span>
+                            Uploaded Bills Summary
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {Object.entries(monthlyBills)
+                              .sort(([monthA], [monthB]) =>
+                                monthB.localeCompare(monthA),
+                              )
+                              .map(([month, bill]: any) => {
+                                const monthDate = new Date(month + "-01");
+                                const monthName = monthDate.toLocaleDateString(
+                                  "en-IN",
+                                  { month: "long", year: "numeric" },
+                                );
+
+                                return (
+                                  <div
+                                    key={month}
+                                    className="group p-4 bg-white border-2 border-gray-200 rounded-lg hover:border-emerald-400 hover:shadow-lg transition-all transform hover:scale-102"
+                                  >
+                                    <div className="flex items-start justify-between mb-3">
+                                      <div className="flex-1 min-w-0">
+                                        <h5 className="font-bold text-cyan-900 text-sm">
+                                          {monthName}
+                                        </h5>
+                                        <p className="text-xs text-gray-600 mt-1 break-words word-break: break-all">
+                                          {bill.fileName}
+                                        </p>
+                                      </div>
+                                      <span className="text-2xl flex-shrink-0 ml-2">
+                                        📑
+                                      </span>
+                                    </div>
+
+                                    <div className="pt-3 border-t border-gray-100 flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          window.open(bill.fileUrl, "_blank")
+                                        }
+                                        className="flex-1 border-cyan-300 text-cyan-700 hover:bg-cyan-50 font-semibold"
+                                      >
+                                        <Eye className="w-4 h-4 mr-1" />
+                                        View
+                                      </Button>
+                                      {/* <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => {
+                                          setSelectedMonth(month);
+                                          setMonthlyFile(null);
+                                        }}
+                                        className="text-blue-600 hover:bg-blue-50 hover:text-blue-800 font-semibold"
+                                        title="Edit this bill"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button> */}
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() =>
+                                          handleDeleteMonthlyBill(month)
+                                        }
+                                        className="text-red-600 hover:bg-red-50 hover:text-red-800 font-semibold"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
                   <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
                     <Table>
@@ -571,61 +1035,55 @@ const CMIS = () => {
                           <TableHead>To Pay</TableHead>
                           <TableHead>Amount</TableHead>
                           <TableHead>Invoice ID</TableHead>
-                          <TableHead>File</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredPayments.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            <TableCell
+                              colSpan={7}
+                              className="text-center py-8 text-muted-foreground"
+                            >
                               No payments recorded yet
                             </TableCell>
                           </TableRow>
                         ) : (
                           filteredPayments.map((payment, index) => (
-                            <TableRow key={payment.id} className="hover:bg-blue-50/50 transition-colors">
+                            <TableRow
+                              key={payment.id}
+                              className="hover:bg-blue-50/50 transition-colors"
+                            >
                               <TableCell>{index + 1}</TableCell>
-                              <TableCell>{payment.date}</TableCell>
+                              <TableCell>
+                                {formatDateDMY(payment.date)}
+                              </TableCell>
                               <TableCell>{payment.particulars}</TableCell>
                               <TableCell>{payment.toPay}</TableCell>
-                              <TableCell className="font-medium">₹{payment.amount.toLocaleString()}</TableCell>
+                              <TableCell className="font-medium">
+                                ₹{payment.amount.toLocaleString()}
+                              </TableCell>
                               <TableCell>{payment.invoiceId}</TableCell>
                               <TableCell>
-                                {payment.fileUrl ? (
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => window.open(payment.fileUrl!, "_blank")}
-                                      className="gap-1"
-                                    >
-                                      <Eye className="w-3 h-3" />
-                                      View File
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteFile(payment.id)}
-                                    >
-                                      <X className="w-4 h-4 text-red-600" />
-                                    </Button>
-                                  </div>
-                                ) : (
+                                <div className="flex gap-2">
                                   <Button
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => handleEditPayment(payment)}
-                                    className="gap-1 text-black"
                                   >
-                                    Upload File
+                                    <Edit className="w-4 h-4" />
                                   </Button>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Button variant="ghost" size="sm" onClick={() => handleEditPayment(payment)}>
-                                  <Edit className="w-4 h-4" />
-                                </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleDeletePayment(payment.id)
+                                    }
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))
@@ -636,66 +1094,124 @@ const CMIS = () => {
 
                   {/* Add Payment Button at bottom too */}
                   <div className="mt-6 flex justify-end">
-                    <Dialog open={openPaymentDialog} onOpenChange={setOpenPaymentDialog}>
+                    <Dialog
+                      open={openPaymentDialog}
+                      onOpenChange={setOpenPaymentDialog}
+                    >
                       <DialogTrigger asChild>
-                        <Button className="gap-2 bg-cyan-500 hover:bg-cyan-600">
+                        <Button
+                          className="gap-2 bg-cyan-500 hover:bg-cyan-600"
+                          onClick={() => resetPaymentForm()}
+                        >
                           <Plus className="w-4 h-4" />
                           Add Payment
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-lg">
                         <DialogHeader>
-                          <DialogTitle>{editPaymentMode ? "Edit Payment" : "Add New Payment"}</DialogTitle>
+                          <DialogTitle>
+                            {editPaymentMode
+                              ? "Edit Payment"
+                              : "Add New Payment"}
+                          </DialogTitle>
                           <DialogDescription>
-                            {editPaymentMode ? "Update payment details." : "Enter payment details below."}
+                            {editPaymentMode
+                              ? "Update payment details."
+                              : "Enter payment details below."}
                           </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handlePaymentSubmit} className="space-y-4 mt-4">
+                        <form
+                          onSubmit={handlePaymentSubmit}
+                          className="space-y-4 mt-4"
+                        >
                           {/* ... same payment form as before ... */}
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                               <Label className="text-sm">Date *</Label>
-                              <Input type="date" value={paymentFormData.date} onChange={(e) => setPaymentFormData({ ...paymentFormData, date: e.target.value })} required />
+                              <Input
+                                type="date"
+                                value={paymentFormData.date}
+                                onChange={(e) =>
+                                  setPaymentFormData({
+                                    ...paymentFormData,
+                                    date: e.target.value,
+                                  })
+                                }
+                                required
+                              />
                             </div>
                             <div className="space-y-1.5">
                               <Label className="text-sm">Amount *</Label>
-                              <Input type="number" placeholder="Enter amount" value={paymentFormData.amount} onChange={(e) => setPaymentFormData({ ...paymentFormData, amount: e.target.value })} required />
+                              <Input
+                                type="number"
+                                placeholder="Enter amount"
+                                value={paymentFormData.amount}
+                                onChange={(e) =>
+                                  setPaymentFormData({
+                                    ...paymentFormData,
+                                    amount: e.target.value,
+                                  })
+                                }
+                                required
+                              />
                             </div>
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-sm">Particulars *</Label>
-                            <Input placeholder="Enter particulars" value={paymentFormData.particulars} onChange={(e) => setPaymentFormData({ ...paymentFormData, particulars: e.target.value })} required />
+                            <Input
+                              placeholder="Enter particulars"
+                              value={paymentFormData.particulars}
+                              onChange={(e) =>
+                                setPaymentFormData({
+                                  ...paymentFormData,
+                                  particulars: e.target.value,
+                                })
+                              }
+                              required
+                            />
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-sm">To Pay *</Label>
-                            <Input placeholder="Enter payee" value={paymentFormData.toPay} onChange={(e) => setPaymentFormData({ ...paymentFormData, toPay: e.target.value })} required />
+                            <Input
+                              placeholder="Enter payee"
+                              value={paymentFormData.toPay}
+                              onChange={(e) =>
+                                setPaymentFormData({
+                                  ...paymentFormData,
+                                  toPay: e.target.value,
+                                })
+                              }
+                              required
+                            />
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-sm">Invoice ID *</Label>
-                            <Input placeholder="Enter invoice ID" value={paymentFormData.invoiceId} onChange={(e) => setPaymentFormData({ ...paymentFormData, invoiceId: e.target.value })} required />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-sm">Attachment (Any File - Max 2 MB)</Label>
                             <Input
-                              type="file"
-                              onChange={(e) => setPaymentFile(e.target.files?.[0] || null)}
+                              placeholder="Enter invoice ID"
+                              value={paymentFormData.invoiceId}
+                              onChange={(e) =>
+                                setPaymentFormData({
+                                  ...paymentFormData,
+                                  invoiceId: e.target.value,
+                                })
+                              }
+                              required
                             />
-                            {existingFileUrl && !paymentFile && (
-                              <p className="text-xs text-green-600 mt-1">
-                                Current file attached
-                              </p>
-                            )}
-                            {paymentFile && (
-                              <p className="text-xs text-blue-600 mt-1">
-                                Selected: {paymentFile.name} ({(paymentFile.size / 1024).toFixed(1)} KB)
-                              </p>
-                            )}
                           </div>
                           <DialogFooter className="mt-4">
-                            <Button type="button" variant="outline" onClick={() => { setOpenPaymentDialog(false); resetPaymentForm(); }}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setOpenPaymentDialog(false);
+                                resetPaymentForm();
+                              }}
+                            >
                               Cancel
                             </Button>
-                            <Button type="submit">{editPaymentMode ? "Update" : "Add"} Payment</Button>
+                            <Button type="submit">
+                              {editPaymentMode ? "Update" : "Add"} Payment
+                            </Button>
                           </DialogFooter>
                         </form>
                       </DialogContent>
@@ -710,18 +1226,24 @@ const CMIS = () => {
               <Card className="shadow-lg">
                 <CardHeader className="bg-gradient-to-r from-cyan-50 to-blue-50 flex flex-row items-center justify-between flex-wrap gap-4">
                   <div>
-                    <CardTitle className="text-2xl">Lab Equipment & Inventory</CardTitle>
-                    <CardDescription>Manage lab assets and particulars</CardDescription>
+                    <CardTitle className="text-2xl">
+                      Lab Equipment & Inventory
+                    </CardTitle>
+                    <CardDescription>
+                      Manage lab assets and particulars
+                    </CardDescription>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Total Asset Value</p>
+                      <p className="text-sm text-muted-foreground">
+                        Total Asset Value
+                      </p>
                       <p className="text-xl font-bold text-indigo-700">
                         ₹{totalAssetsValue.toLocaleString("en-IN")}
                       </p>
                     </div>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => setActiveSection("overview")}
                     >
                       Back to Overview
@@ -741,10 +1263,22 @@ const CMIS = () => {
                       />
                     </div>
                     <div className="flex gap-2">
-                      <Input type="date" value={assetStartDate} onChange={(e) => setAssetStartDate(e.target.value)} />
-                      <Input type="date" value={assetEndDate} onChange={(e) => setAssetEndDate(e.target.value)} />
+                      <Input
+                        type="date"
+                        value={assetStartDate}
+                        onChange={(e) => setAssetStartDate(e.target.value)}
+                      />
+                      <Input
+                        type="date"
+                        value={assetEndDate}
+                        onChange={(e) => setAssetEndDate(e.target.value)}
+                      />
                     </div>
-                    <Button onClick={exportAssetsToExcel} variant="outline" className="gap-2">
+                    <Button
+                      onClick={exportAssetsToExcel}
+                      variant="outline"
+                      className="gap-2"
+                    >
                       <Download className="w-4 h-4" />
                       Export Excel
                     </Button>
@@ -766,33 +1300,64 @@ const CMIS = () => {
                       <TableBody>
                         {filteredAssets.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            <TableCell
+                              colSpan={7}
+                              className="text-center py-8 text-muted-foreground"
+                            >
                               No assets recorded yet
                             </TableCell>
                           </TableRow>
                         ) : (
                           filteredAssets.map((asset, index) => (
-                            <TableRow key={asset.id} className="hover:bg-green-50/50 transition-colors">
+                            <TableRow
+                              key={asset.id}
+                              className="hover:bg-green-50/50 transition-colors"
+                            >
                               <TableCell>{index + 1}</TableCell>
-                              <TableCell className="font-medium">{asset.name}</TableCell>
-                              <TableCell>{asset.description || "N/A"}</TableCell>
-                              <TableCell>₹{asset.value.toLocaleString()}</TableCell>
-                              <TableCell>{asset.acquiredDate}</TableCell>
+                              <TableCell className="font-medium">
+                                {asset.name}
+                              </TableCell>
                               <TableCell>
-                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                  asset.workingCondition === "Working" 
-                                    ? "bg-green-100 text-green-800" 
-                                    : asset.workingCondition === "Under Maintenance"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}>
+                                {asset.description || "N/A"}
+                              </TableCell>
+                              <TableCell>
+                                ₹{asset.value.toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                {formatDateDMY(asset.acquiredDate)}
+                              </TableCell>
+                              <TableCell>
+                                <span
+                                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    asset.workingCondition === "Working"
+                                      ? "bg-green-100 text-green-800"
+                                      : asset.workingCondition ===
+                                          "Under Maintenance"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : "bg-red-100 text-red-800"
+                                  }`}
+                                >
                                   {asset.workingCondition}
                                 </span>
                               </TableCell>
                               <TableCell>
-                                <Button variant="ghost" size="sm" onClick={() => handleEditAsset(asset)}>
-                                  <Edit className="w-4 h-4" />
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditAsset(asset)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteAsset(asset.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))
@@ -803,38 +1368,91 @@ const CMIS = () => {
 
                   {/* Add Asset Button at bottom */}
                   <div className="mt-6 flex justify-end">
-                    <Dialog open={openAssetDialog} onOpenChange={setOpenAssetDialog}>
+                    <Dialog
+                      open={openAssetDialog}
+                      onOpenChange={setOpenAssetDialog}
+                    >
                       <DialogTrigger asChild>
-                        <Button className="gap-2 bg-cyan-600 hover:bg-cyan-700">
+                        <Button
+                          className="gap-2 bg-cyan-600 hover:bg-cyan-700"
+                          onClick={() => resetAssetForm()}
+                        >
                           <Plus className="w-4 h-4" />
                           Add Asset
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-xl">
                         <DialogHeader>
-                          <DialogTitle>{editAssetMode ? "Edit Asset" : "Add New Asset"}</DialogTitle>
+                          <DialogTitle>
+                            {editAssetMode ? "Edit Asset" : "Add New Asset"}
+                          </DialogTitle>
                           <DialogDescription>
-                            {editAssetMode ? "Update asset details." : "Enter asset details below."}
+                            {editAssetMode
+                              ? "Update asset details."
+                              : "Enter asset details below."}
                           </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handleAssetSubmit} className="space-y-6 mt-6">
+                        <form
+                          onSubmit={handleAssetSubmit}
+                          className="space-y-6 mt-6"
+                        >
                           {/* ... same asset form as before ... */}
                           <div className="space-y-2">
                             <Label>Name *</Label>
-                            <Input placeholder="Enter asset name" value={assetFormData.name} onChange={(e) => setAssetFormData({ ...assetFormData, name: e.target.value })} required />
+                            <Input
+                              placeholder="Enter asset name"
+                              value={assetFormData.name}
+                              onChange={(e) =>
+                                setAssetFormData({
+                                  ...assetFormData,
+                                  name: e.target.value,
+                                })
+                              }
+                              required
+                            />
                           </div>
                           <div className="space-y-2">
                             <Label>Description</Label>
-                            <Input placeholder="Enter description" value={assetFormData.description} onChange={(e) => setAssetFormData({ ...assetFormData, description: e.target.value })} />
+                            <Input
+                              placeholder="Enter description"
+                              value={assetFormData.description}
+                              onChange={(e) =>
+                                setAssetFormData({
+                                  ...assetFormData,
+                                  description: e.target.value,
+                                })
+                              }
+                            />
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Value *</Label>
-                              <Input type="number" placeholder="Enter value" value={assetFormData.value} onChange={(e) => setAssetFormData({ ...assetFormData, value: e.target.value })} required />
+                              <Input
+                                type="number"
+                                placeholder="Enter value"
+                                value={assetFormData.value}
+                                onChange={(e) =>
+                                  setAssetFormData({
+                                    ...assetFormData,
+                                    value: e.target.value,
+                                  })
+                                }
+                                required
+                              />
                             </div>
                             <div className="space-y-2">
                               <Label>Acquired Date *</Label>
-                              <Input type="date" value={assetFormData.acquiredDate} onChange={(e) => setAssetFormData({ ...assetFormData, acquiredDate: e.target.value })} required />
+                              <Input
+                                type="date"
+                                value={assetFormData.acquiredDate}
+                                onChange={(e) =>
+                                  setAssetFormData({
+                                    ...assetFormData,
+                                    acquiredDate: e.target.value,
+                                  })
+                                }
+                                required
+                              />
                             </div>
                           </div>
                           <div className="space-y-2">
@@ -842,19 +1460,35 @@ const CMIS = () => {
                             <select
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                               value={assetFormData.workingCondition}
-                              onChange={(e) => setAssetFormData({ ...assetFormData, workingCondition: e.target.value })}
+                              onChange={(e) =>
+                                setAssetFormData({
+                                  ...assetFormData,
+                                  workingCondition: e.target.value,
+                                })
+                              }
                               required
                             >
                               <option value="Working">Working</option>
-                              <option value="Under Maintenance">Under Maintenance</option>
+                              <option value="Under Maintenance">
+                                Under Maintenance
+                              </option>
                               <option value="Not Working">Not Working</option>
                             </select>
                           </div>
                           <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => { setOpenAssetDialog(false); resetAssetForm(); }}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setOpenAssetDialog(false);
+                                resetAssetForm();
+                              }}
+                            >
                               Cancel
                             </Button>
-                            <Button type="submit">{editAssetMode ? "Update" : "Add"} Asset</Button>
+                            <Button type="submit">
+                              {editAssetMode ? "Update" : "Add"} Asset
+                            </Button>
                           </DialogFooter>
                         </form>
                       </DialogContent>
