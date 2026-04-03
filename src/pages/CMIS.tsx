@@ -582,6 +582,12 @@ const CMIS = () => {
     return matchesSearch && matchesDate && matchesMonth;
   });
 
+  // Calculate monthly payment total (only from filtered payments of selected month)
+  const monthlyPaymentTotal = filteredPayments.reduce(
+    (sum, p) => sum + (p.amount || 0),
+    0,
+  );
+
   // Filtered assets
   const filteredAssets = assets.filter((a) => {
     const matchesSearch =
@@ -788,10 +794,10 @@ const CMIS = () => {
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">
-                        Total Amount
+                        Monthly Total
                       </p>
                       <p className="text-xl font-bold text-emerald-700">
-                        ₹{totalPayments.toLocaleString("en-IN")}
+                        ₹{monthlyPaymentTotal.toLocaleString("en-IN")}
                       </p>
                     </div>
                     <Button
