@@ -158,6 +158,23 @@ const Dashboard = () => {
     window.location.href = `/technicians/${session.locationId}`;
   };
 
+  // Load filters from localStorage on component mount
+  useEffect(() => {
+    const savedFilters = localStorage.getItem("dashboard_filters");
+    if (savedFilters) {
+      try {
+        const filters = JSON.parse(savedFilters);
+        setSearchTerm(filters.searchTerm || "");
+        setStartDate(filters.startDate || "");
+        setEndDate(filters.endDate || "");
+        setSelectedTechnicianId(filters.selectedTechnicianId || "all");
+        setSelectedSampleType(filters.selectedSampleType || "all");
+      } catch (err) {
+        console.error("Error loading saved filters:", err);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const fetchLocations = async () => {
       try {
@@ -558,10 +575,38 @@ const Dashboard = () => {
     if (selectedLocationId) {
       fetchDashboardData();
     }
-  }, [selectedLocationId, selectedTechnicianId, session.locationId]);
+  }, [
+    selectedLocationId,
+    selectedTechnicianId,
+    searchTerm,
+    startDate,
+    endDate,
+    selectedSampleType,
+    session.locationId,
+  ]);
 
   const handleApply = () => {
+    // Save filters to localStorage
+    const filters = {
+      searchTerm,
+      startDate,
+      endDate,
+      selectedTechnicianId,
+      selectedSampleType,
+    };
+    localStorage.setItem("dashboard_filters", JSON.stringify(filters));
     fetchDashboardData();
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setStartDate("");
+    setEndDate("");
+    setSelectedTechnicianId("all");
+    setSelectedSampleType("all");
+    // Clear from localStorage
+    localStorage.removeItem("dashboard_filters");
+    // useEffect will automatically trigger and fetch fresh data when state updates
   };
 
   useEffect(() => {
@@ -832,6 +877,13 @@ const Dashboard = () => {
                   <div className="flex gap-2">
                     <Button className="h-11 flex-1" onClick={handleApply}>
                       Apply Filters
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-11 flex-1"
+                      onClick={handleClearFilters}
+                    >
+                      Clear Filters
                     </Button>
                     <Button
                       variant="outline"

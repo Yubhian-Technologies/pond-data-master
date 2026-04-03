@@ -52,6 +52,7 @@ import {
   getDoc,
   setDoc,
   Timestamp,
+  deleteField,
 } from "firebase/firestore";
 
 import { useUserSession } from "../contexts/UserSessionContext";
@@ -128,6 +129,20 @@ const CMIS = () => {
   });
   const [totalAssetsValue, setTotalAssetsValue] = useState<number>(0);
 
+  // Helper function to get current academic year month in YYYY-MM format
+  const getCurrentAcademicMonth = (): string => {
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0 = Jan, 3 = Apr, 11 = Dec
+    const currentYear = now.getFullYear();
+
+    // If current month is April (3) or later, use current year
+    // If current month is Jan-Mar (0-2), use previous year (previous academic year)
+    const year = currentMonth >= 3 ? currentYear : currentYear - 1;
+    // Convert 0-indexed month to 1-indexed format for YYYY-MM
+    const month = String(currentMonth + 1).padStart(2, "0");
+    return `${year}-${month}`;
+  };
+
   // Monthly Bills state
   const [monthlyBills, setMonthlyBills] = useState<
     Record<
@@ -141,10 +156,15 @@ const CMIS = () => {
     >
   >({});
   const [selectedMonth, setSelectedMonth] = useState<string>(
-    new Date().toISOString().slice(0, 7),
+    getCurrentAcademicMonth(),
   ); // YYYY-MM format
   const [monthlyFile, setMonthlyFile] = useState<File | null>(null);
   const [uploadingMonth, setUploadingMonth] = useState<boolean>(false);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<number>(
+    new Date().getMonth() >= 3
+      ? new Date().getFullYear()
+      : new Date().getFullYear() - 1,
+  ); // Start year of academic year
 
   // Helper function to format date as DD/MM/YYYY
   const formatDateDMY = (dateString: string): string => {
@@ -278,9 +298,6 @@ const CMIS = () => {
   const handleDeleteMonthlyBill = async (month: string) => {
     if (!session.locationId) return;
     try {
-      const updatedBills = { ...monthlyBills };
-      delete updatedBills[month];
-
       const ref = doc(
         db,
         "locations",
@@ -288,7 +305,15 @@ const CMIS = () => {
         "monthlyBills",
         "data",
       );
-      await updateDoc(ref, updatedBills);
+
+      // Use deleteField to remove the specific month field from Firestore
+      await updateDoc(ref, {
+        [month]: deleteField(),
+      });
+
+      // Update local state
+      const updatedBills = { ...monthlyBills };
+      delete updatedBills[month];
       setMonthlyBills(updatedBills);
       toast.success("Bill deleted");
     } catch (err) {
@@ -550,7 +575,11 @@ const CMIS = () => {
       (!paymentStartDate || p.date >= paymentStartDate) &&
       (!paymentEndDate || p.date <= paymentEndDate);
 
-    return matchesSearch && matchesDate;
+    // Filter by selected month (YYYY-MM format)
+    const paymentYearMonth = p.date.substring(0, 7); // Extract YYYY-MM from date
+    const matchesMonth = paymentYearMonth === selectedMonth;
+
+    return matchesSearch && matchesDate && matchesMonth;
   });
 
   // Filtered assets
@@ -611,7 +640,14 @@ const CMIS = () => {
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/octet-stream" });
-    saveAs(blob, `Lab_Payments_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const monthName = new Date(selectedMonth + "-01").toLocaleDateString(
+      "en-IN",
+      {
+        month: "long",
+        year: "numeric",
+      },
+    );
+    saveAs(blob, `Lab_Payments_${monthName}.xlsx`);
   };
 
   // Excel Export - Assets
@@ -817,45 +853,123 @@ const CMIS = () => {
                     </CardHeader>
 
                     <CardContent className="pt-8">
-                      {/* Month Selection Grid - Current Year Only */}
+                      {/* Academic Year Tabs */}
                       <div className="mb-8">
-                        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                          <span className="w-1 h-6 bg-cyan-600 rounded"></span>
-                          {new Date().getFullYear()} Month Calendar
-                        </h3>
-                        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                          {Array.from({ length: 12 }, (_, i) => {
-                            const date = new Date(
-                              new Date().getFullYear(),
-                              i,
-                              1,
-                            );
-                            const monthStr = date.toISOString().slice(0, 7);
-                            const isSelected = selectedMonth === monthStr;
-                            const billExists = monthlyBills[monthStr];
-                            const monthName = new Date(
-                              monthStr + "-01",
-                            ).toLocaleDateString("en-IN", { month: "short" });
+                        <div className="flex gap-2 mb-6 border-b border-gray-300">
+                          {[0, 1].map((yearOffset) => {
+                            const now = new Date();
+                            const currentMonth = now.getMonth();
+                            const currentYear = now.getFullYear();
+                            const baseYear =
+                              currentMonth >= 3 ? currentYear : currentYear - 1;
+                            const tabYear = baseYear - yearOffset;
+                            const isActive = selectedAcademicYear === tabYear;
 
                             return (
                               <button
-                                key={i}
-                                onClick={() => setSelectedMonth(monthStr)}
-                                className={`relative p-3 rounded-lg font-semibold transition-all transform hover:scale-105 ${
-                                  isSelected
-                                    ? "bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg ring-2 ring-cyan-300"
-                                    : billExists
-                                      ? "bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-900 border-2 border-emerald-300 hover:from-emerald-200 hover:to-teal-200"
-                                      : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
+                                key={yearOffset}
+                                onClick={() => setSelectedAcademicYear(tabYear)}
+                                className={`px-6 py-3 font-semibold text-lg transition-all ${
+                                  isActive
+                                    ? "text-cyan-600 border-b-4 border-cyan-600"
+                                    : "text-gray-600 border-b-4 border-transparent hover:text-gray-800"
                                 }`}
                               >
-                                {monthName}
-                                {billExists && (
-                                  <span className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full"></span>
-                                )}
+                                Academic Year {tabYear}-
+                                {String(tabYear + 1).slice(-2)}
                               </button>
                             );
                           })}
+                        </div>
+
+                        {/* Month Selection Grid */}
+                        <div>
+                          <p className="text-sm text-gray-600 mb-4 font-semibold">
+                            Months: April {selectedAcademicYear} to March{" "}
+                            {selectedAcademicYear + 1}
+                          </p>
+                          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                            {(() => {
+                              // Generate months explicitly for this academic year
+                              const months = [
+                                { label: "April", year: selectedAcademicYear },
+                                { label: "May", year: selectedAcademicYear },
+                                { label: "June", year: selectedAcademicYear },
+                                { label: "July", year: selectedAcademicYear },
+                                { label: "August", year: selectedAcademicYear },
+                                {
+                                  label: "September",
+                                  year: selectedAcademicYear,
+                                },
+                                {
+                                  label: "October",
+                                  year: selectedAcademicYear,
+                                },
+                                {
+                                  label: "November",
+                                  year: selectedAcademicYear,
+                                },
+                                {
+                                  label: "December",
+                                  year: selectedAcademicYear,
+                                },
+                                {
+                                  label: "January",
+                                  year: selectedAcademicYear + 1,
+                                },
+                                {
+                                  label: "February",
+                                  year: selectedAcademicYear + 1,
+                                },
+                                {
+                                  label: "March",
+                                  year: selectedAcademicYear + 1,
+                                },
+                              ];
+
+                              // Month index for YYYY-MM format
+                              const monthMap = {
+                                April: "04",
+                                May: "05",
+                                June: "06",
+                                July: "07",
+                                August: "08",
+                                September: "09",
+                                October: "10",
+                                November: "11",
+                                December: "12",
+                                January: "01",
+                                February: "02",
+                                March: "03",
+                              };
+
+                              return months.map((month, idx) => {
+                                const monthStr = `${month.year}-${monthMap[month.label as keyof typeof monthMap]}`;
+                                const isSelected = selectedMonth === monthStr;
+                                const billExists = monthlyBills[monthStr];
+                                const monthName = `${month.label.substring(0, 3)} ${month.year}`;
+
+                                return (
+                                  <button
+                                    key={idx}
+                                    onClick={() => setSelectedMonth(monthStr)}
+                                    className={`relative p-3 rounded-lg font-semibold text-sm transition-all transform hover:scale-105 ${
+                                      isSelected
+                                        ? "bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-lg ring-2 ring-cyan-300"
+                                        : billExists
+                                          ? "bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-900 border-2 border-emerald-300 hover:from-emerald-200 hover:to-teal-200"
+                                          : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
+                                    }`}
+                                  >
+                                    {monthName}
+                                    {billExists && (
+                                      <span className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+                                    )}
+                                  </button>
+                                );
+                              });
+                            })()}
+                          </div>
                         </div>
                       </div>
 

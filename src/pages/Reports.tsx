@@ -73,18 +73,52 @@ const Reports = () => {
   const [branchTechnicians, setBranchTechnicians] = useState<
     { id: string; name: string }[]
   >([]);
-  const [selectedTechnicianId, setSelectedTechnicianId] =
-    useState<string>("all");
 
-  // Date filter states
+  // Applied filters (only change when Apply button is clicked)
+  const [appliedStartDate, setAppliedStartDate] = useState<string>("");
+  const [appliedEndDate, setAppliedEndDate] = useState<string>("");
+  const [appliedTechnicianId, setAppliedTechnicianId] = useState<string>("all");
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState<string>("");
+  const [appliedSampleType, setAppliedSampleType] = useState<string>("all");
+
+  // Temporary filter values (what user is typing)
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-
-  // Search state (new)
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedTechnicianId, setSelectedTechnicianId] =
+    useState<string>("all");
   const [selectedSampleType, setSelectedSampleType] = useState<string>("all");
 
   const locationId = session.locationId;
+
+  // Load filters from localStorage on component mount
+  useEffect(() => {
+    const savedFilters = localStorage.getItem("reports_filters");
+    if (savedFilters) {
+      try {
+        const filters = JSON.parse(savedFilters);
+        const sq = filters.searchQuery || "";
+        const sd = filters.startDate || "";
+        const ed = filters.endDate || "";
+        const st = filters.selectedTechnicianId || "all";
+        const ss = filters.selectedSampleType || "all";
+
+        // Set both temporary and applied to saved values
+        setSearchQuery(sq);
+        setAppliedSearchQuery(sq);
+        setStartDate(sd);
+        setAppliedStartDate(sd);
+        setEndDate(ed);
+        setAppliedEndDate(ed);
+        setSelectedTechnicianId(st);
+        setAppliedTechnicianId(st);
+        setSelectedSampleType(ss);
+        setAppliedSampleType(ss);
+      } catch (err) {
+        console.error("Error loading saved filters:", err);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const fetchTechnicians = async () => {
@@ -116,9 +150,11 @@ const Reports = () => {
         );
 
         // Apply date filters if provided
-        if (startDate && endDate) {
-          const startT = Timestamp.fromDate(new Date(startDate));
-          const endT = Timestamp.fromDate(new Date(`${endDate}T23:59:59.999`));
+        if (appliedStartDate && appliedEndDate) {
+          const startT = Timestamp.fromDate(new Date(appliedStartDate));
+          const endT = Timestamp.fromDate(
+            new Date(`${appliedEndDate}T23:59:59.999`),
+          );
 
           invoicesQuery = query(
             collection(db, "locations", locationId, "invoices"),
@@ -194,7 +230,7 @@ const Reports = () => {
     };
 
     fetchReports();
-  }, [locationId, startDate, endDate, selectedTechnicianId]);
+  }, [locationId, appliedStartDate, appliedEndDate, appliedTechnicianId]);
 
   const openReport = (invoiceId: string) => {
     navigate(`/lab-results/${invoiceId}?mode=view`);
@@ -213,15 +249,15 @@ const Reports = () => {
     let result = reports;
 
     // Technician filter
-    if (selectedTechnicianId !== "all") {
+    if (appliedTechnicianId !== "all") {
       result = result.filter(
-        (report) => report.technicianId === selectedTechnicianId,
+        (report) => report.technicianId === appliedTechnicianId,
       );
     }
 
     // Text search filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    if (appliedSearchQuery.trim()) {
+      const q = appliedSearchQuery.toLowerCase().trim();
       result = result.filter((report) => {
         return (
           (report.farmerName || "").toLowerCase().includes(q) ||
@@ -230,21 +266,48 @@ const Reports = () => {
       });
     }
 
-    if (selectedSampleType !== "all") {
+    if (appliedSampleType !== "all") {
       result = result.filter((report) =>
-        report.types.some((type) => type.toLowerCase() === selectedSampleType),
+        report.types.some((type) => type.toLowerCase() === appliedSampleType),
       );
     }
 
     return result;
-  }, [reports, selectedTechnicianId, searchQuery, selectedSampleType]);
+  }, [reports, appliedTechnicianId, appliedSearchQuery, appliedSampleType]);
 
-  const handleResetFilters = () => {
+  const handleApplyFilters = () => {
+    // Apply the temporary filters to the applied filters
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+    setAppliedTechnicianId(selectedTechnicianId);
+    setAppliedSearchQuery(searchQuery);
+    setAppliedSampleType(selectedSampleType);
+
+    // Save to localStorage
+    const filters = {
+      searchQuery,
+      startDate,
+      endDate,
+      selectedTechnicianId,
+      selectedSampleType,
+    };
+    localStorage.setItem("reports_filters", JSON.stringify(filters));
+  };
+
+  const handleClearFilters = () => {
+    // Clear both temporary and applied filters
+    setSearchQuery("");
     setStartDate("");
     setEndDate("");
     setSelectedTechnicianId("all");
-    setSearchQuery(""); // also reset search
     setSelectedSampleType("all");
+    setAppliedSearchQuery("");
+    setAppliedStartDate("");
+    setAppliedEndDate("");
+    setAppliedTechnicianId("all");
+    setAppliedSampleType("all");
+    // Clear from localStorage
+    localStorage.removeItem("reports_filters");
   };
 
   return (
@@ -288,22 +351,6 @@ const Reports = () => {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* Reset Filters Button */}
-                  {(startDate ||
-                    endDate ||
-                    selectedTechnicianId !== "all" ||
-                    searchQuery ||
-                    selectedSampleType !== "all") && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleResetFilters}
-                      title="Reset all filters"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
               </div>
 
@@ -364,6 +411,21 @@ const Reports = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="flex gap-2">
+                      <Button
+                        className="h-10 flex-1"
+                        onClick={handleApplyFilters}
+                      >
+                        Apply Filters
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-10 flex-1"
+                        onClick={handleClearFilters}
+                      >
+                        Clear Filters
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -381,11 +443,11 @@ const Reports = () => {
                     <FileText className="w-10 h-10 text-gray-400" />
                   </div>
                   <h3 className="text-xl font-medium text-muted-foreground mb-2">
-                    {selectedTechnicianId !== "all" ||
-                    startDate ||
-                    endDate ||
-                    searchQuery ||
-                    selectedSampleType !== "all"
+                    {appliedTechnicianId !== "all" ||
+                    appliedStartDate ||
+                    appliedEndDate ||
+                    appliedSearchQuery ||
+                    appliedSampleType !== "all"
                       ? "No reports found for selected filters"
                       : "No completed reports yet"}
                   </h3>

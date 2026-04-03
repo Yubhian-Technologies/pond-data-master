@@ -18,7 +18,7 @@ interface FarmerInfo {
   mobile: string;
   sampleDate: string;
   sampleTime: string;
-  reportDate: string;
+  reportTime: string;
   farmerId: string;
 }
 
@@ -143,9 +143,9 @@ export default function PLReport({
             mobile: savedFarmerInfo.mobile || "-",
             sampleDate: savedFarmerInfo.sampleDate || "-",
             sampleTime: savedFarmerInfo.sampleTime || "-",
-            reportDate:
-              savedFarmerInfo.reportDate ||
-              new Date().toISOString().split("T")[0],
+            reportTime:
+              savedFarmerInfo.reportTime ||
+              new Date().toISOString().split("T")[1].split(".")[0],
             farmerId: savedFarmerInfo.farmerId || "-",
           });
 
@@ -267,7 +267,7 @@ export default function PLReport({
             mobile: "-",
             sampleDate: "-",
             sampleTime: "-",
-            reportDate: new Date().toISOString().split("T")[0],
+            reportTime: new Date().toISOString().split("T")[0],
             farmerId: "-",
           });
         }
@@ -364,6 +364,21 @@ export default function PLReport({
       .replace(/\//g, "-");
   };
 
+  const formatTimeWithAMPM = (timeStr: string | undefined): string => {
+    if (!timeStr) return "-";
+    try {
+      const [hours, minutes] = timeStr.split(":").map(Number);
+      if (isNaN(hours) || isNaN(minutes)) return timeStr;
+      const period = hours >= 12 ? "PM" : "AM";
+      const displayHours = hours % 12 || 12;
+      return `${displayHours.toString().padStart(2, "0")}:${minutes
+        .toString()
+        .padStart(2, "0")} ${period}`;
+    } catch {
+      return timeStr;
+    }
+  };
+
   return (
     <div className="rounded-lg p-8 bg-white" id="pl-report">
       <div className="flex justify-between items-start mb-8 border-b-2 border-black">
@@ -413,10 +428,10 @@ export default function PLReport({
               </td>
               <td className="border px-4 py-2">{farmerInfo.mobile}</td>
               <td className="font-semibold bg-blue-100 border px-4 py-2">
-                Report Date
+                Report Time
               </td>
               <td className="border px-4 py-2">
-                {formatDateDDMMYYYY(farmerInfo.reportDate)}
+                {formatTimeWithAMPM(farmerInfo.reportTime)}
               </td>
             </tr>
             <tr>
@@ -455,7 +470,7 @@ export default function PLReport({
                   key={i}
                   className="border-2 border-black px-2 py-1 font-semibold"
                 >
-                  Tank - {code || `${i + 1}`}
+                  {code || `${i + 1}`}
                 </th>
               ))}
             </tr>

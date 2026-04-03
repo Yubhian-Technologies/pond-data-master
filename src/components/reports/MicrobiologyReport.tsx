@@ -399,52 +399,58 @@ export default function MicrobiologyReport({
           <table className="border-2 border-gray-800 text-sm w-full max-w-full print:text-xs">
             <tbody>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                <td className="font-semibold bg-blue-100 border px-4 py-3 w-1/8 align-middle">
                   Farmer Name
                 </td>
-                <td className="border px-4 py-2 w-1/8">
+                <td className="border px-4 py-3 w-1/8 align-middle">
                   {farmerInfo?.farmerName || "-"}
                 </td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                <td className="font-semibold bg-blue-100 border px-4 py-3 w-1/8 align-middle">
                   Mobile
                 </td>
-                <td className="border px-4 py-2 w-1/8">
+                <td className="border px-4 py-3 w-1/8 align-middle">
                   {farmerInfo?.mobile || "-"}
                 </td>
               </tr>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                <td className="font-semibold bg-blue-100 border px-4 py-3 w-1/8 align-middle">
                   Address
                 </td>
-                <td className="border px-4 py-2 w-1/8">
+                <td className="border px-4 py-3 w-1/8 align-middle">
                   {farmerInfo?.address || "-"}
                 </td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                <td className="font-semibold bg-blue-100 border px-4 py-3 w-1/8 align-middle">
                   Report ID
                 </td>
-                <td className="border px-4 py-2 w-1/8">{invoiceId || "-"}</td>
+                <td className="border px-4 py-3 w-1/8 align-middle">
+                  {invoiceId || "-"}
+                </td>
               </tr>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                <td className="font-semibold bg-blue-100 border px-4 py-3 w-1/8 align-middle">
                   No. of Samples
                 </td>
-                <td className="border px-4 py-2 w-1/8">{allSampleCount}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                <td className="border px-4 py-3 w-1/8 align-middle">
+                  {allSampleCount}
+                </td>
+                <td className="font-semibold bg-blue-100 border px-4 py-3 w-1/8 align-middle">
                   Farmer ID
                 </td>
-                <td className="border px-4 py-2 w-1/8">
+                <td className="border px-4 py-3 w-1/8 align-middle">
                   {farmerInfo?.farmerId || "-"}
                 </td>
               </tr>
               <tr>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                <td className="font-semibold bg-blue-100 border px-4 py-3 w-1/8 align-middle">
                   Sample Type
                 </td>
-                <td className="border px-4 py-2 w-1/8">{sampleType}</td>
-                <td className="font-semibold bg-blue-100 border px-4 py-2 w-1/8">
+                <td className="border px-4 py-3 w-1/8 align-middle">
+                  {sampleType}
+                </td>
+                <td className="font-semibold bg-blue-100 border px-4 py-3 w-1/8 align-middle">
                   Date
                 </td>
-                <td className="border px-4 py-2 w-1/8">
+                <td className="border px-4 py-3 w-1/8 align-middle">
                   {formatDateDDMMYYYY(farmerInfo?.date)}
                 </td>
               </tr>
@@ -472,16 +478,16 @@ export default function MicrobiologyReport({
                 </th>
               </tr>
               <tr className="bg-gray-200">
-                <th className="border px-4 py-1.5 font-semibold text-sm align-middle print:py-1">
+                <th className="border px-4 py-3 font-semibold text-sm text-center align-middle">
                   Test Code
                 </th>
-                <th className="border px-4 py-1.5 font-semibold text-sm bg-yellow-200 align-middle print:py-1">
+                <th className="border px-4 py-3 font-semibold text-sm bg-yellow-200 text-center align-middle">
                   Yellow Colonies
                 </th>
-                <th className="border px-4 py-1.5 font-semibold text-sm bg-green-300 align-middle print:py-1">
+                <th className="border px-4 py-3 font-semibold text-sm bg-green-300 text-center align-middle">
                   Green Colonies
                 </th>
-                <th className="border px-4 py-1.5 font-semibold text-sm align-middle print:py-1">
+                <th className="border px-4 py-3 font-semibold text-sm text-center align-middle">
                   TPC
                 </th>
               </tr>
@@ -489,31 +495,31 @@ export default function MicrobiologyReport({
             <tbody>
               {Array.from({ length: allSampleCount }, (_, i) => (
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="border px-4 py-1.5 text-center text-sm font-medium align-middle print:py-1">
+                  <td className="border px-4 py-3 text-center text-sm font-medium align-middle">
                     {data.testCode?.[i] || `Sample ${i + 1}`}
                   </td>
-                  <td className="border px-4 py-1.5 text-center text-sm align-middle print:py-1">
+                  <td className="border px-4 py-3 text-center text-sm align-middle">
                     {data.yellowColonies?.[i] || "-"}
                   </td>
-                  <td className="border px-4 py-1.5 text-center text-sm align-middle print:py-1">
+                  <td className="border px-4 py-3 text-center text-sm align-middle">
                     {data.greenColonies?.[i] || "-"}
                   </td>
-                  <td className="border px-4 py-1.5 text-center text-sm align-middle print:py-1">
+                  <td className="border px-4 py-3 text-center text-sm align-middle">
                     {data.tpc?.[i] || "-"}
                   </td>
                 </tr>
               ))}
               <tr className="bg-red-50 font-semibold">
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm align-middle print:py-1">
+                <td className="border px-4 py-3 text-center text-red-700 text-sm align-middle">
                   Optimum Values
                 </td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm align-middle print:py-1">
+                <td className="border px-4 py-3 text-center text-red-700 text-sm align-middle">
                   &lt; 300
                 </td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm align-middle print:py-1">
+                <td className="border px-4 py-3 text-center text-red-700 text-sm align-middle">
                   &lt; 50
                 </td>
-                <td className="border px-4 py-1.5 text-center text-red-700 text-sm align-middle print:py-1">
+                <td className="border px-4 py-3 text-center text-red-700 text-sm align-middle">
                   &lt; 1000
                 </td>
               </tr>
