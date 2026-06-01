@@ -896,11 +896,12 @@ const Dashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-5">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <div className="relative">
+                {/* Row 1 — Search + Date range */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3">
+                  <div className="relative md:col-span-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by farmer, invoice, or type..."
+                      placeholder="Search by farmer, ID, phone, invoice..."
                       className="pl-10 h-11"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -918,36 +919,36 @@ const Dashboard = () => {
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
-                  <div className="flex gap-2">
-                    <Button className="h-11 flex-1" onClick={handleApply}>
-                      Apply Filters
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-11 flex-1"
-                      onClick={handleClearFilters}
-                    >
-                      Clear Filters
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-11 px-4 bg-purple-600 hover:bg-purple-700 text-white border-0"
-                      onClick={() => openModal("farmer_summary")}
-                      disabled={loading || invoices.length === 0}
-                    >
-                      <Users className="w-4 h-4 mr-2" />
-                      Farmer Summary
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-11 px-4 bg-green-600 hover:bg-green-700 text-white border-0"
-                      onClick={handleExportToExcel}
-                      disabled={loading || exportData.length === 0}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Export
-                    </Button>
-                  </div>
+                </div>
+
+                {/* Row 2 — Action buttons */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <Button className="h-11 px-6" onClick={handleApply}>
+                    Apply Filters
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-11 px-6"
+                    onClick={handleClearFilters}
+                  >
+                    Clear Filters
+                  </Button>
+                  <Button
+                    className="h-11 px-5 bg-purple-600 hover:bg-purple-700 text-white border-0"
+                    onClick={() => openModal("farmer_summary")}
+                    disabled={loading || invoices.length === 0}
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    Farmer Summary
+                  </Button>
+                  <Button
+                    className="h-11 px-5 bg-green-600 hover:bg-green-700 text-white border-0"
+                    onClick={handleExportToExcel}
+                    disabled={loading || exportData.length === 0}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-gray-200 flex flex-wrap gap-6">
