@@ -128,6 +128,7 @@ export default function PCRReport({
               sampleType: data.sampleType || "PL",
               pathogens: data.pathogens || [],
               gelImageUrl: data.gelImageUrl || null,
+              graphName: data.graphName || "",
               farmerInfo: {
                 farmerName: data.farmerName || "",
                 address: data.address || "",
@@ -137,6 +138,7 @@ export default function PCRReport({
                 sampleType: data.sampleType || "",
                 noOfSamples: data.noOfSamples || "",
                 reportDate: data.reportDate || "",
+                reportTime: data.reportTime || "",
                 docDifference: data.docDifference || "",
               },
             };
@@ -182,6 +184,7 @@ export default function PCRReport({
               sampleType: data.sampleType || "",
               noOfSamples: data.noOfSamples || "",
               reportDate: data.reportDate || "",
+              reportTime: data.reportTime || "",
               docDifference: data.docDifference || "",
             });
 
@@ -191,6 +194,7 @@ export default function PCRReport({
                 sampleType: data.sampleType || "PL",
                 pathogens: data.pathogens || [],
                 gelImageUrl: data.gelImageUrl || null,
+                graphName: data.graphName || "",
               },
             ]);
           } else {
@@ -262,6 +266,19 @@ export default function PCRReport({
         year: "numeric",
       })
       .replace(/\//g, "-");
+  };
+
+  const formatTimeWithAMPM = (timeStr: string | undefined): string => {
+    if (!timeStr) return "-";
+    try {
+      const [hours, minutes] = timeStr.split(":").map(Number);
+      if (isNaN(hours) || isNaN(minutes)) return timeStr;
+      const period = hours >= 12 ? "PM" : "AM";
+      const displayHours = hours % 12 || 12;
+      return `${displayHours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")} ${period}`;
+    } catch {
+      return timeStr;
+    }
   };
 
   if (loading) {
@@ -517,7 +534,7 @@ export default function PCRReport({
                 key={idx}
                 className="w-full max-w-lg flex flex-col items-center border border-gray-200 rounded-xl overflow-hidden shadow-md bg-white"
               >
-                {/* Image container – smaller padding & size */}
+                {/* Image */}
                 <div className="w-full bg-gray-50 flex justify-center items-center p-6 md:p-8">
                   <img
                     src={r.gelImageUrl}
@@ -526,12 +543,12 @@ export default function PCRReport({
                   />
                 </div>
 
-                {/* Sample label */}
-                {/* <div className="py-4 text-center w-full bg-white">
-                <p className="text-base font-semibold text-gray-900">
-                  Sample {r.sampleCode}
-                </p>
-              </div> */}
+                {/* Graph name caption */}
+                {r.graphName && (
+                  <div className="py-3 px-4 text-center w-full bg-white border-t border-gray-100">
+                    <p className="text-sm font-semibold text-gray-800">{r.graphName}</p>
+                  </div>
+                )}
               </div>
             ))}
         </div>
@@ -613,6 +630,12 @@ export default function PCRReport({
             </tr>
             <tr>
               <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
+                Report Time
+              </td>
+              <td className="border-2 border-black px-6 py-3">
+                {formatTimeWithAMPM(farmerInfo.reportTime)}
+              </td>
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 Report Id
               </td>
               <td className="border-2 border-black px-6 py-3">
@@ -624,12 +647,15 @@ export default function PCRReport({
               <td className="border-2 border-black px-6 py-3">
                 {farmerInfo.noOfSamples || allSampleCount || "-"}
               </td>
+            </tr>
+            <tr>
               <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 DOC
               </td>
               <td className="border-2 border-black px-6 py-3">
                 {farmerInfo.docDifference || "-"}
               </td>
+              <td className="border-2 border-black px-6 py-3" colSpan={4} />
             </tr>
           </tbody>
         </table>

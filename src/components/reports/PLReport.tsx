@@ -10,7 +10,6 @@ import {
 import { db } from "../../pages/firebase";
 import ADC from "@/assets/ADC.jpg";
 import AV from "@/assets/AV.jpg";
-import { useUserSession } from "@/contexts/UserSessionContext";
 
 interface FarmerInfo {
   farmerName: string;
@@ -57,11 +56,11 @@ export default function PLReport({
   allSampleCount,
   showSignature = true,
 }: PLReportProps) {
-  const { session } = useUserSession();
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo | null>(null);
   const [plData, setPlData] = useState<PLData | null>(null);
   const [sampleType, setSampleType] = useState<string>("PL (Post Larvae)");
   const [checkedByName, setCheckedByName] = useState<string>("");
+  const [reportedByName, setReportedByName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [locationDetails, setLocationDetails] = useState<{
     address: string;
@@ -284,8 +283,10 @@ export default function PLReport({
         if (invoiceSnap.exists()) {
           const invoiceData = invoiceSnap.data();
           setCheckedByName(invoiceData.checkedBy || "______________________");
+          setReportedByName(invoiceData.technicianName || "______________________");
         } else {
           setCheckedByName("______________________");
+          setReportedByName("______________________");
         }
       } catch (err) {
         console.error("Error fetching PL report:", err);
@@ -541,9 +542,7 @@ export default function PLReport({
             <div className="flex justify-between text-sm px-10 mb-10">
               <div>
                 <p className="font-semibold">Reported by:</p>
-                <p className="mt-8 font-medium">
-                  {session?.technicianName || ""}
-                </p>
+                <p className="mt-8 font-medium">{reportedByName}</p>
               </div>
               <div>
                 <p className="font-semibold">Checked by:</p>

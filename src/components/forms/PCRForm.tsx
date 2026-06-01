@@ -15,13 +15,14 @@ import { useUserSession } from "../../contexts/UserSessionContext";
 
 interface FarmerInfo {
   farmerName: string;
-  address: string; // ← Changed from village to address
+  address: string;
   mobile: string;
   farmerId: string;
   sampleCollectionTime: string;
   sampleType: string;
   noOfSamples: number;
   reportDate: string;
+  reportTime: string;
   docDifference: string;
 }
 
@@ -36,6 +37,7 @@ interface SamplePCRData {
   sampleType: string;
   pathogens: PathogenResult[];
   gelImageUrl: string;
+  graphName: string;
 }
 
 interface PCRFormProps {
@@ -53,6 +55,7 @@ export default function PCRForm({
   const technicianName = session?.technicianName || "";
 
   const today = new Date().toISOString().split("T")[0];
+  const currentTime = new Date().toTimeString().slice(0, 5);
 
   const [localInvoice, setLocalInvoice] = useState<any>(null);
 
@@ -74,13 +77,14 @@ export default function PCRForm({
 
   const [farmerInfo, setFarmerInfo] = useState<FarmerInfo>({
     farmerName: "",
-    address: "", // ← Changed from village
+    address: "",
     mobile: "",
     farmerId: "—",
     sampleCollectionTime: today,
     sampleType: "PL PCR",
     noOfSamples: totalSamples,
     reportDate: today,
+    reportTime: currentTime,
     docDifference: "0 days",
   });
 
@@ -91,8 +95,11 @@ export default function PCRForm({
   const [loading, setLoading] = useState(true);
   const [technicians, setTechnicians] = useState<string[]>([]);
   const [ctCustomMode, setCtCustomMode] = useState<boolean[][]>([]);
+  const [sampleTypeCustomMode, setSampleTypeCustomMode] = useState<boolean[]>([]);
 
   const [checkedBy, setCheckedBy] = useState(technicianName);
+
+  const PCR_SAMPLE_TYPE_OPTIONS = ["PL", "ADULT", "FECAL MATTER", "OTHERS"];
 
   const PATHOGEN_NAME_MAP: Record<string, string> = {
     pl_ehp: "PL EHP",
@@ -234,6 +241,26 @@ export default function PCRForm({
       try {
         setLoading(true);
 
+        // Load PL report test codes so PCR sample codes match PL pond S.nos
+        let plTestCodes: string[] = [];
+        try {
+          const plReportRef = doc(
+            db,
+            "locations",
+            locationId,
+            "invoices",
+            localInvoice.docId,
+            "plReports",
+            "data",
+          );
+          const plSnap = await getDoc(plReportRef);
+          if (plSnap.exists()) {
+            plTestCodes = plSnap.data()?.plData?.testCode || [];
+          }
+        } catch (_) {
+          // PL report may not exist yet — that's fine
+        }
+
         // Get all sample numbers that have pathogens selected
         const samplesWithPathogens: number[] = [];
         if (localInvoice?.samplePathogens) {
@@ -253,6 +280,9 @@ export default function PCRForm({
         let firstCheckedBy = localInvoice?.checkedBy || technicianName; // Load from invoice first, then default fallback
 
         for (const i of samplesWithPathogens) {
+          // PL testCode array is 0-based; sample numbers are 1-based
+          const plTestCode = plTestCodes[i - 1] || "";
+
           const pcrDocRef = doc(
             db,
             "locations",
@@ -268,19 +298,27 @@ export default function PCRForm({
           if (snap.exists()) {
             const data = snap.data();
             loadedSamples.push({
-              sampleCode: data.sampleCode || "",
+              // If saved sampleCode is blank, fall back to PL test code
+              sampleCode: data.sampleCode || plTestCode,
               sampleType: data.sampleType || "",
               pathogens: data.pathogens || [],
               gelImageUrl: data.gelImageUrl || "",
+              graphName: data.graphName || "",
             });
 
             if (data.gelImageUrl) {
               setGelImages((prev) => ({ ...prev, [i]: data.gelImageUrl }));
             }
 
-            // Load checkedBy from first saved sample
-            if (i === 1 && data.checkedBy) {
-              firstCheckedBy = data.checkedBy;
+            // Load checkedBy and reportTime from first saved sample
+            if (i === 1) {
+              if (data.checkedBy) firstCheckedBy = data.checkedBy;
+              setFarmerInfo((prev) => ({
+                ...prev,
+                reportDate: data.reportDate || prev.reportDate,
+                reportTime: data.reportTime || prev.reportTime,
+                docDifference: data.docDifference || prev.docDifference,
+              }));
             }
           } else {
             // Access with string key since Firebase converts numeric keys to strings
@@ -307,10 +345,12 @@ export default function PCRForm({
             );
 
             loadedSamples.push({
-              sampleCode: "",
+              // Pre-fill from PL test code so pond S.nos match automatically
+              sampleCode: plTestCode,
               sampleType: "",
               pathogens: initialPathogens,
               gelImageUrl: "",
+              graphName: "",
             });
           }
         }
@@ -329,6 +369,13 @@ export default function PCRForm({
               const val = p.ctValue?.toLowerCase();
               return val && val !== "Un-determined";
             }),
+          ),
+        );
+
+        // Initialize sample type custom mode — true when saved value is not in predefined list
+        setSampleTypeCustomMode(
+          loadedSamples.map((sample) =>
+            !!sample.sampleType && !PCR_SAMPLE_TYPE_OPTIONS.includes(sample.sampleType),
           ),
         );
       } catch (err) {
@@ -444,6 +491,7 @@ export default function PCRForm({
             sampleType: sample.sampleType,
             pathogens: sample.pathogens,
             gelImageUrl: gelImages[sampleNum] || "",
+            graphName: sample.graphName || "",
             updatedAt: new Date().toISOString(),
             checkedBy: checkedBy.trim() || technicianName || "N/A",
           },
@@ -511,7 +559,9 @@ export default function PCRForm({
                         ? "No. of Samples"
                         : key === "address"
                           ? "Address"
-                          : key.replace(/([A-Z])/g, " $1").trim()}
+                          : key === "reportTime"
+                            ? "Report Time"
+                            : key.replace(/([A-Z])/g, " $1").trim()}
               </label>
 
               {key === "sampleCollectionTime" || key === "reportDate" ? (
@@ -522,6 +572,18 @@ export default function PCRForm({
                     setFarmerInfo((prev) => ({
                       ...prev,
                       [key]: e.target.value,
+                    }))
+                  }
+                  className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                />
+              ) : key === "reportTime" ? (
+                <input
+                  type="time"
+                  value={value}
+                  onChange={(e) =>
+                    setFarmerInfo((prev) => ({
+                      ...prev,
+                      reportTime: e.target.value,
                     }))
                   }
                   className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
@@ -628,14 +690,51 @@ export default function PCRForm({
                 <label className="block text-sm font-medium mb-1">
                   Sample Type
                 </label>
-                <input
-                  value={sample.sampleType}
-                  onChange={(e) =>
-                    handleBasicInput(sampleIndex, "sampleType", e.target.value)
-                  }
-                  placeholder="PL / Water / Soil"
-                  className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
-                />
+                {sampleTypeCustomMode[sampleIndex] ? (
+                  <div className="flex gap-2">
+                    <input
+                      value={sample.sampleType}
+                      onChange={(e) =>
+                        handleBasicInput(sampleIndex, "sampleType", e.target.value)
+                      }
+                      placeholder="Enter sample type"
+                      className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = [...sampleTypeCustomMode];
+                        updated[sampleIndex] = false;
+                        setSampleTypeCustomMode(updated);
+                        handleBasicInput(sampleIndex, "sampleType", "");
+                      }}
+                      className="px-3 py-2 bg-gray-200 rounded text-xs whitespace-nowrap"
+                    >
+                      Select
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={sample.sampleType}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "OTHERS") {
+                        const updated = [...sampleTypeCustomMode];
+                        updated[sampleIndex] = true;
+                        setSampleTypeCustomMode(updated);
+                        handleBasicInput(sampleIndex, "sampleType", "");
+                      } else {
+                        handleBasicInput(sampleIndex, "sampleType", val);
+                      }
+                    }}
+                    className="w-full border rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select type...</option>
+                    {PCR_SAMPLE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -767,6 +866,23 @@ export default function PCRForm({
               <h4 className="font-semibold text-lg mb-4">
                 PCR Amplification Image
               </h4>
+
+              {/* Graph name */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Graph Name / Caption
+                </label>
+                <input
+                  type="text"
+                  value={sample.graphName}
+                  onChange={(e) =>
+                    handleBasicInput(sampleIndex, "graphName", e.target.value)
+                  }
+                  placeholder="e.g. EHP Amplification – Sample CS-3"
+                  className="w-full border border-gray-300 rounded px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
               <input
                 type="file"
                 accept="image/*"

@@ -109,8 +109,18 @@ interface ModalFarmer {
   cultureAreas: number;
 }
 
+interface FarmerSummaryItem {
+  farmerId: string;
+  farmerName: string;
+  farmerPhone: string;
+  visitCount: number;
+  totalBilled: number;
+  totalPaid: number;
+  totalPending: number;
+}
+
 interface ModalData {
-  type: "farmers" | "samples" | "reports" | "revenue" | null;
+  type: "farmers" | "samples" | "reports" | "revenue" | "farmer_summary" | null;
   title: string;
 }
 
@@ -507,26 +517,22 @@ const Dashboard = () => {
       setInvoices(allInvoices);
 
       const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = (inv: InvoiceItem) =>
+        inv.farmerName.toLowerCase().includes(searchLower) ||
+        inv.invoiceId.toLowerCase().includes(searchLower) ||
+        inv.title.toLowerCase().includes(searchLower) ||
+        inv.typeDisplay.toLowerCase().includes(searchLower) ||
+        (inv.farmerPhone || "").toLowerCase().includes(searchLower) ||
+        (inv.farmerId || "").toLowerCase().includes(searchLower);
+
       const filteredInvoices = searchTerm
-        ? allInvoices.filter(
-            (inv) =>
-              inv.farmerName.toLowerCase().includes(searchLower) ||
-              inv.invoiceId.toLowerCase().includes(searchLower) ||
-              inv.title.toLowerCase().includes(searchLower) ||
-              inv.typeDisplay.toLowerCase().includes(searchLower),
-          )
+        ? allInvoices.filter(matchesSearch)
         : allInvoices;
 
       const filteredExportRows = searchTerm
-        ? tempExportRows.filter((row, index) => {
+        ? tempExportRows.filter((_row, index) => {
             const inv = allInvoices[index];
-            if (!inv) return false;
-            return (
-              inv.farmerName.toLowerCase().includes(searchLower) ||
-              inv.invoiceId.toLowerCase().includes(searchLower) ||
-              inv.title.toLowerCase().includes(searchLower) ||
-              inv.typeDisplay.toLowerCase().includes(searchLower)
-            );
+            return inv ? matchesSearch(inv) : false;
           })
         : tempExportRows;
 
@@ -737,6 +743,36 @@ const Dashboard = () => {
       ];
     }
 
+    if (type === "farmer_summary") {
+      title = "Farmer Contribution Summary";
+
+      const farmerMap = new Map<string, FarmerSummaryItem>();
+
+      invoices.forEach((inv) => {
+        const key = inv.farmerId || inv.farmerName;
+        if (!farmerMap.has(key)) {
+          farmerMap.set(key, {
+            farmerId: inv.farmerId || "N/A",
+            farmerName: inv.farmerName,
+            farmerPhone: inv.farmerPhone || "N/A",
+            visitCount: 0,
+            totalBilled: 0,
+            totalPaid: 0,
+            totalPending: 0,
+          });
+        }
+        const entry = farmerMap.get(key)!;
+        entry.visitCount += 1;
+        entry.totalBilled += Number(inv.total || 0);
+        entry.totalPaid += Number(inv.paidAmount || 0);
+        entry.totalPending += Number(inv.balanceAmount || 0);
+      });
+
+      content = Array.from(farmerMap.values()).sort(
+        (a, b) => b.visitCount - a.visitCount,
+      );
+    }
+
     setModalData({ type, title });
     setModalContent(content);
     setModalOpen(true);
@@ -884,6 +920,15 @@ const Dashboard = () => {
                       onClick={handleClearFilters}
                     >
                       Clear Filters
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-11 px-4 bg-purple-600 hover:bg-purple-700 text-white border-0"
+                      onClick={() => openModal("farmer_summary")}
+                      disabled={loading || invoices.length === 0}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Farmer Summary
                     </Button>
                     <Button
                       variant="outline"
@@ -1295,6 +1340,96 @@ const Dashboard = () => {
                       })()}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+
+              {modalData.type === "farmer_summary" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">
+                      Farmer-wise Contribution ({modalContent.length} farmers)
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Sorted by visit count (highest first)
+                    </p>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-purple-50">
+                        <TableHead>Farmer ID</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead className="text-center">Visits</TableHead>
+                        <TableHead className="text-right">Total Billed</TableHead>
+                        <TableHead className="text-right">Amount Paid</TableHead>
+                        <TableHead className="text-right">Pending</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {modalContent.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No data found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        (modalContent as FarmerSummaryItem[]).map((f, i) => (
+                          <TableRow key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                            <TableCell className="font-mono text-xs">{f.farmerId}</TableCell>
+                            <TableCell className="font-semibold">{f.farmerName}</TableCell>
+                            <TableCell>{f.farmerPhone}</TableCell>
+                            <TableCell className="text-center">
+                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-bold text-sm">
+                                {f.visitCount}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              ₹{f.totalBilled.toLocaleString("en-IN")}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-green-600">
+                              ₹{f.totalPaid.toLocaleString("en-IN")}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-red-500">
+                              ₹{f.totalPending.toLocaleString("en-IN")}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+
+                  {/* Footer totals */}
+                  {modalContent.length > 0 && (() => {
+                    const totals = (modalContent as FarmerSummaryItem[]).reduce(
+                      (acc, f) => ({
+                        visits: acc.visits + f.visitCount,
+                        billed: acc.billed + f.totalBilled,
+                        paid: acc.paid + f.totalPaid,
+                        pending: acc.pending + f.totalPending,
+                      }),
+                      { visits: 0, billed: 0, paid: 0, pending: 0 },
+                    );
+                    return (
+                      <div className="grid grid-cols-4 gap-4 pt-2 border-t">
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">Total Visits</p>
+                          <p className="text-lg font-bold text-purple-700">{totals.visits}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">Total Billed</p>
+                          <p className="text-lg font-bold">₹{totals.billed.toLocaleString("en-IN")}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">Total Paid</p>
+                          <p className="text-lg font-bold text-green-600">₹{totals.paid.toLocaleString("en-IN")}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">Total Pending</p>
+                          <p className="text-lg font-bold text-red-500">₹{totals.pending.toLocaleString("en-IN")}</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

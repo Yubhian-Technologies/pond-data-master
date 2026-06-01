@@ -28,6 +28,13 @@ import {
 } from "@/components/ui/table";
 import { Plus, Search, User, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { db } from "./firebase";
 import {
@@ -70,6 +77,38 @@ const LOCATION_NAME_TO_CODE: Record<string, string> = {
   ganapavaram: "GVRM",
   juvvalapalem: "JP",
 };
+
+const STATE_OPTIONS = [
+  "ANDHRA PRADESH",
+  "TELANGANA",
+  "TAMIL NADU",
+  "KARNATAKA",
+  "OTHERS",
+];
+
+const DISTRICT_BY_STATE: Record<string, string[]> = {
+  "ANDHRA PRADESH": ["WEST GODAVARI", "EAST GODAVARI", "KRISHNA", "ELURU", "NELLORE", "ONGOLE", "KADAPA", "OTHERS"],
+  "TELANGANA":      ["KHAMMAM", "NALGONDA", "WARANGAL", "HYDERABAD", "OTHERS"],
+  "TAMIL NADU":     ["CHENNAI", "NAGAPATTINAM", "CUDDALORE", "OTHERS"],
+  "KARNATAKA":      ["UDUPI", "BANGALORE", "MANGALORE", "OTHERS"],
+  "OTHERS":         ["OTHERS"],
+};
+
+const WATER_SOURCE_OPTIONS = [
+  "CANAL WATER",
+  "BORE WATER",
+  "CREEK WATER",
+  "CANAL/BORE WATER",
+  "OTHERS",
+];
+
+const SPECIES_OPTIONS = [
+  "L.VANNAMEI",
+  "P.MONODON TIGAR",
+  "FISH",
+  "POLY CULTURE",
+  "OTHERS",
+];
 
 const Farmers = () => {
   const { session } = useUserSession();
@@ -187,6 +226,19 @@ const Farmers = () => {
     species: "",
   });
 
+  // Dropdown selection trackers — "OTHERS" triggers a free-text input
+  const [stateDropdown, setStateDropdown] = useState("");
+  const [districtDropdown, setDistrictDropdown] = useState("");
+  const [waterSourceDropdown, setWaterSourceDropdown] = useState("");
+  const [speciesDropdown, setSpeciesDropdown] = useState("");
+
+  const resetDropdowns = () => {
+    setStateDropdown("");
+    setDistrictDropdown("");
+    setWaterSourceDropdown("");
+    setSpeciesDropdown("");
+  };
+
   const handleEdit = (farmer: Farmer) => {
     setEditMode(true);
     setEditFarmerId(farmer.id);
@@ -200,6 +252,15 @@ const Farmers = () => {
       cultureAreas: farmer.cultureAreas.toString(),
       species: farmer.species,
     });
+    // Restore dropdown selections — if saved value not in list, show OTHERS + free text
+    setStateDropdown(STATE_OPTIONS.includes(farmer.state) ? farmer.state : "OTHERS");
+    setDistrictDropdown(
+      Object.values(DISTRICT_BY_STATE).flat().includes(farmer.district)
+        ? farmer.district
+        : "OTHERS",
+    );
+    setWaterSourceDropdown(WATER_SOURCE_OPTIONS.includes(farmer.waterSource) ? farmer.waterSource : "OTHERS");
+    setSpeciesDropdown(SPECIES_OPTIONS.includes(farmer.species) ? farmer.species : "OTHERS");
     setOpen(true);
   };
 
@@ -333,6 +394,7 @@ const Farmers = () => {
         cultureAreas: "",
         species: "",
       });
+      resetDropdowns();
 
       fetchFarmers();
     } catch (err) {
@@ -420,45 +482,113 @@ const Farmers = () => {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
+                      {/* State */}
                       <div className="space-y-2">
                         <Label>State *</Label>
-                        <Input
-                          value={formData.state}
-                          onChange={(e) =>
-                            setFormData({ ...formData, state: e.target.value })
-                          }
-                          required
-                        />
+                        <Select
+                          value={stateDropdown}
+                          onValueChange={(val) => {
+                            setStateDropdown(val);
+                            setDistrictDropdown("");
+                            setFormData((prev) => ({
+                              ...prev,
+                              state: val === "OTHERS" ? "" : val,
+                              district: "",
+                            }));
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select state" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATE_OPTIONS.map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {stateDropdown === "OTHERS" && (
+                          <Input
+                            placeholder="Enter state name"
+                            value={formData.state}
+                            onChange={(e) =>
+                              setFormData({ ...formData, state: e.target.value })
+                            }
+                            required
+                          />
+                        )}
                       </div>
+
+                      {/* District — options depend on selected state */}
                       <div className="space-y-2">
                         <Label>District *</Label>
-                        <Input
-                          value={formData.district}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              district: e.target.value,
-                            })
-                          }
-                          required
-                        />
+                        <Select
+                          value={districtDropdown}
+                          onValueChange={(val) => {
+                            setDistrictDropdown(val);
+                            setFormData((prev) => ({
+                              ...prev,
+                              district: val === "OTHERS" ? "" : val,
+                            }));
+                          }}
+                          disabled={!stateDropdown}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={stateDropdown ? "Select district" : "Select state first"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(DISTRICT_BY_STATE[stateDropdown] ?? []).map((d) => (
+                              <SelectItem key={d} value={d}>{d}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {districtDropdown === "OTHERS" && (
+                          <Input
+                            placeholder="Enter district name"
+                            value={formData.district}
+                            onChange={(e) =>
+                              setFormData({ ...formData, district: e.target.value })
+                            }
+                            required
+                          />
+                        )}
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
+                      {/* Water Source */}
                       <div className="space-y-2">
                         <Label>Water Source *</Label>
-                        <Input
-                          value={formData.waterSource}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              waterSource: e.target.value,
-                            })
-                          }
-                          required
-                        />
+                        <Select
+                          value={waterSourceDropdown}
+                          onValueChange={(val) => {
+                            setWaterSourceDropdown(val);
+                            setFormData((prev) => ({
+                              ...prev,
+                              waterSource: val === "OTHERS" ? "" : val,
+                            }));
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select water source" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {WATER_SOURCE_OPTIONS.map((w) => (
+                              <SelectItem key={w} value={w}>{w}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {waterSourceDropdown === "OTHERS" && (
+                          <Input
+                            placeholder="Enter water source"
+                            value={formData.waterSource}
+                            onChange={(e) =>
+                              setFormData({ ...formData, waterSource: e.target.value })
+                            }
+                            required
+                          />
+                        )}
                       </div>
+
                       <div className="space-y-2">
                         <Label>Culture Areas (acres) *</Label>
                         <Input
@@ -473,18 +603,39 @@ const Farmers = () => {
                           required
                         />
                       </div>
+
+                      {/* Species */}
                       <div className="space-y-2">
                         <Label>Species *</Label>
-                        <Input
-                          value={formData.species}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              species: e.target.value,
-                            })
-                          }
-                          required
-                        />
+                        <Select
+                          value={speciesDropdown}
+                          onValueChange={(val) => {
+                            setSpeciesDropdown(val);
+                            setFormData((prev) => ({
+                              ...prev,
+                              species: val === "OTHERS" ? "" : val,
+                            }));
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select species" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SPECIES_OPTIONS.map((sp) => (
+                              <SelectItem key={sp} value={sp}>{sp}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {speciesDropdown === "OTHERS" && (
+                          <Input
+                            placeholder="Enter species name"
+                            value={formData.species}
+                            onChange={(e) =>
+                              setFormData({ ...formData, species: e.target.value })
+                            }
+                            required
+                          />
+                        )}
                       </div>
                     </div>
 
@@ -506,6 +657,7 @@ const Farmers = () => {
                             cultureAreas: "",
                             species: "",
                           });
+                          resetDropdowns();
                         }}
                       >
                         Cancel

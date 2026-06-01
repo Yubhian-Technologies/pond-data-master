@@ -105,7 +105,7 @@ export default function PLForm({
     foulGill: ["Absent"],
     foulAbdomen: ["Absent"],
     salinityPercent: ["100%", "90%", "80%"],
-    sizeVariation: ["<5%", "<10%"],
+    sizeVariation: ["<5%", "1%", "2%", "3%", "4%", "5%", "<10%"],
     totalScore: Array.from({ length: 11 }, (_, i) => (90 + i + "%").toString()),
     // NEW: MGR and MGR% will be handled separately below
   };
@@ -283,9 +283,28 @@ export default function PLForm({
           if (localInvoice?.checkedBy) {
             setCheckedBy(localInvoice.checkedBy);
           }
+
+          const fieldDefaults: Record<string, string> = {
+            sizeVariation: "<5%",
+            mgr: "4:1",
+            mgrPercent: "100",
+            hp: "Full",
+            shg: "Absent",
+            necAppend: "Absent",
+            necRostrum: "Absent",
+            necGill: "Absent",
+            necMuscle: "Absent",
+            foulAppend: "Absent",
+            foulGill: "Absent",
+            foulAbdomen: "Absent",
+            salinityPercent: "100%",
+          };
+
           const fresh: any = {};
           Object.keys(emptyPLData).forEach((key) => {
-            fresh[key] = createEmptyArray(count);
+            fresh[key] = fieldDefaults[key]
+              ? Array(count).fill(fieldDefaults[key])
+              : createEmptyArray(count);
           });
           finalPlData = fresh;
         }
