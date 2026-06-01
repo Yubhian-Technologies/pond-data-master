@@ -150,6 +150,8 @@ const Dashboard = () => {
 
   const [exportData, setExportData] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
+  // Maps Firestore doc ID → human-readable farmerId (e.g. ADC_BVRM_FR_001)
+  const [farmerIdMap, setFarmerIdMap] = useState<Record<string, string>>({});
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState<ModalData>({
@@ -256,14 +258,17 @@ const Dashboard = () => {
 
       const farmersSnap = await getDocs(farmersColl);
       const farmerAddressMap: Record<string, string> = {};
+      const newFarmerIdMap: Record<string, string> = {};
 
       farmersSnap.forEach((farmerDoc) => {
         const f = farmerDoc.data();
-
         const fullAddress = f.address ? f.address : "";
-
         farmerAddressMap[farmerDoc.id] = fullAddress || "N/A";
+        // Map Firestore doc ID → human-readable farmerId field
+        if (f.farmerId) newFarmerIdMap[farmerDoc.id] = f.farmerId;
       });
+
+      setFarmerIdMap(newFarmerIdMap);
       const totalFarmers = farmersSnap.size;
 
       const isDateFiltered = !!startDate && !!endDate;
@@ -751,8 +756,11 @@ const Dashboard = () => {
       invoices.forEach((inv) => {
         const key = inv.farmerId || inv.farmerName;
         if (!farmerMap.has(key)) {
+          // Resolve human-readable ID (e.g. ADC_BVRM_FR_001) from the map
+          const readableFarmerId =
+            farmerIdMap[inv.farmerId] || inv.farmerId || "N/A";
           farmerMap.set(key, {
-            farmerId: inv.farmerId || "N/A",
+            farmerId: readableFarmerId,
             farmerName: inv.farmerName,
             farmerPhone: inv.farmerPhone || "N/A",
             visitCount: 0,
