@@ -148,13 +148,13 @@ export default function PCRReport({
             };
           });
 
-          allReports.sort((a, b) => {
-            const numA =
-              parseInt(a.sampleCode.toString().replace(/\D/g, "")) || 0;
-            const numB =
-              parseInt(b.sampleCode.toString().replace(/\D/g, "")) || 0;
-            return numA - numB;
-          });
+          // allReports.sort((a, b) => {
+          //   const numA =
+          //     parseInt(a.sampleCode.toString().replace(/\D/g, "")) || 0;
+          //   const numB =
+          //     parseInt(b.sampleCode.toString().replace(/\D/g, "")) || 0;
+          //   return numA - numB;
+          // });
 
           if (!compact && allReports.length > 0) {
             setFarmerInfo(allReports[0].farmerInfo);
