@@ -95,15 +95,15 @@ export default function PLForm({
 
   // Dropdown options for special fields
   const fieldOptions: Record<string, string[]> = {
-    hp: ["Full", "Shrink"],
+    hp: ["Full", "1%", "2%", "3%", "4%", "5%"],
     shg: ["Present", "Absent"],
-    necAppend: ["Absent"],
-    necRostrum: ["Absent"],
-    necGill: ["Absent"],
-    necMuscle: ["Absent"],
-    foulAppend: ["Absent"],
-    foulGill: ["Absent"],
-    foulAbdomen: ["Absent"],
+    necAppend: ["Absent", "1%", "2%", "3%", "4%", "5%"],
+    necRostrum: ["Absent", "1%", "2%", "3%", "4%", "5%"],
+    necGill: ["Absent", "1%", "2%", "3%", "4%", "5%"],
+    necMuscle: ["Absent", "1%", "2%", "3%", "4%", "5%"],
+    foulAppend: ["Absent", "1%", "2%", "3%", "4%", "5%"],
+    foulGill: ["Absent", "1%", "2%", "3%", "4%", "5%"],
+    foulAbdomen: ["Absent", "1%", "2%", "3%", "4%", "5%"],
     salinityPercent: ["100%", "90%", "80%"],
     sizeVariation: ["<5%", "1%", "2%", "3%", "4%", "5%", "<10%"],
     totalScore: Array.from({ length: 11 }, (_, i) => (90 + i + "%").toString()),

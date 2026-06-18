@@ -119,8 +119,12 @@ export default function PCRReport({
             const data = d.data();
             const sampleId = d.id.replace(/^sample_/, "");
 
-            if (!techName && (data.technicianName || data.reportedBy)) {
-              techName = data.technicianName || data.reportedBy || "";
+            if (
+              !techName &&
+              (data.checkedBy || data.technicianName || data.reportedBy)
+            ) {
+              techName =
+                data.checkedBy || data.technicianName || data.reportedBy || "";
             }
 
             return {
@@ -173,7 +177,8 @@ export default function PCRReport({
           if (snap.exists()) {
             const data = snap.data();
 
-            techName = data.technicianName || data.reportedBy || "";
+            techName =
+              data.checkedBy || data.technicianName || data.reportedBy || "";
 
             setFarmerInfo({
               farmerName: data.farmerName || "",
@@ -203,18 +208,12 @@ export default function PCRReport({
           }
         }
 
-        if (!techName && session?.technicianName) {
-          techName = session.technicianName;
-        }
-
-        setTechnicianName(techName);
+        setTechnicianName(techName || "______________________");
       } catch (err) {
         console.error("Error fetching PCR report:", err);
         setReports([]);
         setFarmerInfo(null);
-        if (session?.technicianName) {
-          setTechnicianName(session.technicianName);
-        }
+        setTechnicianName("______________________");
       } finally {
         setLoading(false);
       }
@@ -546,7 +545,9 @@ export default function PCRReport({
                 {/* Graph name caption */}
                 {r.graphName && (
                   <div className="py-3 px-4 text-center w-full bg-white border-t border-gray-100">
-                    <p className="text-sm font-semibold text-gray-800">{r.graphName}</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {r.graphName}
+                    </p>
                   </div>
                 )}
               </div>

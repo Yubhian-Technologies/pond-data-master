@@ -419,10 +419,10 @@ const SoilReport: React.FC<SoilReportProps> = ({
           </div>
 
           <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
-            Mobile
+            Farmer UID
           </div>
           <div className="col-span-1 border-r border-black p-1">
-            {formData.mobile || "-"}
+            {formData.farmerUID || "-"}
           </div>
 
           <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
@@ -434,17 +434,17 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
           {/* Row 2 */}
           <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-            Farmer UID
+            Mobile
           </div>
           <div className="col-span-1 border-r border-t border-black p-1">
-            {formData.farmerUID || "-"}
+            {formData.mobile || "-"}
           </div>
 
           <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-            Farmer Address
+            Report Id
           </div>
           <div className="col-span-1 border-r border-t border-black p-1 break-words whitespace-normal">
-            {formData.farmerAddress || "-"}
+            {invoiceId || "-"}
           </div>
 
           <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
@@ -456,10 +456,10 @@ const SoilReport: React.FC<SoilReportProps> = ({
 
           {/* Row 3 */}
           <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-            Report Id
+             Farmer Address Report Id
           </div>
           <div className="col-span-1 border-t border-black p-1">
-            {invoiceId || "-"}
+            {formData.farmerAddress || "-"}
           </div>
 
           <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
