@@ -339,6 +339,19 @@ const SoilReport: React.FC<SoilReportProps> = ({
     fetchLocationDetails();
   }, [locationId]);
 
+  const formatTimeWithAMPM = (timeStr: string | undefined): string => {
+    if (!timeStr || timeStr === "-") return "-";
+    try {
+      const [hours, minutes] = timeStr.split(":");
+      const hour = parseInt(hours, 10);
+      const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+      const period = hour < 12 ? "AM" : "PM";
+      return `${displayHour.toString().padStart(2, "0")}:${minutes} ${period}`;
+    } catch {
+      return timeStr;
+    }
+  };
+
   if (loading)
     return <p className="text-center py-12 text-xl">Loading Soil Report...</p>;
   if (samples.length === 0 && formData.farmerName === "") {
@@ -409,73 +422,70 @@ const SoilReport: React.FC<SoilReportProps> = ({
           </h2>
         </div>
 
-        <div className="grid grid-cols-6 gap-0 text-sm mb-6 border border-black">
-          {/* Row 1 */}
-          <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
-            Farmer Name
-          </div>
-          <div className="col-span-1 border-r border-black p-1 break-words whitespace-normal">
-            {formData.farmerName || "-"}
-          </div>
-
-          <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
-            Farmer UID
-          </div>
-          <div className="col-span-1 border-r border-black p-1">
-            {formData.farmerUID || "-"}
-          </div>
-
-          <div className="col-span-1 border-r border-black p-1 font-semibold bg-gray-100 text-start">
-            Sample Date
-          </div>
-          <div className="col-span-1 border-black p-1">
-            {formatDateDDMMYYYY(formData.sampleDate)}
-          </div>
-
-          {/* Row 2 */}
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-            Mobile
-          </div>
-          <div className="col-span-1 border-r border-t border-black p-1">
-            {formData.mobile || "-"}
-          </div>
-
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-            Report Id
-          </div>
-          <div className="col-span-1 border-r border-t border-black p-1 break-words whitespace-normal">
-            {invoiceId || "-"}
-          </div>
-
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-            Sample Collection Time
-          </div>
-          <div className="col-span-1 border-t border-black p-1">
-            {formatDateDDMMYYYY(formData.sampleCollectionTime)}
-          </div>
-
-          {/* Row 3 */}
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-             Farmer Address Report Id
-          </div>
-          <div className="col-span-1 border-t border-black p-1">
-            {formData.farmerAddress || "-"}
-          </div>
-
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-            Source of Soil
-          </div>
-          <div className="col-span-1 border-r border-t border-black p-1">
-            {formData.sourceOfSoil || "-"}
-          </div>
-
-          <div className="col-span-1 border-r border-t border-black p-1 font-semibold bg-gray-100 text-start">
-            No. of Samples
-          </div>
-          <div className="col-span-1 border-r border-t border-black p-1">
-            {formData.noOfSamples || "-"}
-          </div>
-        </div>
+        <table className="w-full text-sm mb-6 border-2 border-black">
+          <tbody>
+            <tr>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                Farmer Name
+              </td>
+              <td className="border border-black px-4 py-2 break-words whitespace-normal">
+                {formData.farmerName || "-"}
+              </td>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                Farmer ID
+              </td>
+              <td className="border border-black px-4 py-2">
+                {formData.farmerUID || "-"}
+              </td>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                Report Date
+              </td>
+              <td className="border border-black px-4 py-2">
+                {formatDateDDMMYYYY(formData.reportDate)}
+              </td>
+            </tr>
+            <tr>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                Mobile No
+              </td>
+              <td className="border border-black px-4 py-2">
+                {formData.mobile || "-"}
+              </td>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                Report ID
+              </td>
+              <td className="border border-black px-4 py-2">
+                {invoiceId || "-"}
+              </td>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                Report Time
+              </td>
+              <td className="border border-black px-4 py-2">
+                {formatTimeWithAMPM(formData.reportTime)}
+              </td>
+            </tr>
+            <tr>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                Address
+              </td>
+              <td className="border border-black px-4 py-2 break-words whitespace-normal">
+                {formData.farmerAddress || "-"}
+              </td>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                No Of Samples
+              </td>
+              <td className="border border-black px-4 py-2">
+                {formData.noOfSamples || "-"}
+              </td>
+              <td className="border border-black px-4 py-2 font-semibold bg-gray-100">
+                Source of Soil
+              </td>
+              <td className="border border-black px-4 py-2">
+                {formData.sourceOfSoil || "-"}
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
         <table
           className="w-full mb-4 text-xs"

@@ -501,47 +501,45 @@ const WaterReport: React.FC<WaterReportProps> = ({
                 </td>
                 <td className="border px-4 py-2">{formData.farmerName}</td>
                 <td className="font-semibold bg-gray-100 border px-4 py-2">
-                  Mobile
+                  Farmer ID
+                </td>
+                <td className="border px-4 py-2">{formData.farmerUID || "-"}</td>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">
+                  Report Date
+                </td>
+                <td className="border px-4 py-2">
+                  {formatDateDDMMYYYY(formData.reportDate)}
+                </td>
+              </tr>
+              <tr>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">
+                  Mobile No
                 </td>
                 <td className="border px-4 py-2">{formData.mobile}</td>
                 <td className="font-semibold bg-gray-100 border px-4 py-2">
-                  Sample Collection time
-                </td>
-                <td className="border px-4 py-2">
-                  {formatTimeWithAMPM(formData.sampleCollectionTime)}
-                </td>
-              </tr>
-              <tr>
-                <td className="font-semibold bg-gray-100 border px-4 py-2">
-                  Report Id
+                  Report ID
                 </td>
                 <td className="border px-4 py-2">{invoiceId || "-"}</td>
                 <td className="font-semibold bg-gray-100 border px-4 py-2">
-                  Source
-                </td>
-                <td className="border px-4 py-2">{formData.sourceOfWater}</td>
-                <td className="font-semibold bg-gray-100 border px-4 py-2">
-                  No. of samples
-                </td>
-                <td className="border px-4 py-2">{formData.noOfSamples}</td>
-              </tr>
-              <tr>
-                <td className="font-semibold bg-gray-100 border px-4 py-2">
-                  Farmer ID
+                  Report Time
                 </td>
                 <td className="border px-4 py-2">
-                  {formData.farmerUID || "-"}
+                  {formatTimeWithAMPM(formData.reportTime)}
                 </td>
+              </tr>
+              <tr>
                 <td className="font-semibold bg-gray-100 border px-4 py-2">
                   Address
                 </td>
                 <td className="border px-4 py-2">{formData.farmerAddress}</td>
                 <td className="font-semibold bg-gray-100 border px-4 py-2">
-                  Sample Date
+                  No Of Samples
                 </td>
-                <td className="border px-4 py-2">
-                  {formatDateDDMMYYYY(formData.sampleDate)}
+                <td className="border px-4 py-2">{formData.noOfSamples}</td>
+                <td className="font-semibold bg-gray-100 border px-4 py-2">
+                  Water Source
                 </td>
+                <td className="border px-4 py-2">{formData.sourceOfWater}</td>
               </tr>
             </tbody>
           </table>

@@ -597,26 +597,6 @@ export default function PCRReport({
                 {farmerInfo.farmerName || "-"}
               </td>
               <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
-                Address
-              </td>
-              <td className="border-2 border-black px-6 py-3">
-                {farmerInfo.address || "-"}
-              </td>
-              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
-                Sample Collected
-              </td>
-              <td className="border-2 border-black px-6 py-3">
-                {formatDateDDMMYYYY(farmerInfo.sampleCollectionTime)}
-              </td>
-            </tr>
-            <tr>
-              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
-                Mobile
-              </td>
-              <td className="border-2 border-black px-6 py-3">
-                {farmerInfo.mobile || "-"}
-              </td>
-              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
                 Farmer ID
               </td>
               <td className="border-2 border-black px-6 py-3">
@@ -631,32 +611,43 @@ export default function PCRReport({
             </tr>
             <tr>
               <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
-                Report Time
+                Mobile No
               </td>
               <td className="border-2 border-black px-6 py-3">
-                {formatTimeWithAMPM(farmerInfo.reportTime)}
+                {farmerInfo.mobile || "-"}
               </td>
               <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
-                Report Id
+                Report ID
               </td>
               <td className="border-2 border-black px-6 py-3">
                 {invoiceId || "-"}
               </td>
               <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
-                No of samples
+                Report Time
               </td>
               <td className="border-2 border-black px-6 py-3">
-                {farmerInfo.noOfSamples || allSampleCount || "-"}
+                {formatTimeWithAMPM(farmerInfo.reportTime)}
               </td>
             </tr>
             <tr>
               <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
-                DOC
+                Address
+              </td>
+              <td className="border-2 border-black px-6 py-3">
+                {farmerInfo.address || "-"}
+              </td>
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
+                No Of Samples
+              </td>
+              <td className="border-2 border-black px-6 py-3">
+                {farmerInfo.noOfSamples || allSampleCount || "-"}
+              </td>
+              <td className="border-2 border-black px-6 py-3 font-bold bg-gray-100">
+                Doc
               </td>
               <td className="border-2 border-black px-6 py-3">
                 {farmerInfo.docDifference || "-"}
               </td>
-              <td className="border-2 border-black px-6 py-3" colSpan={4} />
             </tr>
           </tbody>
         </table>
