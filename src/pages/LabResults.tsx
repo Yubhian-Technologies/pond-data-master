@@ -313,7 +313,7 @@ export default function LabResults() {
         <div className="flex justify-between text-sm px-10 mb-10">
           <div>
             <p className="font-semibold">Reported by:</p>
-            <p className="mt-8 font-medium">{session?.technicianName || ""}</p>
+            <p className="mt-8 font-medium">{invoice?.technicianName || ""}</p>
           </div>
           <div>
             <p className="font-semibold">Checked by:</p>
