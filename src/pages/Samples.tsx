@@ -133,6 +133,11 @@ const Samples = () => {
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
 
+  // Edit bill dialog states
+  const [editBillDialogOpen, setEditBillDialogOpen] = useState(false);
+  const [editBillTotal, setEditBillTotal] = useState("");
+  const [editBillPaid, setEditBillPaid] = useState("");
+
   // Restore filters from localStorage + URL on first mount
   useEffect(() => {
     const saved = localStorage.getItem(FILTER_STORAGE_KEY);
@@ -609,6 +614,50 @@ const Samples = () => {
     setCurrentInvoice(null);
   };
 
+  const openEditBillDialog = (invoice: any) => {
+    setCurrentInvoice(invoice);
+    setEditBillTotal(String(invoice.total || ""));
+    setEditBillPaid(String(invoice.paidAmount || "0"));
+    setEditBillDialogOpen(true);
+  };
+
+  const handleEditBill = async () => {
+    if (!currentInvoice) return;
+    const newTotal = parseFloat(editBillTotal);
+    const newPaid = parseFloat(editBillPaid);
+    if (isNaN(newTotal) || newTotal < 0 || isNaN(newPaid) || newPaid < 0) {
+      toast({ title: "Error", description: "Enter valid amounts", variant: "destructive" });
+      return;
+    }
+    if (newPaid > newTotal) {
+      toast({ title: "Error", description: "Paid amount cannot exceed bill amount", variant: "destructive" });
+      return;
+    }
+    try {
+      const invoiceRef = doc(db, "locations", session.locationId!, "invoices", currentInvoice.id);
+      const newBalance = newTotal - newPaid;
+      await updateDoc(invoiceRef, {
+        total: newTotal,
+        paidAmount: newPaid,
+        balanceAmount: newBalance,
+        isPartialPayment: newBalance > 0,
+        paymentMode: newPaid >= newTotal ? (currentInvoice.paymentMode || "cash") : "pending",
+      });
+      setInvoices((prev) =>
+        prev.map((inv) =>
+          inv.id === currentInvoice.id
+            ? { ...inv, total: newTotal, paidAmount: newPaid, balanceAmount: newBalance }
+            : inv,
+        ),
+      );
+      toast({ title: "Success", description: "Bill updated successfully!" });
+      setEditBillDialogOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Error", description: "Failed to update bill.", variant: "destructive" });
+    }
+  };
+
   const handleSubmitAndGenerate = () => {
     if (!selectedFarmer || !dateOfCulture || selectedTypes.length === 0) return;
 
@@ -917,6 +966,15 @@ const Samples = () => {
                                     Add Payment
                                   </Button>
                                 )}
+
+                                <Button
+                                  className="bg-transparent text-black border hover:bg-orange-500 hover:text-white"
+                                  size="sm"
+                                  onClick={() => openEditBillDialog(sample)}
+                                  title="Edit bill amount / paid amount"
+                                >
+                                  Edit Bill
+                                </Button>
 
                                 <Button
                                   className="bg-transparent text-black border hover:bg-yellow-600 hover:text-white"
@@ -1321,6 +1379,69 @@ const Samples = () => {
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     Record Payment
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Edit Bill Dialog */}
+            <Dialog open={editBillDialogOpen} onOpenChange={setEditBillDialogOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Edit Bill Amount</DialogTitle>
+                  <DialogDescription>
+                    Invoice:{" "}
+                    <span className="font-semibold">{currentInvoice?.invoiceId}</span>{" "}
+                    | Farmer:{" "}
+                    <span className="font-semibold">{currentInvoice?.farmerName}</span>
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Total Bill Amount (₹)</Label>
+                    <Input
+                      type="number"
+                      value={editBillTotal}
+                      onChange={(e) => setEditBillTotal(e.target.value)}
+                      placeholder="Enter total bill amount"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Amount Already Paid (₹)</Label>
+                    <Input
+                      type="number"
+                      value={editBillPaid}
+                      onChange={(e) => setEditBillPaid(e.target.value)}
+                      placeholder="Enter amount paid"
+                      min="0"
+                    />
+                  </div>
+
+                  {editBillTotal && editBillPaid && (
+                    <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 rounded p-3">
+                      <div>
+                        <p className="text-muted-foreground">Total Bill</p>
+                        <p className="font-bold text-lg">₹{editBillTotal}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Pending</p>
+                        <p className={`font-bold text-lg ${parseFloat(editBillTotal) - parseFloat(editBillPaid) > 0 ? "text-red-600" : "text-green-600"}`}>
+                          ₹{Math.max(0, parseFloat(editBillTotal || "0") - parseFloat(editBillPaid || "0"))}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setEditBillDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleEditBill} className="bg-orange-500 hover:bg-orange-600">
+                    Save Changes
                   </Button>
                 </DialogFooter>
               </DialogContent>
