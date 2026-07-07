@@ -137,6 +137,8 @@ const Samples = () => {
   const [editBillDialogOpen, setEditBillDialogOpen] = useState(false);
   const [editBillTotal, setEditBillTotal] = useState("");
   const [editBillPaid, setEditBillPaid] = useState("");
+  const [editBillPaymentMode, setEditBillPaymentMode] = useState<"cash" | "qr" | "neft" | "pending" | "">("");
+  const [editBillTransactionRef, setEditBillTransactionRef] = useState("");
 
   // Restore filters from localStorage + URL on first mount
   useEffect(() => {
@@ -618,6 +620,8 @@ const Samples = () => {
     setCurrentInvoice(invoice);
     setEditBillTotal(String(invoice.total || ""));
     setEditBillPaid(String(invoice.paidAmount || "0"));
+    setEditBillPaymentMode(invoice.paymentMode || "pending");
+    setEditBillTransactionRef(invoice.transactionRef || "");
     setEditBillDialogOpen(true);
   };
 
@@ -633,6 +637,10 @@ const Samples = () => {
       toast({ title: "Error", description: "Paid amount cannot exceed bill amount", variant: "destructive" });
       return;
     }
+    if ((editBillPaymentMode === "qr" || editBillPaymentMode === "neft") && !editBillTransactionRef.trim()) {
+      toast({ title: "Error", description: "Transaction reference is required for QR/NEFT", variant: "destructive" });
+      return;
+    }
     try {
       const invoiceRef = doc(db, "locations", session.locationId!, "invoices", currentInvoice.id);
       const newBalance = newTotal - newPaid;
@@ -641,12 +649,13 @@ const Samples = () => {
         paidAmount: newPaid,
         balanceAmount: newBalance,
         isPartialPayment: newBalance > 0,
-        paymentMode: newPaid >= newTotal ? (currentInvoice.paymentMode || "cash") : "pending",
+        paymentMode: editBillPaymentMode || "pending",
+        transactionRef: (editBillPaymentMode === "qr" || editBillPaymentMode === "neft") ? editBillTransactionRef.trim() : null,
       });
       setInvoices((prev) =>
         prev.map((inv) =>
           inv.id === currentInvoice.id
-            ? { ...inv, total: newTotal, paidAmount: newPaid, balanceAmount: newBalance }
+            ? { ...inv, total: newTotal, paidAmount: newPaid, balanceAmount: newBalance, paymentMode: editBillPaymentMode }
             : inv,
         ),
       );
@@ -1419,6 +1428,35 @@ const Samples = () => {
                       min="0"
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label>Payment Mode</Label>
+                    <Select
+                      value={editBillPaymentMode}
+                      onValueChange={(v) => setEditBillPaymentMode(v as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="qr">QR Code / UPI</SelectItem>
+                        <SelectItem value="neft">NEFT / Bank Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(editBillPaymentMode === "qr" || editBillPaymentMode === "neft") && (
+                    <div className="space-y-2">
+                      <Label>Transaction Reference</Label>
+                      <Input
+                        value={editBillTransactionRef}
+                        onChange={(e) => setEditBillTransactionRef(e.target.value)}
+                        placeholder="Enter UPI ID / Reference No."
+                      />
+                    </div>
+                  )}
 
                   {editBillTotal && editBillPaid && (
                     <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 rounded p-3">
