@@ -921,17 +921,12 @@ const Samples = () => {
                                 <Button
                                   className="bg-transparent text-black border hover:bg-yellow-600 hover:text-white"
                                   size="sm"
-                                  disabled={!fullyCompleted}
                                   onClick={() =>
                                     navigate(
                                       `/lab-results/${sample.invoiceId}?mode=edit`,
                                     )
                                   }
-                                  title={
-                                    !fullyCompleted
-                                      ? "Edit available only after report is fully generated"
-                                      : "Edit report data"
-                                  }
+                                  title="Edit report data"
                                 >
                                   Edit
                                 </Button>
